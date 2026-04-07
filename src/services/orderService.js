@@ -1,7 +1,7 @@
 const CartData = require("../models/CartData");
 const Cart = require("../models/Cart");
 const Order = require("../models/Order");
-const Coupon = require("../models/Coupons");
+const CouponMobile = require("../models/Coupons");
 const User = require("../models/User");
 const OrderDetail = require("../models/OrderDetail");
 const Product = require("../models/Product");
@@ -830,7 +830,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
     });
 
     if (couponCode && phone) {
-        const coupon = await Coupon.findOneAndUpdate(
+        const coupon = await CouponMobile.findOneAndUpdate(
             {
                 coupon: couponCode,
                 phone: phone,
@@ -1532,7 +1532,7 @@ async function processPendingPayment(paymentId, payment) {
         });
 
         if (orderData.couponCode && orderData.mobileNumber) {
-            const coupon = await Coupon.findOneAndUpdate(
+            const coupon = await CouponMobile.findOneAndUpdate(
                 {
                     coupon: orderData.couponCode,
                     phone: orderData.mobileNumber,

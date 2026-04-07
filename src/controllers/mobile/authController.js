@@ -1,7 +1,7 @@
 const authService = require("../../services/authService");
 const userService = require("../../services/userService");
 const User = require('../../models/User');
-const Coupon = require("../../models/Coupons");
+const CouponMobile = require("../../models/Coupons");
 const CouponsCount = require("../../models/CouponsCount");
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require("../../config/jwtSecret");
@@ -327,7 +327,7 @@ exports.getCustomerID = async (req, res) => {
 
 exports.coupons = async (req, res) => {
     try {
-        const couponCount = await Coupon.countDocuments();
+        const couponCount = await CouponMobile.countDocuments();
         const newCouponCount = await CouponsCount.findOne();
         return res.status(200).json({
             success: true,
@@ -376,12 +376,12 @@ exports.createCoupon = async (req, res) => {
             });
         }
 
-        const existingUser = await Coupon.findOne({ phone, user_id: { $ne: user_id } });
+        const existingUser = await CouponMobile.findOne({ phone, user_id: { $ne: user_id } });
         if (existingUser) {
             return res.status(400).json({ message: "Phone already exists" });
         }
 
-        const lastCoupon = await Coupon.findOne().sort({ id: -1 }).exec();
+        const lastCoupon = await CouponMobile.findOne().sort({ id: -1 }).exec();
         const nextId = lastCoupon && typeof lastCoupon.id === "number" ? lastCoupon.id + 1 : 1;
 
         const couponCode = await generateCouponCode();
@@ -391,7 +391,7 @@ exports.createCoupon = async (req, res) => {
         const validUntil = new Date(validFrom);
         validUntil.setMonth(validFrom.getMonth() + 1);
 
-        const newCoupon = new Coupon({
+        const newCoupon = new CouponMobile({
             id: nextId,
             coupon: couponCode,
             name,
@@ -493,7 +493,7 @@ exports.createCoupon = async (req, res) => {
 const generateCouponCode = async () => {
     try {
         let nextNumber = 1;
-        const coupons = await Coupon.find();
+        const coupons = await CouponMobile.find();
 
         if (coupons && coupons.length > 0) {
             const lastCoupon = coupons[coupons.length - 1].coupon;
@@ -597,7 +597,7 @@ exports.checkCouponCode = async (req, res) => {
     }
 
     try {
-        const coupon = await Coupon.findOne({
+        const coupon = await CouponMobile.findOne({
             coupon: couponCode,
             status: "unused",
             phone: phone,
