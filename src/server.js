@@ -5,26 +5,40 @@ const cors = require("cors");
 const axios = require("axios");
 const compression = require("compression");
 const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
 const NodeCache = require("node-cache");
+const mongoose = require("mongoose");
 require("dotenv").config();
 
+const logger = require("./utilities/logger");
 const JWT_SECRET = require("./config/jwtSecret.js");
 const authMiddleware = require("./middleware/authMiddleware");
+const adminMiddleware = require("./middleware/adminMiddleware");
 const Coupon = require("./models/Coupon.js");
 const Cronjoblog = require("./models/Cronjoblog.js");
 const updateProducts = require("./scripts/updateProducts.js");
 const updateProductsNew = require("./scripts/updateProductsNew.js");
 const sendScheduledNotifications = require("./scripts/sendScheduledNotifications.js");
 
+// ==========================================
+// STARTUP VALIDATION
+// ==========================================
+
+const REQUIRED_ENV = ["MONGO_URI", "JWT_SECRET"];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    logger.fatal(`Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 // Ecommerce server controllers (inline routes)
 const { tabbyWebhook: ecommerceTabbyWebhook } = require("./controllers/ecommerce/publicController");
-
-// Mobile API controller (tabby webhook)
-const { tabbyWebhook: mobileTabbyWebhook } = require("./controllers/mobile/orderController");
 
 // ==========================================
 // ECOMMERCE ROUTES (consumed by: Storefront, User Dashboard, Admin Dashboard)
@@ -63,29 +77,60 @@ const cache = new NodeCache({ stdTTL: 1800 });
 
 const PORT = process.env.PORT || 5000;
 const BACKEND_URL = process.env.BACKEND_URL;
-const API_KEY = process.env.API_KEY;
-const PRODUCTS_URL = process.env.PRODUCTS_URL;
 const domain = process.env.DOMAIN;
+const isProduction = process.env.NODE_ENV === "production";
 const LOG_FILE = "cron.log";
 let cronJobRunning = false;
 
 // ==========================================
-// MIDDLEWARE STACK
+// SECURITY MIDDLEWARE
+// ==========================================
+
+// Security headers
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin for uploads/images
+  })
+);
+
+// Rate limiting on auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many attempts, please try again later." },
+});
+app.use("/user/login", authLimiter);
+app.use("/user/register", authLimiter);
+app.use("/admin/login", authLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+
+// Stricter rate limit for password reset
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: "Too many password reset attempts, please try again later." },
+});
+app.use("/user/forgot-password", passwordResetLimiter);
+app.use("/admin/forgot-password", passwordResetLimiter);
+app.use("/api/auth/forgot-password", passwordResetLimiter);
+
+// ==========================================
+// CORE MIDDLEWARE
 // ==========================================
 
 // Tabby webhook needs raw body BEFORE any body parsers
-// This handles the ecommerce server's tabby webhook (was at POST /tabby/webhook with auth)
 app.post("/tabby/webhook", bodyParser.raw({ type: "*/*" }), (req, res, next) => {
-  // Try ecommerce handler first (it was the original), fallback to mobile handler
-  // Both backends registered this path — use ecommerce version which includes auth check
   return ecommerceTabbyWebhook(req, res, next);
 });
 
 app.use(cookieParser());
 
-// CORS: Support both restricted (web clients) and open (mobile clients)
+// CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : [];
 
 app.use(
@@ -95,41 +140,67 @@ app.use(
       if (!origin) {
         return callback(null, true);
       }
-
       // Allow Apple Sign-In origin
       if (origin.includes("appleid.apple.com")) {
         return callback(null, true);
       }
-
       // Allow origins from environment variable
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
 );
 
-app.use(express.json());
+// Body parsing with size limits
+app.use(express.json({ limit: "10mb" }));
 app.use(compression());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (duration > 5000) {
+      logger.warn({ method: req.method, url: req.originalUrl, status: res.statusCode, duration: `${duration}ms` }, "Slow request");
+    }
+  });
+  next();
+});
+
+// ==========================================
+// HEALTH CHECK
+// ==========================================
+
+app.get("/health", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = { 0: "disconnected", 1: "connected", 2: "connecting", 3: "disconnecting" };
+  res.status(dbState === 1 ? 200 : 503).json({
+    status: dbState === 1 ? "healthy" : "unhealthy",
+    uptime: Math.floor(process.uptime()),
+    database: dbStatus[dbState] || "unknown",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ==========================================
 // INLINE ROUTES FROM ECOMMERCE SERVER.JS
-// These were defined directly in the ecommerce server.js, not in route files
 // ==========================================
 
 app.post("/api/user/auth/logout", (req, res) => {
-  res.clearCookie("user_token", {
-    domain: domain,
-    path: "/",
-  });
+  const cookieOptions = { domain: domain, path: "/" };
+  if (isProduction) {
+    cookieOptions.secure = true;
+    cookieOptions.sameSite = "strict";
+  }
+  res.clearCookie("user_token", cookieOptions);
   res.status(200).json({ message: "User logged out successfully" });
 });
 
@@ -138,7 +209,6 @@ app.get("/api/user/auth/check", (req, res) => {
   if (!token) {
     return res.json({ authenticated: false });
   }
-
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.json({ authenticated: false });
@@ -149,35 +219,16 @@ app.get("/api/user/auth/check", (req, res) => {
 
 app.get("/api/user/profile", authMiddleware("user"), async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      avatar,
-      username,
-      role,
-      phone,
-      authProvider: provider,
-    } = req.user;
-
+    const { name, email, avatar, username, role, phone, authProvider: provider } = req.user;
     const couponDoc = await Coupon.findOne({ phone });
     const state = !!couponDoc;
     const dataCoupon = couponDoc || [];
-
     res.json({
-      name,
-      email,
-      avatar,
-      username,
-      role,
-      phone,
-      provider,
-      coupon: {
-        data: dataCoupon,
-        status: state,
-      },
+      name, email, avatar, username, role, phone, provider,
+      coupon: { data: dataCoupon, status: state },
     });
   } catch (error) {
-    console.error("Profile Error:", error);
+    logger.error({ err: error }, "Profile Error");
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -213,12 +264,39 @@ const connectAndRun = async () => {
   app.use("/api", mobileCouponsRoutes);
   app.use("/api", mobilePublicRoutes);
   app.use("/api", mobileBannerImages);
+
+  // ==========================================
+  // GLOBAL ERROR HANDLER (must be after all routes)
+  // ==========================================
+  app.use((err, req, res, _next) => {
+    // CORS errors
+    if (err.message === "Not allowed by CORS") {
+      return res.status(403).json({ success: false, message: "CORS not allowed" });
+    }
+
+    logger.error({
+      err: err,
+      method: req.method,
+      url: req.originalUrl,
+      body: req.method === "GET" ? undefined : "[redacted]",
+    }, "Unhandled error");
+
+    res.status(err.status || 500).json({
+      success: false,
+      message: isProduction ? "Internal server error" : err.message,
+    });
+  });
+
+  // 404 handler
+  app.use((req, res) => {
+    res.status(404).json({ success: false, message: "Route not found" });
+  });
 };
 
 connectAndRun();
 
 // ==========================================
-// CRON JOBS (from Ecommerce server)
+// CRON JOBS
 // ==========================================
 
 // Product sync: daily at 3 AM Dubai time
@@ -228,50 +306,23 @@ cron.schedule(
     if (cronJobRunning) return;
     cronJobRunning = true;
     const date = new Date();
-    const day = date.toLocaleString("en-US", {
-      weekday: "long",
-      timeZone: "Asia/Dubai",
-    });
-    const dateStr = date.toLocaleString("en-US", {
-      day: "numeric",
-      month: "numeric",
-      year: "numeric",
-      timeZone: "Asia/Dubai",
-    });
-    const timeStr = date.toLocaleString("en-US", {
-      hour: "2-digit",
-      minute: "numeric",
-      second: "numeric",
-      hour12: true,
-      timeZone: "Asia/Dubai",
-    });
+    const day = date.toLocaleString("en-US", { weekday: "long", timeZone: "Asia/Dubai" });
+    const dateStr = date.toLocaleString("en-US", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Dubai" });
+    const timeStr = date.toLocaleString("en-US", { hour: "2-digit", minute: "numeric", second: "numeric", hour12: true, timeZone: "Asia/Dubai" });
     const formattedDate = `${day}, ${dateStr}, ${timeStr}`;
     const logMessage1 = `Cron job executing at: ${formattedDate}\n`;
     const logMessage2 = `Cron job executing at: ${formattedDate}`;
 
     fs.appendFileSync(LOG_FILE, logMessage1);
+    logger.info("Product sync cron started");
 
     try {
       const { storedCount, updatedCount } = await updateProducts();
       const { parkedCount, inactiveCount } = await updateProductsNew();
       const updatedDate = new Date();
-      const updatedDay = updatedDate.toLocaleString("en-US", {
-        weekday: "long",
-        timeZone: "Asia/Dubai",
-      });
-      const updatedDateStr = updatedDate.toLocaleString("en-US", {
-        day: "numeric",
-        month: "numeric",
-        year: "numeric",
-        timeZone: "Asia/Dubai",
-      });
-      const updatedTimeStr = updatedDate.toLocaleString("en-US", {
-        hour: "2-digit",
-        minute: "numeric",
-        second: "numeric",
-        hour12: true,
-        timeZone: "Asia/Dubai",
-      });
+      const updatedDay = updatedDate.toLocaleString("en-US", { weekday: "long", timeZone: "Asia/Dubai" });
+      const updatedDateStr = updatedDate.toLocaleString("en-US", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Dubai" });
+      const updatedTimeStr = updatedDate.toLocaleString("en-US", { hour: "2-digit", minute: "numeric", second: "numeric", hour12: true, timeZone: "Asia/Dubai" });
       const updatedFormattedDate = `${updatedDay}, ${updatedDateStr}, ${updatedTimeStr}`;
 
       const productsUpdatedMessage1 = `Products updated successfully at: ${updatedFormattedDate}\n`;
@@ -288,34 +339,29 @@ cron.schedule(
       });
       await cronLog.save();
 
+      logger.info({ storedCount, updatedCount, parkedCount, inactiveCount }, "Product sync completed");
+
       try {
         const response = await axios.get(`${BACKEND_URL}/categories`);
-        const categoriesUpdatedMessage = `${response.data.message} at ${updatedFormattedDate}\n`;
-        fs.appendFileSync(LOG_FILE, categoriesUpdatedMessage);
+        fs.appendFileSync(LOG_FILE, `${response.data.message} at ${updatedFormattedDate}\n`);
       } catch (apiError) {
-        const errorMessage = `Error calling API: ${apiError.message}\n`;
-        fs.appendFileSync(LOG_FILE, errorMessage);
+        fs.appendFileSync(LOG_FILE, `Error calling API: ${apiError.message}\n`);
       }
 
       try {
         const brandsResponse = await axios.get(`${BACKEND_URL}/brands`);
-        const brandsUpdatedMessage = `${brandsResponse.data.message} at ${updatedFormattedDate}\n`;
-        fs.appendFileSync(LOG_FILE, brandsUpdatedMessage);
+        fs.appendFileSync(LOG_FILE, `${brandsResponse.data.message} at ${updatedFormattedDate}\n`);
       } catch (apiError) {
-        const errorMessage = `Error calling /brands API: ${apiError.message}\n`;
-        fs.appendFileSync(LOG_FILE, errorMessage);
+        fs.appendFileSync(LOG_FILE, `Error calling /brands API: ${apiError.message}\n`);
       }
     } catch (error) {
-      const errorMessage = `Error updating products: ${error.message}\n`;
-      fs.appendFileSync(LOG_FILE, errorMessage);
+      logger.error({ err: error }, "Product sync cron failed");
+      fs.appendFileSync(LOG_FILE, `Error updating products: ${error.message}\n`);
     } finally {
       cronJobRunning = false;
     }
   },
-  {
-    scheduled: true,
-    timezone: "Asia/Dubai",
-  }
+  { scheduled: true, timezone: "Asia/Dubai" }
 );
 
 // Scheduled notifications: every minute
@@ -325,21 +371,46 @@ cron.schedule(
     try {
       await sendScheduledNotifications();
     } catch (error) {
-      console.error("Error in scheduled notifications cron job:", error);
+      logger.error({ err: error }, "Scheduled notifications cron failed");
     }
   },
-  {
-    scheduled: true,
-    timezone: "Asia/Dubai",
-  }
+  { scheduled: true, timezone: "Asia/Dubai" }
 );
 
 // ==========================================
-// START SERVER
+// START SERVER + GRACEFUL SHUTDOWN
 // ==========================================
 
-app.listen(PORT, () => {
-  console.log(`Bazaar Unified API running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Bazaar Unified API started");
+});
+
+function gracefulShutdown(signal) {
+  logger.info({ signal }, "Shutdown signal received, closing gracefully...");
+  server.close(() => {
+    logger.info("HTTP server closed");
+    mongoose.connection.close(false).then(() => {
+      logger.info("MongoDB connection closed");
+      process.exit(0);
+    });
+  });
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "Unhandled Promise Rejection");
+});
+
+process.on("uncaughtException", (error) => {
+  logger.fatal({ err: error }, "Uncaught Exception — shutting down");
+  process.exit(1);
 });
 
 module.exports = app;

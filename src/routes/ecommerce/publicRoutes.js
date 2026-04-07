@@ -106,8 +106,8 @@ router.post("/search-single-product", searchSingleProduct);
 router.post("/contact-us", contactUs);
 router.post("/news-letter", newsLetter);
 
-router.get("/get-newsletter-subscribers", getAllNewsLetters);
-router.post("/send-bulk-mails", sendBulkEmails);
+router.get("/get-newsletter-subscribers", adminMiddleware, getAllNewsLetters);
+router.post("/send-bulk-mails", adminMiddleware, sendBulkEmails);
 
 // router.get('/product-details/:id', productDetails);
 router.get("/random-products/:id", randomProducts);
@@ -141,27 +141,27 @@ router.get("/fetch-products-no-images", fetchProductsNoImages);
 router.post("/body-images-upload", editorBodyImagesUpload);
 router.post("/delete-body-images-upload", deleteFileByUrl);
 
-//  CMS Routes
+//  CMS Routes (GET is public for reading, POST requires admin for writing)
 
 router.get("/get-cms-data", getCmsData);
-router.post("/coupon-cms", CouponCms);
+router.post("/coupon-cms", adminMiddleware, CouponCms);
 router.get("/get-coupon-cms-data", getCouponCms);
-router.post("/header-info-cms", headerInfoCms);
-router.post("/slider-cms", sliderCms);
-router.post("/features-cms", featuresCms);
-router.post("/offers-cms", offersCms);
-router.post("/categoriesImages-cms", categoryImagesCms);
-router.post("/offerFilter-cms", offerFilterCms);
-router.post("/footerInfo-cms", FooterInfoCms);
-router.post("/about-cms", AboutCms);
-router.post("/shop-cms", ShopCms);
-router.post("/contact-cms", contactCms);
-router.post("/brandsLogo-cms", BrandsLogo);
+router.post("/header-info-cms", adminMiddleware, headerInfoCms);
+router.post("/slider-cms", adminMiddleware, sliderCms);
+router.post("/features-cms", adminMiddleware, featuresCms);
+router.post("/offers-cms", adminMiddleware, offersCms);
+router.post("/categoriesImages-cms", adminMiddleware, categoryImagesCms);
+router.post("/offerFilter-cms", adminMiddleware, offerFilterCms);
+router.post("/footerInfo-cms", adminMiddleware, FooterInfoCms);
+router.post("/about-cms", adminMiddleware, AboutCms);
+router.post("/shop-cms", adminMiddleware, ShopCms);
+router.post("/contact-cms", adminMiddleware, contactCms);
+router.post("/brandsLogo-cms", adminMiddleware, BrandsLogo);
 
 router.post("/update-coupon-count", updateCouponCount);
 router.get("/get-coupon-count", getCouponCount);
 
-router.get("/get-cron-logs", getCronLogs);
+router.get("/get-cron-logs", adminMiddleware, getCronLogs);
 
 router.post("/export-products-to-sheet", async (req, res) => {
   try {

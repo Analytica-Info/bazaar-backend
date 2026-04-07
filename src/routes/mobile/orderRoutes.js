@@ -14,7 +14,7 @@ router.post('/checkout-session-tabby', authMiddleware, orderController.checkoutS
 router.get('/verify-tabby-status', authMiddleware, orderController.verifyTabbyPayment);
 router.get('/address', authMiddleware, orderController.address);
 router.post('/address', authMiddleware, orderController.storeAddress);
-router.post("/order-status/:orderId", orderUpload.single("file"), orderController.updateOrderStatus);
+router.post("/order-status/:orderId", authMiddleware, orderUpload.single("file"), orderController.updateOrderStatus);
 router.delete("/address/:addressId", authMiddleware, orderController.deleteAddress);
 router.patch("/address/:addressId/set-primary", authMiddleware, orderController.setPrimaryAddress);
 
