@@ -1,6 +1,4 @@
-const { BannerImages } = require("../../models/BannerImages");
-const path = require("path");
-const fs = require("fs");
+const bannerService = require("../../services/bannerService");
 
 exports.createBanner = async (req, res) => {
     try {
@@ -14,31 +12,25 @@ exports.createBanner = async (req, res) => {
             return res.status(400).json({ message: "Banner image is required" });
         }
 
-        let newFile = req.file.path.replace(/\\/g, "/");
-        newFile = `${process.env.FRONTEND_BASE_URL}/${newFile}`;
-
-        const existing = await BannerImages.findOne({ name });
-        if (existing) {
-            return res.status(400).json({ message: "Banner name already exists" });
-        }
-
-        const banner = await BannerImages.create({ name, image: newFile });
+        const filePath = req.file.path.replace(/\\/g, "/");
+        const banner = await bannerService.createBanner(name, filePath);
 
         res.status(201).json({
             message: "Banner created successfully",
             banner,
         });
-    } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ message: err.message });
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
 exports.getAllBanners = async (req, res) => {
     try {
-        const banners = await BannerImages.find().sort({ createdAt: -1 });
+        const banners = await bannerService.getAllBanners();
         res.status(200).json({ banners });
-    } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+    } catch (err) {
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
@@ -46,50 +38,24 @@ exports.updateBanner = async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
+        const filePath = req.file?.path?.replace(/\\/g, "/") || null;
 
-        const banner = await BannerImages.findById(id);
-        if (!banner) {
-            return res.status(404).json({ message: "Banner not found" });
-        }
-
-        if (name) banner.name = name;
-
-        if (req.file) {
-            const oldPath = path.resolve(banner.image.replace(process.env.FRONTEND_BASE_URL + "/", ""));
-            if (fs.existsSync(oldPath)) {
-                fs.unlinkSync(oldPath);
-            }
-
-            let newFile = req.file.path.replace(/\\/g, "/");
-            banner.image = `${process.env.FRONTEND_BASE_URL}/${newFile}`;
-        }
-
-        await banner.save();
+        const banner = await bannerService.updateBanner(id, name, filePath);
 
         res.status(200).json({ message: "Banner updated successfully", banner });
-    } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ message: err.message });
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
 exports.deleteBanner = async (req, res) => {
     try {
         const { id } = req.params;
-
-        const banner = await BannerImages.findById(id);
-        if (!banner) {
-            return res.status(404).json({ message: "Banner not found" });
-        }
-
-        const oldPath = path.resolve(banner.image.replace(process.env.FRONTEND_BASE_URL + "/", ""));
-        if (fs.existsSync(oldPath)) {
-            fs.unlinkSync(oldPath);
-        }
-
-        await BannerImages.findByIdAndDelete(id);
-
+        await bannerService.deleteBanner(id);
         res.status(200).json({ message: "Banner deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+    } catch (err) {
+        if (err.status) return res.status(err.status).json({ message: err.message });
+        res.status(500).json({ message: "Server error", error: err.message });
     }
 };
