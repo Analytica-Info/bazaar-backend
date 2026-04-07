@@ -154,11 +154,10 @@ app.use(
   })
 );
 
-// Body parsing with size limits
+// Body parsing with size limits (Express 5 has built-in parsers)
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(compression());
-app.use(bodyParser.json({ limit: "10mb" }));
-app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
