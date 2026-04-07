@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const wishlistController = require('../../controllers/ecommerce/wishlistController');
+const wishlistController = require('../../controllers/shared/wishlistController');
 const authMiddleware = require('../../middleware/authMiddleware');
 
 router.get('/get-wishlist', authMiddleware('user'), wishlistController.getWishlist);
