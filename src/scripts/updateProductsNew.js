@@ -1,0 +1,502 @@
+const axios = require("axios");
+require("dotenv").config();
+const Product = require("../models/Product");
+const ProductId = require("../models/ProductId");
+const fs = require("fs");
+const API_KEY = process.env.API_KEY;
+
+const LOG_FILE = "cron.log";
+
+const updateProductsNew = async () => {
+  try {
+    console.log("Cron Job Start (Inactive & Parked)");
+    const allParkedProductIds = await filterParkProducts();
+    const parkedCountResult = await updateParkedDetails(allParkedProductIds);
+    const parkedCount = (typeof parkedCountResult === 'number') ? parkedCountResult : 0;
+    console.log(
+      "1 - Total After Filter Park Products : ",
+      allParkedProductIds.length
+    );
+    console.log("1 - Total Updated Parked Products : ", parkedCount);
+
+    const inactiveProductsIds = await filterActiveProducts();
+    const inactiveCountResult = await updateInactiveDetails(inactiveProductsIds);
+    const inactiveCount = (typeof inactiveCountResult === 'number') ? inactiveCountResult : 0;
+    console.log(
+      "2 - Total After Filter Active Products : ",
+      inactiveProductsIds.length
+    );
+    console.log("2 - Total Updated Inactive Products : ", inactiveCount);
+
+    await updateAllProductDiscounts();
+    await updateSoldItems();
+
+    return { parkedCount, inactiveCount };
+  } catch (error) {
+    console.error("Error fetching and storing product IDs:", error.message);
+    return { parkedCount: 0, inactiveCount: 0 };
+  }
+};
+
+const updateParkedDetails = async (productIds, res) => {
+  try {
+    let parkedCount = 0;
+    for (const id of productIds) {
+      const matchedProduct = await Product.findOne({
+        "variantsData.id": id.product,
+      });
+
+      if (matchedProduct) {
+        console.log(`Parent Parked Product Id: ${matchedProduct.product.id}`);
+        const itemId = matchedProduct.product.id;
+        const productDoc = await Product.findOne({ "product.id": itemId });
+        if (productDoc) {
+          const { inventoryLevel } = await fetchProductInventory(
+            itemId,
+            id.product,
+            id.qty,
+            id.status
+          );
+          const updatedVariants = productDoc.variantsData.map((variant) => {
+            if (variant.id === id.product) {
+              return {
+                ...variant,
+                qty: inventoryLevel,
+              };
+            }
+            return variant;
+          });
+
+          const totalQty = updatedVariants.reduce(
+            (sum, v) => sum + (v.qty || 0),
+            0
+          );
+          const status = totalQty === 0 ? false : true;
+          const webhook = "updateParkedDetails";
+          const webhookTime = await currentTime();
+
+          await Product.updateOne(
+            {
+              "product.id": itemId,
+            },
+            {
+              $set: {
+                variantsData: updatedVariants,
+                totalQty: totalQty,
+                status: status,
+                webhook,
+                webhookTime,
+              },
+            }
+          );
+
+          console.log(
+            `✅ Parked Sale Inventory Updated Product with ID : ${id.product} | Parent ID : ${itemId}`
+          );
+        }
+        parkedCount++;
+      } else {
+        console.log(
+          `❌ No Parked Product found for Variant ID : ${id.product} | Quantity : ${id.qty} | Status : ${id.status}`
+        );
+      }
+    }
+    console.log(`Parked Product details processed successfully.`);
+    const summaryMessage = `Total Updated Products: ${parkedCount}\n`;
+    console.log(summaryMessage);
+    fs.appendFileSync(LOG_FILE, summaryMessage);
+    return parkedCount;
+  } catch (error) {
+    console.error("Error processing product details:", error.message);
+    fs.appendFileSync(
+      LOG_FILE,
+      `Error processing product details: ${error.message}\n`
+    );
+    return 0;
+  }
+};
+
+const updateInactiveDetails = async (productIds, res) => {
+  try {
+    let inactiveCount = 0;
+    for (const id of productIds) {
+      const response = await axios.get(
+        `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const productDetail = response.data.data;
+      const onlineStatus = productDetail.ecwid_enabled_webstore;
+
+      const existingProductId = await ProductId.findOne({ productId: id });
+      const webhook = "updateParkedDetails";
+      const webhookTime = await currentTime();
+      if (existingProductId) {
+        await Product.updateOne(
+          { "product.id": id },
+          {
+            $set: {
+              status: onlineStatus === true,
+              webhook,
+              webhookTime,
+            },
+          }
+        );
+        console.log(
+          `✅ Inactive Product Details Updated Product with ID: ${id} : `
+        );
+        inactiveCount++;
+      }
+    }
+    console.log(`Inactive Product details processed successfully.`);
+    const summaryMessage = `Total Updated Products: ${inactiveCount}\n`;
+    console.log(summaryMessage);
+    fs.appendFileSync(LOG_FILE, summaryMessage);
+    return inactiveCount;
+  } catch (error) {
+    console.error("Error processing product details:", error.message);
+    fs.appendFileSync(
+      LOG_FILE,
+      `Error processing product details: ${error.message}\n`
+    );
+    return 0;
+  }
+};
+
+async function filterParkProducts() {
+  try {
+    const productsResponse = await axios.get(
+      "https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/search?type=sales&status=SAVED",
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const allSales = productsResponse.data.data || [];
+    const allParkedProductIds = [];
+
+    const parkedProductIds = new Set();
+
+    for (const sale of allSales) {
+      if (Array.isArray(sale.line_items)) {
+        for (const item of sale.line_items) {
+          if (item.product_id) {
+            parkedProductIds.add(item.product_id);
+            allParkedProductIds.push({
+              product: item.product_id,
+              qty: Math.floor(item.quantity),
+              status: item.status,
+            });
+          }
+        }
+      }
+    }
+
+    return allParkedProductIds;
+  } catch (error) {
+    console.warn(
+      "Error fetching park products from Lightspeed:",
+      error.message
+    );
+    return [];
+  }
+}
+
+async function filterActiveProducts() {
+  const allStoredProducts = [];
+  let after = "";
+
+  do {
+    const inventoryResponse = await axios.get(
+      `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products?page_size=10000&after=${after}`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const inventories = inventoryResponse.data;
+    allStoredProducts.push(...inventories.data);
+
+    after = inventories.version?.max || "";
+  } while (after);
+
+  const inactiveProducts = allStoredProducts.filter(
+    (product) => product.ecwid_enabled_webstore === false
+  );
+
+  const inactiveProductsIds = inactiveProducts.map((product) => product.id);
+
+  console.log(
+    `Found ${inactiveProductsIds.length} inactive OR webstore-disabled products (from input list).`
+  );
+
+  return inactiveProductsIds;
+}
+
+async function updateAllProductDiscounts() {
+  try {
+    const products = await Product.find({
+      $or: [{ status: { $exists: false } }, { status: true }],
+      totalQty: { $gt: 0 },
+    }).lean();
+
+    const productsWithDiscounts = await Promise.all(
+      products.map(async (product) => {
+        const discount = await calculateDiscount(product);
+        return { ...product, discount };
+      })
+    );
+
+    const maxDiscount = Math.max(
+      ...productsWithDiscounts.map((p) => p.discount || 0)
+    );
+
+    let count = 0;
+    for (let product of productsWithDiscounts) {
+      count++;
+
+      const webhook = "updateProductDiscounts";
+      const webhookTime = await currentTime();
+
+      const originalPrice = Number(
+        (product.product.price_standard?.tax_inclusive / 0.65).toFixed(2)
+      );
+
+      let highestDiscountPercentage = 0;
+      let highestDiscountVariant = null;
+      if (product.variantsData && product.variantsData.length > 0) {
+        product.variantsData.forEach((variant) => {
+          const discountPercentage = Number(
+            (((originalPrice - variant.price) / originalPrice) * 100).toFixed(2)
+          );
+
+          if (discountPercentage > highestDiscountPercentage) {
+            highestDiscountPercentage = discountPercentage;
+            highestDiscountVariant = variant;
+          }
+        });
+      }
+
+      await Product.updateOne(
+        { _id: product._id },
+        {
+          $set: {
+            discount: product.discount,
+            isHighest: product.discount === maxDiscount,
+            originalPrice: originalPrice,
+            discountedPrice: highestDiscountVariant?.price,
+            webhook,
+            webhookTime,
+          },
+        }
+      );
+    }
+  } catch (err) {
+    console.error("❌ Error updating discounts:", err);
+  }
+}
+
+async function updateSoldItems() {
+  try {
+    const saleItems = await getSalesItem();
+    const soldCounts = {};
+    for (const sale of saleItems) {
+      if (!sale.line_items || sale.line_items.length === 0) continue;
+
+      for (const item of sale.line_items) {
+        const productId = item.product_id?.toString();
+        const qty = item.quantity || 0;
+
+        if (!productId) continue;
+
+        if (!soldCounts[productId]) {
+          soldCounts[productId] = 0;
+        }
+        soldCounts[productId] += qty;
+      }
+    }
+
+    for (const [productId, soldQty] of Object.entries(soldCounts)) {
+      const product = await Product.findOne({
+        "variantsData.id": productId,
+      });
+
+      if (!product) {
+        continue;
+      }
+
+      const newTotalQty = Math.max((product.totalQty || 0) - soldQty, 0);
+      const safeSoldQty =
+        soldQty && typeof soldQty === "number" && soldQty > 0 ? soldQty : 0;
+
+      await Product.updateOne(
+        { _id: product._id },
+        {
+          $set: {
+            sold: safeSoldQty,
+          },
+        }
+      );
+    }
+
+    console.log("🎉 All sold products updated successfully");
+  } catch (err) {
+    console.error("❌ Error updating sold items:", err);
+  }
+}
+
+async function getSalesItem() {
+  const saleItems = [];
+  let after = "";
+
+  do {
+    const salesResponse = await axios.get(
+      `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/sales?page_size=5000&after=${after}`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const data = salesResponse.data;
+    if (data.data && data.data.length > 0) {
+      saleItems.push(...data.data);
+    }
+
+    after = data.version?.max || "";
+  } while (after);
+
+  return saleItems;
+}
+
+const fetchProductInventory = async (id, inventoryId, qty, status) => {
+  try {
+    const response = await axios.get(
+      `https://bazaargeneraltrading.retail.lightspeed.app/api/3.0/products/${id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    let product = response.data.data;
+    if (!product) throw new Error("Product not found.");
+
+    const inventoryResponse = await axios.get(
+      `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${inventoryId}/inventory`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const is_active = product.is_active;
+    if (is_active !== true) return;
+
+    let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
+    if (status === "SAVED") {
+      inventoryLevel = Math.max(inventoryLevel - qty, 0);
+    }
+
+    return { inventoryLevel };
+  } catch (error) {
+    console.error(
+      `Error fetching product details for ID: ${id}`,
+      error.message
+    );
+    throw error;
+  }
+};
+
+const currentTime = async () => {
+  const date = new Date();
+  const formatter = new Intl.DateTimeFormat("en-AE", {
+    timeZone: "Asia/Dubai",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const parts = formatter.formatToParts(date);
+
+  let hour = "",
+    minute = "",
+    second = "",
+    period = "",
+    day = "",
+    month = "",
+    year = "";
+
+  parts.forEach((part) => {
+    switch (part.type) {
+      case "hour":
+        hour = part.value;
+        break;
+      case "minute":
+        minute = part.value;
+        break;
+      case "second":
+        second = part.value;
+        break;
+      case "dayPeriod":
+        period = part.value;
+        break;
+      case "day":
+        day = part.value;
+        break;
+      case "month":
+        month = part.value;
+        break;
+      case "year":
+        year = part.value;
+        break;
+    }
+  });
+
+  const timeFormatted = `${hour}:${minute}:${second} ${period.toUpperCase()} - ${day} ${month}, ${year}`;
+  return timeFormatted;
+};
+
+const calculateDiscount = (product) => {
+  const originalPrice = Math.round(
+    product.product?.price_standard?.tax_inclusive / 0.65
+  );
+
+  let discount = 0;
+
+  if (product.variantsData && product.variantsData.length > 0) {
+    product.variantsData.forEach((variant) => {
+      const discountPercentage = Math.round(
+        ((originalPrice - variant.price) / originalPrice) * 100
+      );
+      if (discountPercentage > discount) {
+        discount = discountPercentage;
+      }
+    });
+  }
+
+  return discount;
+};
+
+module.exports = updateProductsNew;

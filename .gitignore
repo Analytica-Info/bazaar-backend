@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+uploads/
+*.p8
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
