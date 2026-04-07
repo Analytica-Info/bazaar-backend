@@ -7,11 +7,10 @@ const orderDetailSchema = new mongoose.Schema({
     product_image: String,
     variant_name: String,
     amount: Number,
-    quantity: Number,
-    isGiftWithPurchase: { type: Boolean, default: false },
-    nonReturnable: { type: Boolean, default: false },
+    quantity: Number
 }, {
-    timestamps: true
+    timestamps: true,
+    strict: false,
 });
 
 const OrderDetail = mongoose.model('OrderDetail', orderDetailSchema);
