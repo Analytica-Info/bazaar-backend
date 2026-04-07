@@ -340,6 +340,175 @@ describe("adminService", () => {
       expect(result.orders).toHaveLength(0);
       expect(result.pagination.totalOrders).toBe(0);
     });
+
+    it("should return paginated orders with filters", async () => {
+      const user = await makeUser({ email: "ord@test.com" });
+      await makeOrder(user._id, { order_id: "BZR-10001", order_no: 101, status: "Confirmed" });
+      await makeOrder(user._id, { order_id: "BZR-10002", order_no: 102, status: "Delivered" });
+      await makeOrder(user._id, { order_id: "BZR-10003", order_no: 103, status: "Confirmed" });
+
+      const result = await adminService.getOrders({ page: 1, limit: 2 });
+
+      expect(result.orders).toHaveLength(2);
+      expect(result.pagination.totalOrders).toBe(3);
+      expect(result.pagination.totalPages).toBe(2);
+    });
+
+    it("should filter orders by status", async () => {
+      const user = await makeUser({ email: "ordstat@test.com" });
+      await makeOrder(user._id, { order_id: "BZR-20001", order_no: 201, status: "Confirmed" });
+      await makeOrder(user._id, { order_id: "BZR-20002", order_no: 202, status: "Delivered" });
+
+      const result = await adminService.getOrders({ page: 1, limit: 10, status: "Delivered" });
+
+      expect(result.orders).toHaveLength(1);
+      expect(result.orders[0].order_id).toBe("BZR-20002");
+    });
+
+    it("should search orders by order_id", async () => {
+      const user = await makeUser({ email: "ordsearch@test.com" });
+      await makeOrder(user._id, { order_id: "BZR-30001", order_no: 301 });
+      await makeOrder(user._id, { order_id: "BZR-30002", order_no: 302 });
+
+      const result = await adminService.getOrders({ page: 1, limit: 10, search: "30001" });
+
+      expect(result.orders).toHaveLength(1);
+      expect(result.orders[0].order_id).toBe("BZR-30001");
+    });
+  });
+
+  // ---- createSubAdmin ----
+  describe("createSubAdmin", () => {
+    it("should create admin with valid role", async () => {
+      const role = await makeRole({ name: "Editor", isActive: true });
+
+      const result = await adminService.createSubAdmin({
+        firstName: "Sub",
+        lastName: "Admin",
+        email: "subadmin@test.com",
+        phone: "0503333333",
+        password: "Pass@1234",
+        roleId: role._id.toString(),
+      });
+
+      expect(result.firstName).toBe("Sub");
+      expect(result.email).toBe("subadmin@test.com");
+      expect(result.role).toBeDefined();
+    });
+
+    it("should throw when required fields are missing", async () => {
+      try {
+        await adminService.createSubAdmin({ firstName: "Only" });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw on duplicate email", async () => {
+      const role = await makeRole({ name: "DupRole", isActive: true });
+      await makeAdmin({ email: "dup-sub@test.com" });
+
+      try {
+        await adminService.createSubAdmin({
+          firstName: "Dup",
+          lastName: "Sub",
+          email: "dup-sub@test.com",
+          phone: "0504444444",
+          password: "Pass@1234",
+          roleId: role._id.toString(),
+        });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already exists/i);
+      }
+    });
+  });
+
+  // ---- updateSubAdmin ----
+  describe("updateSubAdmin", () => {
+    it("should update admin details", async () => {
+      const role = await makeRole({ name: "UpdateRole", isActive: true });
+      const admin = await makeAdmin({ email: "upd-sub@test.com", role: role._id });
+
+      const result = await adminService.updateSubAdmin(admin._id.toString(), {
+        firstName: "Updated",
+        lastName: "SubAdmin",
+        phone: "0505555555",
+      });
+
+      expect(result.firstName).toBe("Updated");
+      expect(result.lastName).toBe("SubAdmin");
+    });
+
+    it("should throw when admin not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId();
+
+      try {
+        await adminService.updateSubAdmin(fakeId.toString(), { firstName: "X" });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ---- deleteSubAdmin ----
+  describe("deleteSubAdmin", () => {
+    it("should deactivate admin", async () => {
+      const admin = await makeAdmin({ email: "del-sub@test.com" });
+
+      await adminService.deleteSubAdmin(admin._id.toString());
+
+      const saved = await Admin.findById(admin._id);
+      expect(saved.isActive).toBe(false);
+    });
+
+    it("should throw when admin not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId();
+
+      try {
+        await adminService.deleteSubAdmin(fakeId.toString());
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ---- getProductAnalytics ----
+  describe("getProductAnalytics", () => {
+    it("should return analytics data for viewed products", async () => {
+      const Product = require("../../src/models/Product");
+      const ProductView = require("../../src/models/ProductView");
+
+      const product = await Product.create({
+        product: { id: "analytics-1", name: "Analytics Widget", images: [{ url: "http://img/a" }] },
+        variantsData: [{ sku: "SKU-A" }],
+        totalQty: 10,
+        status: true,
+        discountedPrice: 50,
+      });
+
+      const fakeUserId = new mongoose.Types.ObjectId();
+      await ProductView.create({ product_id: product._id, user_id: null, views: 10, lastViewedAt: new Date() });
+      await ProductView.create({ product_id: product._id, user_id: fakeUserId, views: 5, lastViewedAt: new Date() });
+
+      const result = await adminService.getProductAnalytics({ page: 1, limit: 10 });
+
+      expect(result.analytics).toBeDefined();
+      expect(result.analytics.length).toBeGreaterThanOrEqual(1);
+      expect(result.analytics[0].total_views).toBe(15);
+      expect(result.pagination).toBeDefined();
+    });
+
+    it("should return empty analytics when no views exist", async () => {
+      const result = await adminService.getProductAnalytics({ page: 1, limit: 10 });
+
+      expect(result.analytics).toHaveLength(0);
+      expect(result.pagination.totalProducts).toBe(0);
+    });
   });
 
   // ---- getActivityLogs ----
@@ -352,6 +521,156 @@ describe("adminService", () => {
 
       expect(result.logs).toHaveLength(0);
       expect(result.pagination.totalCount).toBe(0);
+    });
+
+    it("should return filtered logs", async () => {
+      await ActivityLog.create({
+        platform: "Mobile App Frontend",
+        log_type: "frontend_log",
+        action: "Test Action",
+        status: "success",
+        message: "Test log entry",
+        user_name: "John",
+        timestamp: new Date(),
+      });
+      await ActivityLog.create({
+        platform: "Website Backend",
+        log_type: "backend_activity",
+        action: "Other Action",
+        status: "failure",
+        message: "Error log entry",
+        user_name: "Jane",
+        timestamp: new Date(),
+      });
+
+      const result = await adminService.getActivityLogs({
+        page: 1,
+        limit: 20,
+        platform: "Mobile App Frontend",
+      });
+
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].platform).toBe("Mobile App Frontend");
+    });
+
+    it("should search logs by message content", async () => {
+      await ActivityLog.create({
+        platform: "Website Backend",
+        log_type: "backend_activity",
+        action: "Search Test",
+        status: "success",
+        message: "Unique search term xyz123",
+        user_name: "Admin",
+        timestamp: new Date(),
+      });
+
+      const result = await adminService.getActivityLogs({
+        page: 1,
+        limit: 20,
+        search: "xyz123",
+      });
+
+      expect(result.logs).toHaveLength(1);
+    });
+  });
+
+  // ---- getBackendLogs ----
+  describe("getBackendLogs", () => {
+    it("should return empty when no backend logs", async () => {
+      const BackendLog = require("../../src/models/BackendLog");
+
+      const result = await adminService.getBackendLogs({ page: 1, limit: 20 });
+
+      expect(result.logs).toHaveLength(0);
+      expect(result.pagination.totalCount).toBe(0);
+    });
+
+    it("should return backend logs filtered by date", async () => {
+      const BackendLog = require("../../src/models/BackendLog");
+
+      await BackendLog.create({
+        date: "2025-01-15",
+        platform: "Website Backend",
+        activities: [{ activity_name: "Test", status: "success", message: "OK" }],
+        total_activities: 1,
+        success_count: 1,
+        failure_count: 0,
+      });
+
+      const result = await adminService.getBackendLogs({
+        page: 1,
+        limit: 20,
+        date: "2025-01-15",
+      });
+
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].date).toBe("2025-01-15");
+    });
+  });
+
+  // ---- exportUsers ----
+  describe("exportUsers", () => {
+    it("should return all users for export", async () => {
+      await makeUser({ email: "exp1@test.com" });
+      await makeUser({ email: "exp2@test.com" });
+
+      const result = await adminService.exportUsers({});
+
+      expect(result).toHaveLength(2);
+      expect(result[0].email).toBeDefined();
+      expect(result[0].name).toBeDefined();
+    });
+
+    it("should filter by status", async () => {
+      await makeUser({ email: "active@test.com", isDeleted: false, isBlocked: false });
+      await makeUser({ email: "deleted@test.com", isDeleted: true });
+
+      const result = await adminService.exportUsers({ status: "active" });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].email).toBe("active@test.com");
+    });
+  });
+
+  // ---- updateUser ----
+  describe("updateUser", () => {
+    it("should update user name and phone", async () => {
+      const user = await makeUser({ email: "upduser@test.com" });
+
+      const result = await adminService.updateUser(user._id.toString(), {
+        name: "New Name",
+        phone: "0509876543",
+      });
+
+      expect(result.name).toBe("New Name");
+      expect(result.phone).toBe("0509876543");
+    });
+
+    it("should throw on duplicate email", async () => {
+      await makeUser({ email: "existing-upd@test.com" });
+      const user = await makeUser({ email: "tochange-upd@test.com" });
+
+      try {
+        await adminService.updateUser(user._id.toString(), {
+          email: "existing-upd@test.com",
+        });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already exists/i);
+      }
+    });
+
+    it("should throw when user is deleted", async () => {
+      const user = await makeUser({ email: "del-upd@test.com", isDeleted: true });
+
+      try {
+        await adminService.updateUser(user._id.toString(), { name: "X" });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/cannot update a deleted user/i);
+      }
     });
   });
 });

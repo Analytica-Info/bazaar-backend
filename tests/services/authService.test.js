@@ -346,4 +346,243 @@ describe('authService.updateProfile', () => {
             message: 'Email already exists in another user',
         }));
     });
+
+    it('should throw when name is missing', async () => {
+        const user = await makeUser({ email: 'noupd-name@example.com' });
+
+        await expect(
+            authService.updateProfile(user._id, {
+                email: 'noupd-name@example.com',
+                phone: '1234567890',
+            })
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Name is required',
+        }));
+    });
+
+    it('should update phone number successfully', async () => {
+        const user = await makeUser({ email: 'upd-phone@example.com', phone: '1111111111' });
+
+        const result = await authService.updateProfile(user._id, {
+            name: 'Test User',
+            email: 'upd-phone@example.com',
+            phone: '9999999999',
+        });
+
+        expect(result.user.phone).toBe('9999999999');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getUserData
+// ---------------------------------------------------------------------------
+describe('authService.getUserData', () => {
+    it('should return user profile data', async () => {
+        const user = await makeUser({ email: 'getdata@example.com', phone: '5555555555' });
+
+        const result = await authService.getUserData(user._id, 'web');
+
+        expect(result.data).toBeDefined();
+        expect(result.data.email).toBe('getdata@example.com');
+        expect(result.coupon).toBeDefined();
+    });
+
+    it('should throw 404 when user not found', async () => {
+        const fakeId = new (require('mongoose').Types.ObjectId)();
+
+        await expect(
+            authService.getUserData(fakeId, 'web')
+        ).rejects.toEqual(expect.objectContaining({ status: 404 }));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// deleteAccountPublic
+// ---------------------------------------------------------------------------
+describe('authService.deleteAccountPublic', () => {
+    it('should soft-delete user with valid credentials', async () => {
+        await makeUser({ email: 'delpub@example.com' });
+
+        await authService.deleteAccountPublic('delpub@example.com', VALID_PASSWORD);
+
+        const user = await User.findOne({ email: 'delpub@example.com' });
+        expect(user.isDeleted).toBe(true);
+        expect(user.deletedBy).toBe('user');
+    });
+
+    it('should throw when email is missing', async () => {
+        await expect(
+            authService.deleteAccountPublic(null, VALID_PASSWORD)
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Email and password are required',
+        }));
+    });
+
+    it('should throw on wrong password', async () => {
+        await makeUser({ email: 'delpub-wrong@example.com' });
+
+        await expect(
+            authService.deleteAccountPublic('delpub-wrong@example.com', 'Wrong@9999')
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Invalid email or password',
+        }));
+    });
+
+    it('should throw when account is already deleted', async () => {
+        await makeUser({
+            email: 'delpub-already@example.com',
+            isDeleted: true,
+            deletedAt: new Date(),
+        });
+
+        await expect(
+            authService.deleteAccountPublic('delpub-already@example.com', VALID_PASSWORD)
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Account already deleted',
+        }));
+    });
+
+    it('should throw when account is blocked', async () => {
+        await makeUser({
+            email: 'delpub-blocked@example.com',
+            isBlocked: true,
+            blockedAt: new Date(),
+        });
+
+        await expect(
+            authService.deleteAccountPublic('delpub-blocked@example.com', VALID_PASSWORD)
+        ).rejects.toEqual(expect.objectContaining({
+            status: 403,
+            message: expect.stringContaining('blocked'),
+        }));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// resendRecoveryCode
+// ---------------------------------------------------------------------------
+describe('authService.resendRecoveryCode', () => {
+    it('should resend code for deleted user', async () => {
+        await makeUser({
+            email: 'resend@example.com',
+            isDeleted: true,
+            deletedAt: new Date(),
+            recoveryAttempts: 0,
+        });
+
+        const result = await authService.resendRecoveryCode('resend@example.com');
+
+        expect(result.attemptsUsed).toBe(1);
+        expect(result.attemptsLeft).toBe(4);
+
+        const user = await User.findOne({ email: 'resend@example.com' });
+        expect(user.recoveryCode).toBeDefined();
+        expect(user.recoveryCodeExpires).toBeDefined();
+    });
+
+    it('should throw when email is missing', async () => {
+        await expect(
+            authService.resendRecoveryCode(null)
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Email is required.',
+        }));
+    });
+
+    it('should throw when no deleted account found', async () => {
+        await makeUser({ email: 'notdel@example.com', isDeleted: false });
+
+        await expect(
+            authService.resendRecoveryCode('notdel@example.com')
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'No deleted account found with this email.',
+        }));
+    });
+
+    it('should rate limit after 5 attempts', async () => {
+        await makeUser({
+            email: 'ratelimit@example.com',
+            isDeleted: true,
+            deletedAt: new Date(),
+            recoveryAttempts: 5,
+            lastRecoveryRequest: new Date(),
+        });
+
+        await expect(
+            authService.resendRecoveryCode('ratelimit@example.com')
+        ).rejects.toEqual(expect.objectContaining({
+            status: 429,
+            attemptsLeft: 0,
+        }));
+    });
+
+    it('should reset attempts after 24 hours', async () => {
+        const pastDate = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+        await makeUser({
+            email: 'reset-attempts@example.com',
+            isDeleted: true,
+            deletedAt: new Date(),
+            recoveryAttempts: 5,
+            lastRecoveryRequest: pastDate,
+        });
+
+        const result = await authService.resendRecoveryCode('reset-attempts@example.com');
+
+        expect(result.attemptsUsed).toBe(1);
+        expect(result.attemptsLeft).toBe(4);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// register with platform differences
+// ---------------------------------------------------------------------------
+describe('authService.register - platform differences', () => {
+    it('should register with web platform by default', async () => {
+        const result = await authService.register({
+            name: 'Web User',
+            email: 'webuser@example.com',
+            phone: '8888888888',
+            password: VALID_PASSWORD,
+        });
+
+        expect(result.user).toBeDefined();
+        const dbUser = await User.findOne({ email: 'webuser@example.com' });
+        expect(dbUser.platform).toBe('Website');
+    });
+
+    it('should register with mobile platform', async () => {
+        const result = await authService.register({
+            name: 'Mobile User',
+            email: 'mobileuser@example.com',
+            phone: '7777777777',
+            password: VALID_PASSWORD,
+            platform: 'mobile',
+        });
+
+        expect(result.user).toBeDefined();
+        const dbUser = await User.findOne({ email: 'mobileuser@example.com' });
+        expect(dbUser.platform).toBe('Mobile app');
+    });
+
+    it('should throw on duplicate phone for mobile platform', async () => {
+        await makeUser({ email: 'phone-dup1@example.com', phone: '6666666666' });
+
+        await expect(
+            authService.register({
+                name: 'Dup Phone',
+                email: 'phone-dup2@example.com',
+                phone: '6666666666',
+                password: VALID_PASSWORD,
+                platform: 'mobile',
+            })
+        ).rejects.toEqual(expect.objectContaining({
+            status: 400,
+            message: 'Phone already exists with another user',
+        }));
+    });
 });

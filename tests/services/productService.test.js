@@ -148,6 +148,48 @@ describe("productService", () => {
         expect(err.message).toMatch(/no product found/i);
       }
     });
+
+    it("should track product view for authenticated user", async () => {
+      const prod = await Product.create(
+        makeProduct({ product: { id: "view-prod", name: "View Widget", images: [{ url: "http://img/v" }] } })
+      );
+      const fakeUserId = new (require("mongoose").Types.ObjectId)();
+
+      await productService.getProductDetails("view-prod", fakeUserId.toString());
+
+      const view = await ProductView.findOne({ product_id: prod._id, user_id: fakeUserId.toString() });
+      expect(view).not.toBeNull();
+      expect(view.views).toBe(1);
+    });
+
+    it("should return total views aggregated from ProductView", async () => {
+      const prod = await Product.create(
+        makeProduct({ product: { id: "tv-prod", name: "TotalView Widget", images: [{ url: "http://img/tv" }] } })
+      );
+      const fakeUserId = new (require("mongoose").Types.ObjectId)();
+      await ProductView.create({ product_id: prod._id, user_id: null, views: 5, lastViewedAt: new Date() });
+      await ProductView.create({ product_id: prod._id, user_id: fakeUserId, views: 3, lastViewedAt: new Date() });
+
+      const result = await productService.getProductDetails("tv-prod", null);
+
+      // total_view should be 5+3 = 8, plus the new view tracked by getProductDetails itself (+1)
+      expect(result.total_view).toBeGreaterThanOrEqual(8);
+    });
+
+    it("should return multiple reviews with averaged ratings", async () => {
+      const prod = await Product.create(
+        makeProduct({ product: { id: "multi-rev", name: "MultiRev Widget", images: [{ url: "http://img/mr" }] } })
+      );
+      await Review.create({ product_id: prod._id, quality_rating: 2, value_rating: 4, price_rating: 3 });
+      await Review.create({ product_id: prod._id, quality_rating: 4, value_rating: 2, price_rating: 5 });
+
+      const result = await productService.getProductDetails("multi-rev", null);
+
+      expect(result.reviewsCount).toBe(2);
+      expect(Number(result.avgQuality)).toBeCloseTo(3, 0);
+      expect(Number(result.avgValue)).toBeCloseTo(3, 0);
+      expect(Number(result.avgPrice)).toBeCloseTo(4, 0);
+    });
   });
 
   // ── getCategories ─────────────────────────────────────────────
@@ -244,6 +286,123 @@ describe("productService", () => {
 
     it("should return empty results for no matches", async () => {
       const result = await productService.fetchDbProducts({ page: "1", limit: "10", search: "ZZZZZZZ" });
+
+      expect(result.pagination.totalCount).toBe(0);
+      expect(result.products).toHaveLength(0);
+    });
+  });
+
+  // ── getAllCategories ──────────────────────────────────────────────
+
+  describe("getAllCategories", () => {
+    it("should return category tree and flat list", async () => {
+      // Create a Category document with category_path entries
+      await Category.create({
+        side_bar_categories: [{ id: "cat-root", name: "Electronics" }],
+        search_categoriesList: [{ id: "cat-root", name: "Electronics" }],
+        category_path: [
+          { id: "cat-root", name: "Electronics" },
+          { id: "cat-sub", name: "Phones" },
+        ],
+      });
+
+      // Also create a product to match
+      await Product.create(
+        makeProduct({
+          product: { id: "cat-prod", name: "Phone", product_type_id: "cat-sub", images: [{ url: "http://img/p" }] },
+          status: true,
+          totalQty: 5,
+        })
+      );
+
+      const result = await productService.getAllCategories();
+
+      expect(result.side_bar_categories).toBeDefined();
+      expect(result.search_categoriesList).toBeDefined();
+      expect(Array.isArray(result.side_bar_categories)).toBe(true);
+      expect(Array.isArray(result.search_categoriesList)).toBe(true);
+    });
+
+    it("should return empty tree when no categories exist", async () => {
+      const result = await productService.getAllCategories();
+
+      expect(result.side_bar_categories).toHaveLength(0);
+      expect(result.search_categoriesList).toHaveLength(0);
+    });
+  });
+
+  // ── getSimilarProducts ────────────────────────────────────────────
+
+  describe("getSimilarProducts", () => {
+    it("should return similar products excluding the given product ID", async () => {
+      const prod1 = await Product.create(
+        makeProduct({
+          product: { id: "sim-1", name: "Similar A", product_type_id: "type-abc", images: [{ url: "http://img/s1" }] },
+          status: true,
+          discountedPrice: 50,
+        })
+      );
+      await Product.create(
+        makeProduct({
+          product: { id: "sim-2", name: "Similar B", product_type_id: "type-abc", images: [{ url: "http://img/s2" }] },
+          status: true,
+          discountedPrice: 60,
+        })
+      );
+
+      const result = await productService.getSimilarProducts("type-abc", prod1._id.toString());
+
+      // Should not include prod1
+      expect(result.similarProducts).toBeDefined();
+      const ids = result.similarProducts.map((p) => p._id.toString());
+      expect(ids).not.toContain(prod1._id.toString());
+    });
+
+    it("should throw 400 when product type ID is missing", async () => {
+      try {
+        await productService.getSimilarProducts("", null);
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/product type id is required/i);
+      }
+    });
+  });
+
+  // ── fetchProductsNoImages ─────────────────────────────────────────
+
+  describe("fetchProductsNoImages", () => {
+    it("should return products without images", async () => {
+      // Product with no images
+      await Product.create(
+        makeProduct({
+          product: { id: "no-img-1", name: "No Image Widget", images: [] },
+        })
+      );
+      // Product with images (should not be returned)
+      await Product.create(
+        makeProduct({
+          product: { id: "has-img-1", name: "Has Image Widget", images: [{ url: "http://img/1" }] },
+        })
+      );
+
+      const result = await productService.fetchProductsNoImages({ page: "1", limit: "10" });
+
+      expect(result.pagination).toBeDefined();
+      expect(result.products).toBeDefined();
+      // Only the no-image product should be found
+      expect(result.pagination.totalCount).toBe(1);
+      expect(result.products[0].product.name).toBe("No Image Widget");
+    });
+
+    it("should return empty when all products have images", async () => {
+      await Product.create(
+        makeProduct({
+          product: { id: "img-all", name: "All Good", images: [{ url: "http://img/a" }] },
+        })
+      );
+
+      const result = await productService.fetchProductsNoImages({ page: "1", limit: "10" });
 
       expect(result.pagination.totalCount).toBe(0);
       expect(result.products).toHaveLength(0);

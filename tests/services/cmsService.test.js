@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 const ContactCms = require("../../src/models/ContactCms");
 const FeaturesCms = require("../../src/models/FeaturesCms");
 const CouponCms = require("../../src/models/CouponCms");
+const SliderCms = require("../../src/models/SliderCms");
+const HeaderInfoCms = require("../../src/models/HeaderInfo");
+const FooterInfoCms = require("../../src/models/FooterInfoCms");
+const OffersCms = require("../../src/models/OffersCms");
+const AboutCms = require("../../src/models/About");
 
 // Mock file-system helpers used by CMS update functions with file uploads
 jest.mock("../../src/utils/deleteOldFile", () => jest.fn());
@@ -157,6 +162,288 @@ describe("cmsService", () => {
       } catch (err) {
         expect(err.status).toBe(400);
         expect(err.message).toMatch(/must be an array/i);
+      }
+    });
+  });
+
+  // ── updateSlider ────────────────────────────────────────────────
+
+  describe("updateSlider", () => {
+    it("should create slider CMS when none exists", async () => {
+      const files = {
+        sliderImage1: { filename: "slide1.jpg" },
+        sliderImage2: { filename: "slide2.jpg" },
+        sliderImage3: { filename: "slide3.jpg" },
+      };
+
+      const result = await cmsService.updateSlider({}, files);
+
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await SliderCms.findOne();
+      expect(saved).not.toBeNull();
+      expect(saved.sliderImage1).toContain("slide1.jpg");
+      expect(saved.sliderImage2).toContain("slide2.jpg");
+      expect(saved.sliderImage3).toContain("slide3.jpg");
+    });
+
+    it("should update existing slider images", async () => {
+      await SliderCms.create({
+        sliderImage1: "http://old/1.jpg",
+        sliderImage2: "http://old/2.jpg",
+        sliderImage3: "http://old/3.jpg",
+      });
+
+      const files = {
+        sliderImage1: { filename: "new-slide1.jpg" },
+      };
+
+      const result = await cmsService.updateSlider({}, files);
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await SliderCms.findOne();
+      expect(saved.sliderImage1).toContain("new-slide1.jpg");
+      // Other images should remain unchanged
+      expect(saved.sliderImage2).toBe("http://old/2.jpg");
+    });
+  });
+
+  // ── updateHeader ────────────────────────────────────────────────
+
+  describe("updateHeader", () => {
+    it("should create header info when none exists", async () => {
+      const files = { logo: { filename: "logo.png" } };
+      const data = { contactNumber: "+971501234567" };
+
+      const result = await cmsService.updateHeader(data, files);
+
+      expect(result.message).toMatch(/saved successfully/i);
+
+      const saved = await HeaderInfoCms.findOne();
+      expect(saved).not.toBeNull();
+      expect(saved.contactNumber).toBe("+971501234567");
+      expect(saved.logo).toContain("logo.png");
+    });
+
+    it("should update existing header info", async () => {
+      await HeaderInfoCms.create({
+        logo: "http://old/logo.png",
+        contactNumber: "+971500000000",
+      });
+
+      const result = await cmsService.updateHeader(
+        { contactNumber: "+971509999999" },
+        {}
+      );
+
+      expect(result.message).toMatch(/saved successfully/i);
+
+      const saved = await HeaderInfoCms.findOne();
+      expect(saved.contactNumber).toBe("+971509999999");
+      // Logo unchanged since no file was provided
+      expect(saved.logo).toBe("http://old/logo.png");
+    });
+  });
+
+  // ── updateFooter ────────────────────────────────────────────────
+
+  describe("updateFooter", () => {
+    it("should create footer info when none exists", async () => {
+      const data = {
+        tagLine: "Best Deals",
+        address: "123 Street",
+        email: "footer@test.com",
+        phone: "+971501234567",
+        facebook: "http://fb.com",
+        tiktok: "http://tiktok.com",
+        instagram: "http://ig.com",
+        youtube: "http://yt.com",
+      };
+      const files = { logo: { filename: "footer-logo.png" } };
+
+      const result = await cmsService.updateFooter(data, files);
+
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await FooterInfoCms.findOne();
+      expect(saved).not.toBeNull();
+      expect(saved.tagLine).toBe("Best Deals");
+      expect(saved.logo).toContain("footer-logo.png");
+      expect(saved.youtube).toBe("http://yt.com");
+    });
+
+    it("should update existing footer info without file", async () => {
+      await FooterInfoCms.create({
+        logo: "http://old/logo.png",
+        tagLine: "Old Tag",
+        address: "Old Addr",
+        email: "old@test.com",
+        phone: "000",
+        facebook: "http://fb.com",
+        tiktok: "http://tiktok.com",
+        instagram: "http://ig.com",
+        youtube: "http://yt.com",
+      });
+
+      const result = await cmsService.updateFooter(
+        {
+          tagLine: "New Tag",
+          address: "New Addr",
+          email: "new@test.com",
+          phone: "111",
+          facebook: "http://fb2.com",
+          tiktok: "http://tiktok2.com",
+          instagram: "http://ig2.com",
+          youtube: "http://yt2.com",
+        },
+        {}
+      );
+
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await FooterInfoCms.findOne();
+      expect(saved.tagLine).toBe("New Tag");
+      expect(saved.logo).toBe("http://old/logo.png");
+    });
+  });
+
+  // ── updateOffers ────────────────────────────────────────────────
+
+  describe("updateOffers", () => {
+    it("should create offers CMS with images", async () => {
+      const data = { offerCategory: ["Electronics", "Home"] };
+      const files = {
+        offerImages: [
+          { filename: "offer1.jpg" },
+          { filename: "offer2.jpg" },
+        ],
+      };
+
+      const result = await cmsService.updateOffers(data, files);
+
+      expect(result.message).toMatch(/updated successfully/i);
+
+      const saved = await OffersCms.findOne();
+      expect(saved).not.toBeNull();
+      expect(saved.offersData).toHaveLength(2);
+      expect(saved.offersData[0].offerImage).toContain("offer1.jpg");
+      expect(saved.offersData[0].offerCategory).toBe("Electronics");
+    });
+
+    it("should update existing offers", async () => {
+      await OffersCms.create({
+        offersData: [
+          { offerImage: "http://old/1.jpg", offerCategory: "Old" },
+        ],
+      });
+
+      const data = { offerCategory: ["NewCat"] };
+      const files = {
+        offerImages: [{ filename: "new-offer.jpg" }],
+      };
+
+      const result = await cmsService.updateOffers(data, files);
+      expect(result.message).toMatch(/updated successfully/i);
+
+      const saved = await OffersCms.findOne();
+      expect(saved.offersData[0].offerImage).toContain("new-offer.jpg");
+      expect(saved.offersData[0].offerCategory).toBe("NewCat");
+    });
+  });
+
+  // ── updateAbout ─────────────────────────────────────────────────
+
+  describe("updateAbout", () => {
+    it("should create about CMS with parsed contents", async () => {
+      const data = {
+        contents: JSON.stringify([
+          { title: "Our Story", paragraph: "We started in 2020" },
+        ]),
+      };
+      const files = { backgroundImage: { filename: "about-bg.jpg" } };
+
+      const result = await cmsService.updateAbout(data, files);
+
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await AboutCms.findOne();
+      expect(saved).not.toBeNull();
+      expect(saved.contents).toHaveLength(1);
+      expect(saved.contents[0].title).toBe("Our Story");
+      expect(saved.backgroundImage).toContain("about-bg.jpg");
+    });
+
+    it("should throw 400 when contents is invalid JSON", async () => {
+      try {
+        await cmsService.updateAbout({ contents: "not-valid-json{" }, {});
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid contents format/i);
+      }
+    });
+
+    it("should update existing about without file", async () => {
+      await AboutCms.create({
+        backgroundImage: "http://old/bg.jpg",
+        contents: [{ title: "Old", paragraph: "Old text" }],
+      });
+
+      const result = await cmsService.updateAbout(
+        { contents: [{ title: "New", paragraph: "New text" }] },
+        {}
+      );
+
+      expect(result.message).toMatch(/uploaded successfully/i);
+
+      const saved = await AboutCms.findOne();
+      expect(saved.contents[0].title).toBe("New");
+      expect(saved.backgroundImage).toBe("http://old/bg.jpg");
+    });
+  });
+
+  // ── uploadEditorImage ───────────────────────────────────────────
+
+  describe("uploadEditorImage", () => {
+    it("should return file URL when path is provided", async () => {
+      const result = await cmsService.uploadEditorImage("image123.jpg");
+
+      expect(result.uploaded).toBe(1);
+      expect(result.url).toContain("image123.jpg");
+      expect(result.url).toContain("EditorBodyImages");
+    });
+
+    it("should throw 400 when file path is missing", async () => {
+      try {
+        await cmsService.uploadEditorImage(null);
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/missing required file/i);
+      }
+    });
+  });
+
+  // ── deleteEditorImage ───────────────────────────────────────────
+
+  describe("deleteEditorImage", () => {
+    it("should throw 400 when URL is invalid", async () => {
+      try {
+        await cmsService.deleteEditorImage("not-a-url");
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid url/i);
+      }
+    });
+
+    it("should throw 404 when file does not exist", async () => {
+      try {
+        await cmsService.deleteEditorImage("http://localhost:3000/uploads/EditorBodyImages/nonexistent.png");
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(404);
+        expect(err.message).toMatch(/file not found/i);
       }
     });
   });
