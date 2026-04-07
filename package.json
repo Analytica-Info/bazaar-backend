@@ -5,12 +5,17 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "build": "echo 'No build step required — plain Node.js project. Add TypeScript to enable build.' && exit 0",
+    "lint": "echo 'Add eslint to enable linting' && exit 0",
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
     "cron": "node src/scripts/cronWorker.js",
     "migrate": "node src/scripts/migrateOrderFields.js",
     "migrate:apply": "node src/scripts/migrateOrderFields.js --apply",
     "migrate:cleanup": "node src/scripts/migrateOrderFields.js --cleanup",
     "seed:roles": "node src/scripts/seedRolesAndPermissions.js",
-    "test": "jest --forceExit --detectOpenHandles"
+    "validate": "node src/scripts/validatePaths.js",
+    "check": "npm run validate && npm test"
   },
   "keywords": [],
   "author": "Analytica",
