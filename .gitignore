@@ -1,9 +1,39 @@
+# Dependencies
 node_modules/
+
+# Environment variables (contains secrets)
 .env
+.env.local
+.env.production
+
+# Logs
 *.log
+cron.log
+
+# File uploads (runtime data, not source code)
 uploads/
+
+# Apple Sign-In private keys
 *.p8
-*.json
-!package.json
-!package-lock.json
-!tsconfig.json
+
+# Firebase service account credentials
+*firebase*.json
+*service-account*.json
+*adminsdk*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Build artifacts
+dist/
+build/
