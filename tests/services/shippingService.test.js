@@ -12,7 +12,7 @@ describe("shippingService", () => {
       code: "AE",
       currency: "AED",
       currencySymbol: "AED",
-      defaultShippingRate: 15,
+      defaultShippingRate: 30,
       freeShippingThreshold: 200,
       sortOrder: 1,
       isActive: true,
@@ -335,12 +335,12 @@ describe("shippingService", () => {
 
     it("should return country default when city not found", async () => {
       const result = await shippingService.calculateShippingCost("AE", "Unknown City");
-      expect(result.shippingCost).toBe(15);
+      expect(result.shippingCost).toBe(30);
     });
 
     it("should return country default when no city/area provided", async () => {
       const result = await shippingService.calculateShippingCost("AE");
-      expect(result.shippingCost).toBe(15);
+      expect(result.shippingCost).toBe(30);
     });
 
     it("should return free shipping when threshold met", async () => {
