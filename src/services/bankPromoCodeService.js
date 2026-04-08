@@ -8,6 +8,7 @@ async function enrichPromo(promo) {
   });
   return {
     ...doc,
+    id: doc._id.toString(),
     uniqueCustomers,
     expiryDate: doc.expiryDate
       ? new Date(doc.expiryDate).toISOString().split("T")[0]
@@ -113,7 +114,10 @@ async function toggleActive(id) {
   }
 
   await promo.save();
-  return enrichPromo(promo);
+  return {
+    message: promo.active ? "Promo code activated." : "Promo code deactivated.",
+    promo: await enrichPromo(promo),
+  };
 }
 
 async function remove(id) {

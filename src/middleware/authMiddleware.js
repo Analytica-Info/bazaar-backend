@@ -13,11 +13,17 @@ const JWT_SECRET = require('../config/jwtSecret');
  */
 const handler = (role = 'user') => {
   return async (req, res, next) => {
+    let tokenFromCookie = false;
     try {
       // Try cookie first (web), then Authorization header (mobile/admin)
-      const token =
-        req.cookies?.user_token ||
-        req.header('Authorization')?.replace('Bearer ', '');
+      let token = null;
+
+      if (req.cookies?.user_token) {
+        token = req.cookies.user_token;
+        tokenFromCookie = true;
+      } else {
+        token = req.header('Authorization')?.replace('Bearer ', '') || null;
+      }
 
       if (!token) {
         return res.status(401).json({ message: 'No token provided' });
@@ -45,9 +51,11 @@ const handler = (role = 'user') => {
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
-        return res.status(402).json({ message: 'Token expired. Please log in again.' });
+        // Web clients (cookie auth) expect 402; mobile clients (Bearer) expect 401
+        const expiredStatus = tokenFromCookie ? 402 : 401;
+        return res.status(expiredStatus).json({ message: 'Token expired. Please log in again.' });
       } else if (error.name === 'JsonWebTokenError') {
-        return res.status(401).json({ message: 'Invalid token. Please log in again.' });
+        return res.status(401).json({ message: 'Invalid token' });
       } else {
         console.error('Auth middleware error:', error.message);
         return res.status(500).json({ message: 'Internal server error' });

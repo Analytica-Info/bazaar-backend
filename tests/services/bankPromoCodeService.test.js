@@ -78,7 +78,8 @@ describe("bankPromoCodeService", () => {
       const created = await BankPromoCode.create(validPromo());
 
       const result = await bankPromoCodeService.toggleActive(created._id.toString());
-      expect(result.active).toBe(false);
+      expect(result.promo.active).toBe(false);
+      expect(result.message).toContain("deactivated");
 
       const saved = await BankPromoCode.findById(created._id);
       expect(saved.active).toBe(false);

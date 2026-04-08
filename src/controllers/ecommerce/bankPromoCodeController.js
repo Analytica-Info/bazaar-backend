@@ -110,7 +110,7 @@ exports.toggleActive = async (req, res) => {
  */
 exports.delete = async (req, res) => {
     try {
-        await bankPromoCodeService.delete(req.params.id);
+        await bankPromoCodeService.remove(req.params.id);
         return res.status(200).json({
             success: true,
             message: 'Promo code deleted successfully.',
