@@ -10,6 +10,7 @@ services:
       - "0.0.0.0:5050:5000"
     volumes:
       - ./uploads:/app/uploads
+      - ./temp:/app/temp
     env_file:
       - .env.test
     environment:
@@ -29,6 +30,7 @@ services:
       - "127.0.0.1:5051:5000"
     volumes:
       - ./uploads:/app/uploads
+      - ./temp:/app/temp
     env_file:
       - .env
     environment:
@@ -38,7 +40,7 @@ services:
       - app-network
 
   # ==========================================
-  # CRON WORKER (production only)
+  # CRON WORKER (production only — product sync + notifications)
   # ==========================================
   cron:
     build:
@@ -52,6 +54,8 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    depends_on:
+      - api-prod
     networks:
       - app-network
 

@@ -1,5 +1,5 @@
 # Development stage
-FROM node:22-alpine AS dev
+FROM node:23-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
@@ -8,10 +8,10 @@ EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
 # Production stage
-FROM node:22-alpine AS prod
+FROM node:23-alpine AS prod
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 COPY . .
 EXPOSE 5000
 CMD ["npm", "start"]
