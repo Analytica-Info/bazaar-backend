@@ -7,6 +7,7 @@ const cartItemSchema = new mongoose.Schema({
 
 const addressSchema = new mongoose.Schema({
     name: { type: String, required: true },
+    country: { type: String, default: 'AE' },
     city: { type: String, required: true },
     area: { type: String, required: true },
     email: { type: String },

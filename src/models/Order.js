@@ -8,6 +8,8 @@ const orderSchema = new mongoose.Schema(
         order_datetime: { type: String },
         name: { type: String, required: true },
         phone: { type: String, default: '-' },
+        country: { type: String, default: 'AE' },
+        currency: { type: String, default: 'AED' },
         state: { type: String, default: '-' },
         address: { type: String, required: true },
         city: { type: String, default: '-' },

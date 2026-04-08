@@ -14,6 +14,7 @@
     "migrate:apply": "node src/scripts/migrateOrderFields.js --apply",
     "migrate:cleanup": "node src/scripts/migrateOrderFields.js --cleanup",
     "seed:roles": "node src/scripts/seedRolesAndPermissions.js",
+    "seed:shipping": "node src/scripts/seedShippingCountries.js",
     "validate": "node src/scripts/validatePaths.js",
     "check": "npm run validate && npm test"
   },

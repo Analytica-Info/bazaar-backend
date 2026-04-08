@@ -80,8 +80,14 @@ const { exportProductsToGoogleSheet } = require("../../scripts/googleSheetExport
 const adminMiddleware = require("../../middleware/adminMiddleware");
 const authMiddleware = require("../../middleware/authMiddleware");
 const upload = require("../../config/multerConfig");
+const shippingCtrl = require("../../controllers/ecommerce/shippingCountryController");
 
 const router = express.Router();
+
+// Public shipping endpoints
+router.get("/shipping-countries", shippingCtrl.listActive);
+router.get("/shipping-countries/:code/cities", shippingCtrl.getCities);
+router.get("/shipping-cost", shippingCtrl.getShippingCost);
 
 router.post("/create-card-checkout", createCardCheckout);
 router.post("/create-tabby-checkout", createTabbyCheckout);
