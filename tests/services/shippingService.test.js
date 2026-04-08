@@ -190,6 +190,93 @@ describe("shippingService", () => {
   });
 
   // ============================
+  // Bulk Import
+  // ============================
+
+  describe("bulkImportCities", () => {
+    it("should bulk add cities from objects array", async () => {
+      const result = await shippingService.bulkImportCities(uaeId, [
+        { name: "Sharjah", shippingRate: 10 },
+        { name: "Ajman", shippingRate: 12 },
+        { name: "Fujairah" },
+      ]);
+      expect(result.added).toBe(3);
+      expect(result.skipped).toBe(0);
+      expect(result.totalCities).toBe(5); // 2 existing + 3 new
+    });
+
+    it("should bulk add cities from string array", async () => {
+      const result = await shippingService.bulkImportCities(uaeId, [
+        "Sharjah", "Ajman", "Ras Al Khaimah"
+      ]);
+      expect(result.added).toBe(3);
+    });
+
+    it("should skip duplicate cities", async () => {
+      const result = await shippingService.bulkImportCities(uaeId, [
+        "Dubai", "Sharjah", "Abu Dhabi", "Ajman"
+      ]);
+      expect(result.added).toBe(2); // Sharjah + Ajman
+      expect(result.skipped).toBe(2); // Dubai + Abu Dhabi already exist
+    });
+
+    it("should handle cities with nested areas", async () => {
+      const result = await shippingService.bulkImportCities(uaeId, [
+        {
+          name: "Sharjah",
+          shippingRate: 10,
+          areas: [
+            { name: "Al Nahda", shippingRate: 10 },
+            { name: "Al Majaz", shippingRate: 8 },
+          ],
+        },
+      ]);
+      expect(result.added).toBe(1);
+      const country = await ShippingCountry.findById(uaeId);
+      const sharjah = country.cities.find(c => c.name === "Sharjah");
+      expect(sharjah.areas).toHaveLength(2);
+    });
+
+    it("should throw on empty array", async () => {
+      await expect(
+        shippingService.bulkImportCities(uaeId, [])
+      ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  describe("bulkImportAreas", () => {
+    it("should bulk add areas from string array", async () => {
+      const country = await ShippingCountry.findById(uaeId);
+      const dubaiId = country.cities[0]._id.toString();
+      const result = await shippingService.bulkImportAreas(uaeId, dubaiId, [
+        "JBR", "Marina", "Downtown"
+      ]);
+      expect(result.added).toBe(3);
+      expect(result.totalAreas).toBe(5); // 2 existing + 3 new
+    });
+
+    it("should skip duplicate areas", async () => {
+      const country = await ShippingCountry.findById(uaeId);
+      const dubaiId = country.cities[0]._id.toString();
+      const result = await shippingService.bulkImportAreas(uaeId, dubaiId, [
+        "Al Barsha", "JBR", "International City"
+      ]);
+      expect(result.added).toBe(1); // JBR only
+      expect(result.skipped).toBe(2); // Al Barsha + International City exist
+    });
+
+    it("should bulk add areas from objects", async () => {
+      const country = await ShippingCountry.findById(uaeId);
+      const dubaiId = country.cities[0]._id.toString();
+      const result = await shippingService.bulkImportAreas(uaeId, dubaiId, [
+        { name: "JBR", shippingRate: 0 },
+        { name: "Business Bay", shippingRate: 3 },
+      ]);
+      expect(result.added).toBe(2);
+    });
+  });
+
+  // ============================
   // Area CRUD
   // ============================
 

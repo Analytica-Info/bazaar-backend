@@ -89,6 +89,9 @@ router.get("/shipping-countries/:id", adminMiddleware, shippingCtrl.getById);
 router.put("/shipping-countries/:id", adminMiddleware, shippingCtrl.update);
 router.patch("/shipping-countries/:id/toggle-active", adminMiddleware, shippingCtrl.toggleActive);
 router.delete("/shipping-countries/:id", adminMiddleware, shippingCtrl.remove);
+// Bulk Import
+router.post("/shipping-countries/:id/bulk-cities", adminMiddleware, shippingCtrl.bulkImportCities);
+router.post("/shipping-countries/:id/cities/:cityId/bulk-areas", adminMiddleware, shippingCtrl.bulkImportAreas);
 // Cities
 router.post("/shipping-countries/:id/cities", adminMiddleware, shippingCtrl.addCity);
 router.put("/shipping-countries/:id/cities/:cityId", adminMiddleware, shippingCtrl.updateCity);

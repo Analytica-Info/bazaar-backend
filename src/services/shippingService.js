@@ -92,6 +92,116 @@ exports.deleteCountry = async (id) => {
 };
 
 // ============================================
+// BULK IMPORT
+// ============================================
+
+/**
+ * Bulk import cities (with optional areas) into a country.
+ * Skips duplicates by city name. Accepts array of:
+ *   { name: "Muscat", shippingRate: 3, areas: [{ name: "Ruwi", shippingRate: 3 }] }
+ *
+ * Also accepts a flat array of city name strings:
+ *   ["Muscat", "Salalah", "Sohar"]
+ */
+exports.bulkImportCities = async (countryId, cities) => {
+  const country = await ShippingCountry.findById(countryId);
+  if (!country) throw { status: 404, message: "Shipping country not found." };
+
+  if (!Array.isArray(cities) || cities.length === 0) {
+    throw { status: 400, message: "Cities array is required and must not be empty." };
+  }
+
+  const existingNames = new Set(country.cities.map((c) => c.name.toLowerCase()));
+  let added = 0;
+  let skipped = 0;
+
+  for (const item of cities) {
+    const cityName = typeof item === "string" ? item : item?.name;
+    if (!cityName || !cityName.trim()) {
+      skipped++;
+      continue;
+    }
+
+    if (existingNames.has(cityName.trim().toLowerCase())) {
+      skipped++;
+      continue;
+    }
+
+    const cityObj = {
+      name: cityName.trim(),
+      shippingRate: typeof item === "object" ? (item.shippingRate ?? null) : null,
+      areas: [],
+    };
+
+    // If areas provided as array
+    if (typeof item === "object" && Array.isArray(item.areas)) {
+      const seenAreas = new Set();
+      for (const area of item.areas) {
+        const areaName = typeof area === "string" ? area : area?.name;
+        if (!areaName || seenAreas.has(areaName.trim().toLowerCase())) continue;
+        seenAreas.add(areaName.trim().toLowerCase());
+        cityObj.areas.push({
+          name: areaName.trim(),
+          shippingRate: typeof area === "object" ? (area.shippingRate ?? null) : null,
+        });
+      }
+    }
+
+    country.cities.push(cityObj);
+    existingNames.add(cityName.trim().toLowerCase());
+    added++;
+  }
+
+  await country.save();
+  return { added, skipped, totalCities: country.cities.length, country: country.toObject() };
+};
+
+/**
+ * Bulk import areas into a city. Skips duplicates.
+ * Accepts array of objects or strings:
+ *   [{ name: "Ruwi", shippingRate: 3 }, "Mutrah", "Qurum"]
+ */
+exports.bulkImportAreas = async (countryId, cityId, areas) => {
+  const country = await ShippingCountry.findById(countryId);
+  if (!country) throw { status: 404, message: "Shipping country not found." };
+
+  const city = country.cities.id(cityId);
+  if (!city) throw { status: 404, message: "City not found." };
+
+  if (!Array.isArray(areas) || areas.length === 0) {
+    throw { status: 400, message: "Areas array is required and must not be empty." };
+  }
+
+  const existingNames = new Set(city.areas.map((a) => a.name.toLowerCase()));
+  let added = 0;
+  let skipped = 0;
+
+  for (const item of areas) {
+    const areaName = typeof item === "string" ? item : item?.name;
+    if (!areaName || !areaName.trim()) {
+      skipped++;
+      continue;
+    }
+
+    if (existingNames.has(areaName.trim().toLowerCase())) {
+      skipped++;
+      continue;
+    }
+
+    city.areas.push({
+      name: areaName.trim(),
+      shippingRate: typeof item === "object" ? (item.shippingRate ?? null) : null,
+    });
+
+    existingNames.add(areaName.trim().toLowerCase());
+    added++;
+  }
+
+  await country.save();
+  return { added, skipped, totalAreas: city.areas.length, country: country.toObject() };
+};
+
+// ============================================
 // CITY CRUD
 // ============================================
 

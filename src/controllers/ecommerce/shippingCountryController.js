@@ -69,6 +69,30 @@ exports.remove = async (req, res) => {
 };
 
 // ============================================
+// ADMIN — Bulk Import
+// ============================================
+
+exports.bulkImportCities = async (req, res) => {
+  try {
+    const result = await shippingService.bulkImportCities(req.params.id, req.body.cities);
+    res.status(200).json({ success: true, message: `${result.added} cities added, ${result.skipped} skipped.`, ...result });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Failed to import cities", error: err.message });
+  }
+};
+
+exports.bulkImportAreas = async (req, res) => {
+  try {
+    const result = await shippingService.bulkImportAreas(req.params.id, req.params.cityId, req.body.areas);
+    res.status(200).json({ success: true, message: `${result.added} areas added, ${result.skipped} skipped.`, ...result });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Failed to import areas", error: err.message });
+  }
+};
+
+// ============================================
 // ADMIN — City CRUD
 // ============================================
 
