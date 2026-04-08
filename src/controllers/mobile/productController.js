@@ -7,6 +7,7 @@ const ProductView = require("../../models/ProductView");
 
 const productService = require("../../services/productService");
 
+const logger = require("../../utilities/logger");
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 
 // ─── Thin wrapper helper ─────────────────────────────────────────
@@ -275,7 +276,7 @@ exports.review = async (req, res) => {
             reviews: mappedReviews,
         });
     } catch (error) {
-        console.error("Error fetching reviews:", error);
+        logger.error({ err: error }, "Error fetching reviews:");
         res.status(500).json({ error: error.message });
     }
 };
@@ -319,7 +320,7 @@ exports.UserReview = async (req, res) => {
             reviews: mappedReviews,
         });
     } catch (error) {
-        console.error("Error fetching reviews:", error);
+        logger.error({ err: error }, "Error fetching reviews:");
         res.status(500).json({ error: error.message });
     }
 };

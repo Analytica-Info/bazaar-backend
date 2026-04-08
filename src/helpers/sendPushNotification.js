@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
+const logger = require("../utilities/logger");
 let firebaseInitialized = false;
 
 function initializeFirebase() {
@@ -15,7 +16,7 @@ function initializeFirebase() {
         const serviceAccountPath = path.join(__dirname, '../config/bazaar-2aa3a-firebase-adminsdk-fbsvc-270d47e77a.json');
 
         if (!fs.existsSync(serviceAccountPath)) {
-            console.error('Firebase service account file not found at:', serviceAccountPath);
+            logger.error({ err: serviceAccountPath }, 'Firebase service account file not found at:');
             return;
         }
 
@@ -27,9 +28,9 @@ function initializeFirebase() {
             });
         }
         firebaseInitialized = true;
-        console.log('Firebase Admin initialized successfully for admin notifications');
+        logger.info('Firebase Admin initialized successfully for admin notifications');
     } catch (error) {
-        console.error('Firebase initialization error:', error.message);
+        logger.error({ err: error }, 'Firebase initialization error:');
     }
 }
 
@@ -42,12 +43,12 @@ function isFirebaseInitialized() {
 
 const sendPushNotificationToUser = async (fcmToken, title, body, userId, notificationId = null) => {
     if (!fcmToken) {
-        console.log(`No FCM token for user ${userId}`);
+        logger.info(`No FCM token for user ${userId}`);
         return false;
     }
 
     if (!isFirebaseInitialized()) {
-        console.error('Firebase not initialized, cannot send notification');
+        logger.error('Firebase not initialized, cannot send notification');
         return false;
     }
 
@@ -79,7 +80,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
     try {
         const existing = await Notification.findById(notificationId);
         if (!existing) {
-            console.error('Notification not found:', notificationId);
+            logger.error({ err: notificationId }, 'Notification not found:');
             return noResult();
         }
         if (existing.sentAt) {
@@ -87,7 +88,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
             return noResult();
         }
         if (!isFirebaseInitialized()) {
-            console.error('Firebase not initialized, cannot send notification');
+            logger.error('Firebase not initialized, cannot send notification');
             return noResult();
         }
 
@@ -124,7 +125,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
         }
 
         if (targetUsers.length === 0) {
-            console.log('No users with FCM tokens found');
+            logger.info('No users with FCM tokens found');
             return noResult();
         }
 
@@ -133,7 +134,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
 
         for (const user of targetUsers) {
             if (!user.fcmToken) {
-                console.log(`Skipping user ${user._id} - no FCM token`);
+                logger.info(`Skipping user ${user._id} - no FCM token`);
                 failCount++;
                 continue;
             }
@@ -154,11 +155,11 @@ exports.sendNotificationToUsers = async (notificationId) => {
         }
 
         if (successCount > 0 && failCount === 0) {
-            console.log(`[Notification Send] SUCCESS — sent to ${successCount} user(s). id: ${notificationId}`);
+            logger.info(`[Notification Send] SUCCESS — sent to ${successCount} user(s). id: ${notificationId}`);
         } else if (failCount > 0) {
-            console.log(`[Notification Send] PARTIAL/FAIL — ${successCount} success, ${failCount} failed. id: ${notificationId}`);
+            logger.info(`[Notification Send] PARTIAL/FAIL — ${successCount} success, ${failCount} failed. id: ${notificationId}`);
         } else {
-            console.log(`[Notification Send] FAIL — 0 sent. id: ${notificationId}`);
+            logger.info(`[Notification Send] FAIL — 0 sent. id: ${notificationId}`);
         }
 
         for (const user of targetUsers) {
@@ -171,7 +172,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
                     createdAt: new Date()
                 });
             } catch (error) {
-                console.error('Error creating user notification record:', error);
+                logger.error({ err: error }, 'Error creating user notification record:');
             }
         }
 
@@ -180,10 +181,10 @@ exports.sendNotificationToUsers = async (notificationId) => {
         await Notification.findByIdAndUpdate(notificationId, { $set: { status: finalStatus } });
 
         if (successCount > 0) {
-            console.log(`\n========== NOTIFICATION SENT TO ${successCount} USER(S) — id: ${notificationId} ==========\n`);
+            logger.info(`\n========== NOTIFICATION SENT TO ${successCount} USER(S) — id: ${notificationId} ==========\n`);
         }
         if (finalStatus === 'failed') {
-            console.log(`[Notification Send] FAILED — ${successCount}/${totalTargets} received. ${failCount > 0 ? 'At least one delivery failed.' : 'No users received.'}`);
+            logger.info(`[Notification Send] FAILED — ${successCount}/${totalTargets} received. ${failCount > 0 ? 'At least one delivery failed.' : 'No users received.'}`);
         }
 
         const sendMessage = finalStatus === 'sent'
@@ -211,7 +212,7 @@ exports.sendNotificationToUsers = async (notificationId) => {
 
         return { successCount, failCount, total: targetUsers.length };
     } catch (error) {
-        console.error('Error in sendNotificationToUsers:', error);
+        logger.error({ err: error }, 'Error in sendNotificationToUsers:');
         return noResult();
     }
 };
@@ -247,7 +248,7 @@ exports.checkAndSendScheduledNotifications = async () => {
     try {
         const gotLock = await tryAcquireMinuteLock();
         if (!gotLock) {
-            console.log('[Scheduled Notifications] runId=', runId, '| SKIP (another process holds the lock for this minute). Run only ONE server to see sends here.');
+            logger.info('[Scheduled Notifications] runId=', runId, '| SKIP (another process holds the lock for this minute). Run only ONE server to see sends here.');
             return;
         }
 
@@ -257,7 +258,7 @@ exports.checkAndSendScheduledNotifications = async () => {
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             if (attempt > 0) {
-                console.log('[Scheduled Notifications] runId=', runId, '| retry attempt', attempt + 1, 'after', delayMs / 1000, 's');
+                logger.info('[Scheduled Notifications] runId=', runId, '| retry attempt', attempt + 1, 'after', delayMs / 1000, 's');
                 await new Promise(r => setTimeout(r, delayMs));
             }
 
@@ -270,7 +271,7 @@ exports.checkAndSendScheduledNotifications = async () => {
                 scheduledDateTime: { $ne: null }
             }).read('primary').lean().exec();
 
-            console.log('[Scheduled Notifications] runId=', runId, '| allPending count:', allPending.length, allPending.length ? '| ids: ' + allPending.map(n => n._id.toString()).join(', ') : '');
+            logger.info('[Scheduled Notifications] runId=', runId, '| allPending count:', allPending.length, allPending.length ? '| ids: ' + allPending.map(n => n._id.toString()).join(', ') : '');
 
             const toSend = allPending.filter(n => {
                 const scheduled = n.scheduledDateTime ? new Date(n.scheduledDateTime).getTime() : 0;
@@ -289,24 +290,24 @@ exports.checkAndSendScheduledNotifications = async () => {
                     if (recent) {
                         console.log('[Scheduled Notifications] No due (last attempt). Debug: id=', recent._id, 'sentAt=', recent.sentAt);
                         if (recent.sentAt) {
-                            console.log('[Scheduled Notifications] ^ That notification was already SENT (likely by another Node process). Run only ONE server (stop PM2/duplicate terminals/IDE run).');
+                            logger.info('[Scheduled Notifications] ^ That notification was already SENT (likely by another Node process). Run only ONE server (stop PM2/duplicate terminals/IDE run).');
                         }
                     }
                 }
             } else {
-                console.log('[Scheduled Notifications] runId=', runId, '| Found', toSend.length, 'to send');
+                logger.info('[Scheduled Notifications] runId=', runId, '| Found', toSend.length, 'to send');
                 for (const notification of toSend) {
                     console.log('[Scheduled Notifications] runId=', runId, '| Calling sendNotificationToUsers id:', notification._id.toString());
                     await exports.sendNotificationToUsers(notification._id);
                     totalSent++;
                 }
-                console.log('[Scheduled Notifications] runId=', runId, '| DONE (sent', totalSent, ')');
+                logger.info('[Scheduled Notifications] runId=', runId, '| DONE (sent', totalSent, ')');
                 break;
             }
         }
 
         if (totalSent === 0) {
-            console.log('[Scheduled Notifications] runId=', runId, '| DONE (sent 0 after', maxAttempts, 'attempts)');
+            logger.info('[Scheduled Notifications] runId=', runId, '| DONE (sent 0 after', maxAttempts, 'attempts)');
         }
 
         const now = new Date();
@@ -318,10 +319,10 @@ exports.checkAndSendScheduledNotifications = async () => {
             { $set: { status: 'failed' } }
         );
         if (marked.modifiedCount > 0) {
-            console.log('[Scheduled Notifications] Marked', marked.modifiedCount, 'past-due as failed.');
+            logger.info('[Scheduled Notifications] Marked', marked.modifiedCount, 'past-due as failed.');
         }
     } catch (error) {
-        console.error('Error checking scheduled notifications:', error);
+        logger.error({ err: error }, 'Error checking scheduled notifications:');
     }
 };
 

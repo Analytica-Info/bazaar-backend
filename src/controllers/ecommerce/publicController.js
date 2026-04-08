@@ -57,6 +57,7 @@ const couponService = require("../../services/couponService");
 const checkoutService = require("../../services/checkoutService");
 const newsletterService = require("../../services/newsletterService");
 
+const logger = require("../../utilities/logger");
 // ─── Multer Uploaders (kept here — routes reference these arrays) ─
 const upload = multer({ dest: "temp/" });
 
@@ -478,7 +479,7 @@ exports.fetchHomeProducts = async (req, res) => {
     const result = await productService.getHomeProducts();
     res.json({ result });
   } catch (error) {
-    console.error("Error fetching products:", error);
+    logger.error({ err: error }, "Error fetching products:");
     res.status(500).json({ error: "Failed to fetch home products" });
   }
 };
@@ -507,7 +508,7 @@ exports.searchProduct = async (req, res) => {
     if (error.status) {
       return res.status(error.status).json({ error: error.message });
     }
-    console.error("Error processing search request:", error);
+    logger.error({ err: error }, "Error processing search request:");
     res.status(500).json({
       error: "An error occurred while processing the request",
     });
@@ -577,7 +578,7 @@ exports.allCategories = async (req, res) => {
     const result = await productService.getAllCategories();
     res.json(result);
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     res.status(500).json({ error: "Failed to fetch categories or products" });
   }
 };
@@ -588,7 +589,7 @@ exports.categoriesProduct = async (req, res) => {
     const result = await productService.getCategoriesProduct(id, req.query);
     res.json(result);
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     res.status(500).json({ error: "Failed to fetch categories or products" });
   }
 };
@@ -599,7 +600,7 @@ exports.subCategoriesProduct = async (req, res) => {
     const result = await productService.getSubCategoriesProduct(id, req.query);
     res.json(result);
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     res.status(500).json({ error: "Failed to fetch categories or products" });
   }
 };
@@ -610,7 +611,7 @@ exports.subSubCategoriesProduct = async (req, res) => {
     const result = await productService.getSubSubCategoriesProduct(id, req.query);
     res.json(result);
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     res.status(500).json({ error: "Failed to fetch categories or products" });
   }
 };
@@ -621,7 +622,7 @@ exports.randomProducts = async (req, res) => {
     const result = await productService.getRandomProducts(id);
     return res.json(result);
   } catch (error) {
-    console.error("Error fetching product details:", error.message);
+    logger.error({ err: error }, "Error fetching product details:");
     return res.status(500).json({ error: "Failed to fetch product details" });
   }
 };
@@ -642,7 +643,7 @@ exports.fetchDbProducts = async (req, res) => {
     const result = await productService.fetchDbProducts(req.query);
     res.json(result);
   } catch (error) {
-    console.error("Error fetching products:", error);
+    logger.error({ err: error }, "Error fetching products:");
     res.status(500).json({ error: "Failed to fetch products" });
   }
 };
@@ -652,7 +653,7 @@ exports.fetchProductsNoImages = async (req, res) => {
     const result = await productService.fetchProductsNoImages(req.query);
     res.json(result);
   } catch (error) {
-    console.error("Error fetching products with no images:", error);
+    logger.error({ err: error }, "Error fetching products with no images:");
     res.status(500).json({ error: "Failed to fetch products with no images" });
   }
 };
@@ -671,7 +672,7 @@ exports.createCardCheckout = async (req, res) => {
     );
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error creating checkout session:", error);
+    logger.error({ err: error }, "Error creating checkout session:");
     res.status(500).send("Internal Server Error");
   }
 };
@@ -693,7 +694,7 @@ exports.createTabbyCheckout = async (req, res) => {
         ...(error.data ? error.data : {}),
       });
     }
-    console.error("Tabby checkout error:", error);
+    logger.error({ err: error }, "Tabby checkout error:");
     const user = req.user || {};
     await logActivity({
       platform: 'Website Backend',
@@ -723,7 +724,7 @@ exports.verifyCardPayment = async (req, res) => {
     if (error.status) {
       return res.status(error.status).json({ message: error.message });
     }
-    console.error("Error verifying card payment:", error);
+    logger.error({ err: error }, "Error verifying card payment:");
     return res.status(500).json({ message: error.message });
   }
 };
@@ -738,7 +739,7 @@ exports.verifyTabbyPayment = async (req, res) => {
     if (error.status) {
       return res.status(error.status).json({ error: error.message });
     }
-    console.error("Tabby Payment error:", error);
+    logger.error({ err: error }, "Tabby Payment error:");
     const user = req.user || {};
     await logActivity({
       platform: 'Website Backend',
@@ -790,7 +791,7 @@ exports.tabbyWebhook = async (req, res) => {
     if (error.status) {
       return res.status(error.status).send(error.message);
     }
-    console.error("Tabby webhook error:", error);
+    logger.error({ err: error }, "Tabby webhook error:");
     return res.status(500).send("Internal server error");
   }
 };
@@ -938,7 +939,7 @@ exports.contactUs = [
       const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 
       if (!RECAPTCHA_API_KEY || !PROJECT_ID) {
-        console.error("reCAPTCHA Enterprise credentials are not configured");
+        logger.error("reCAPTCHA Enterprise credentials are not configured");
         return res.status(500).json({ message: "Server configuration error" });
       }
 
@@ -973,7 +974,7 @@ exports.contactUs = [
       }
 
       if (action !== "contact_form") {
-        console.error("Invalid reCAPTCHA action:", action);
+        logger.error({ err: action }, "Invalid reCAPTCHA action:");
         return res.status(403).json({ message: "Invalid verification action" });
       }
 
@@ -1160,7 +1161,7 @@ exports.downloadFile = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     response.data.pipe(res);
   } catch (error) {
-    console.error("Error downloading the file:", error);
+    logger.error({ err: error }, "Error downloading the file:");
     res.status(500).send("Failed to download the file.");
   }
 };
@@ -1254,7 +1255,7 @@ exports.productDetails = async (req, res) => {
     }
     return res.json({ product, variantsData, totalQty });
   } catch (error) {
-    console.error("Error fetching product details:", error.message);
+    logger.error({ err: error }, "Error fetching product details:");
     return res.status(500).json({ error: "Failed to fetch product details" });
   }
 };
@@ -1274,19 +1275,19 @@ exports.updateProductDetails = async (req, res) => {
     );
 
     if (updatedEntry) {
-      console.log(`Updated details for product ID: ${product.id}`);
+      logger.info(`Updated details for product ID: ${product.id}`);
       return res.json({
         message: `Product details updated successfully.`,
         product: updatedEntry,
       });
     } else {
-      console.log(`Product ID: ${product.id} does not exist.`);
+      logger.info(`Product ID: ${product.id} does not exist.`);
       return res
         .status(404)
         .json({ error: `Product not found in the database.` });
     }
   } catch (error) {
-    console.error("Error updating product details:", error.message);
+    logger.error({ err: error }, "Error updating product details:");
     return res.status(500).json({ error: "Failed to update product details." });
   }
 };
@@ -1300,7 +1301,7 @@ exports.getIdss = async (req, res) => {
 
   req.on("close", () => {
     isProcessing = false;
-    console.log("Client disconnected, stopping processing");
+    logger.info("Client disconnected, stopping processing");
   });
 
   try {
@@ -1332,7 +1333,7 @@ exports.getIdss = async (req, res) => {
       }
     }
   } catch (error) {
-    console.error("Error fetching and storing product IDs:", error.message);
+    logger.error({ err: error }, "Error fetching and storing product IDs:");
     if (isClientConnected(res)) {
       return res.status(500).json({
         message: "Failed to process product IDs",
@@ -1361,17 +1362,17 @@ exports.getIdsss = async (req, res) => {
 
       for (const id of missingProductIds) {
         await ProductId.create({ productId: id });
-        console.log(`Added new Product ID: ${id}`);
+        logger.info(`Added new Product ID: ${id}`);
       }
       await storeProductDetails(missingProductIds, res);
     } else {
-      console.log("No missing product IDs found.");
+      logger.info("No missing product IDs found.");
       return res.status(200).json({
         message: "All product IDs are already in the database.",
       });
     }
   } catch (error) {
-    console.error("Error fetching and storing product IDs:", error.message);
+    logger.error({ err: error }, "Error fetching and storing product IDs:");
     return res.status(500).json({
       message: "Failed to process product IDs",
       error: error.message,
@@ -1468,20 +1469,20 @@ exports.categories = async (req, res) => {
 
     const existingCategories = await Category.findOne({});
     if (existingCategories) {
-      console.log("Categories updated in database.");
+      logger.info("Categories updated in database.");
     } else {
       const newCategory = new Category(categoryData);
       await newCategory.save();
-      console.log("Categories saved to database.");
+      logger.info("Categories saved to database.");
     }
 
-    console.log("Return - API - All Categories");
+    logger.info("Return - API - All Categories");
     res.json({
       success: true,
       message: "Categories processed and saved to the database successfully.",
     });
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     res
       .status(500)
       .json({ error: "Failed to fetch or save categories or products." });
@@ -1602,7 +1603,7 @@ async function updateQuantities(cartData, orderId = null) {
                 const fetched = await fetchProductDetails(mainProductId);
                 variantsData = Array.isArray(fetched.variantsData) ? fetched.variantsData.map((v) => ({ ...v })) : [];
               } catch (fetchErr) {
-                console.error(`fetchProductDetails failed for ${mainProductId}:`, fetchErr.message);
+                logger.error({ err: fetchErr }, `fetchProductDetails failed for ${mainProductId}:`);
                 variantsData = Array.isArray(currentDoc.variantsData) ? currentDoc.variantsData.map((v) => ({ ...v })) : [];
                 const vIdx = variantsData.findIndex((vv) => String(vv.id) === String(lightspeedVariantId));
                 if (vIdx !== -1) {
@@ -1685,7 +1686,7 @@ async function updateQuantities(cartData, orderId = null) {
     );
     return updateResults;
   } catch (error) {
-    console.error("Error in updateQuantities:", error.message);
+    logger.error({ err: error }, "Error in updateQuantities:");
     throw error;
   }
 }
@@ -1763,11 +1764,11 @@ async function filterAndCacheProductsByInventory(productsResponse) {
     const cachedProducts = cache.get(cacheKey);
 
     if (cachedProducts) {
-      console.log("Fetching filtered products from cache");
+      logger.info("Fetching filtered products from cache");
       return cachedProducts;
     }
 
-    console.log("Fetching filtered products from Lightspeed API");
+    logger.info("Fetching filtered products from Lightspeed API");
 
     const allProducts = productsResponse || [];
     const allInventories = [];
@@ -1835,7 +1836,7 @@ async function filterAndCacheProductsByInventory(productsResponse) {
 
     return filteredProducts;
   } catch (error) {
-    console.error("Error filtering products by inventory:", error.message);
+    logger.error({ err: error }, "Error filtering products by inventory:");
     throw new Error("Failed to filter products by inventory");
   }
 }
@@ -1867,11 +1868,11 @@ async function fetchAndCacheProducts() {
     const cachedProducts = cache.get(cacheKey);
 
     if (cachedProducts) {
-      console.log("Fetching products from cache");
+      logger.info("Fetching products from cache");
       return cachedProducts;
     }
 
-    console.log("Fetching products from Lightspeed API");
+    logger.info("Fetching products from Lightspeed API");
 
     const response = await axios.get(PRODUCTS_URL, {
       headers: {
@@ -1890,7 +1891,7 @@ async function fetchAndCacheProducts() {
 
     return activeProducts;
   } catch (error) {
-    console.error("Error fetching products:", error.message);
+    logger.error({ err: error }, "Error fetching products:");
 
     if (error.response && error.response.status >= 500) {
       throw new Error("Server error while fetching product");
@@ -1936,11 +1937,11 @@ async function fetchAndCacheCategories() {
   try {
     const cachedCategories = cache.get(cacheKey);
     if (cachedCategories) {
-      console.log("Fetching categories from cache");
+      logger.info("Fetching categories from cache");
       return cachedCategories;
     }
 
-    console.log("Fetching categories from Lightspeed API");
+    logger.info("Fetching categories from Lightspeed API");
 
     const categoriesResponse = await axios.get(CATEGORIES_URL, {
       headers: {
@@ -1967,14 +1968,14 @@ async function fetchAndCacheCategories() {
 
 async function autoCacheProducts() {
   try {
-    console.log("Running scheduled cache refresh...");
+    logger.info("Running scheduled cache refresh...");
     let productsResponse = await Product.find();
     productsResponse = productsResponse.filter(
       (product) => product.status === true
     );
     await filterAndCacheProductsByInventory(productsResponse);
   } catch (error) {
-    console.error("Error in scheduled cache refresh:", error.message);
+    logger.error({ err: error }, "Error in scheduled cache refresh:");
   }
 }
 
@@ -1998,7 +1999,7 @@ const generateCouponCode = async () => {
     const newCoupon = `DH${nextNumber}YHZXB`;
     return newCoupon;
   } catch (error) {
-    console.error("Error generating the coupon code:", error);
+    logger.error({ err: error }, "Error generating the coupon code:");
     return "DH1YHZXB";
   }
 };
@@ -2008,7 +2009,7 @@ const storeProductDetails = async (productIds, res, isProcessing) => {
     let count = 0;
     for (const id of productIds) {
       if (!isProcessing || !isClientConnected(res)) {
-        console.log("Processing stopped due to client disconnection");
+        logger.info("Processing stopped due to client disconnection");
         return;
       }
       count++;
@@ -2041,14 +2042,14 @@ const storeProductDetails = async (productIds, res, isProcessing) => {
         );
       }
     }
-    console.log("Products stored and processed successfully.");
+    logger.info("Products stored and processed successfully.");
     if (isClientConnected(res)) {
       return res.status(200).json({
         message: "Products stored and processed successfully.",
       });
     }
   } catch (error) {
-    console.error("Error processing product details:", error.message);
+    logger.error({ err: error }, "Error processing product details:");
     if (isClientConnected(res)) {
       return res.status(500).json({
         message: "Failed to process product details",
@@ -2162,7 +2163,7 @@ const fetchCouponDetails = async (id) => {
       return response.data.data;
     }
 
-    console.error("Invalid promotion response format.");
+    logger.error("Invalid promotion response format.");
     return null;
 
   } catch (error) {

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const fs = require("fs");
 const path = require("path");
 
+const logger = require("../../utilities/logger");
 const logStatusFalseItems = (endpoint, req, res, responseData) => {
     try {
         let products = [];
@@ -53,13 +54,13 @@ const logStatusFalseItems = (endpoint, req, res, responseData) => {
                 } else {
                     fs.writeFileSync(logFilePath, `# Status False Items Log\n\n${logContent}`);
                 }
-                console.log(`ALERT: ${falseStatusItems.length} items with status: false found in ${endpoint}`);
+                logger.info(`ALERT: ${falseStatusItems.length} items with status: false found in ${endpoint}`);
             } catch (fileError) {
-                console.error('Error writing to status log file:', fileError);
+                logger.error({ err: fileError }, 'Error writing to status log file:');
             }
         }
     } catch (error) {
-        console.error('Error in status logging:', error);
+        logger.error({ err: error }, 'Error in status logging:');
     }
 };
 
@@ -89,7 +90,7 @@ exports.productsByPrice = async (req, res) => {
         if (error.responseBody) {
             return res.status(error.status).json(error.responseBody);
         }
-        console.error("Error fetching products by price:", error);
+        logger.error({ err: error }, "Error fetching products by price:");
         return res.status(500).json({
             success: false,
             message: "An error occurred while fetching products by price"
@@ -131,7 +132,7 @@ exports.todayDeal = async (req, res) => {
 
         res.status(200).json(result);
     } catch (error) {
-        console.error("Error in todayDeal:", error);
+        logger.error({ err: error }, "Error in todayDeal:");
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -168,7 +169,7 @@ exports.getFlashSales = async (req, res) => {
 
         return res.status(200).json(result);
     } catch (err) {
-        console.error("Error in getFlashSales:", err);
+        logger.error({ err: err }, "Error in getFlashSales:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
 };
@@ -181,7 +182,7 @@ exports.favouritesOfWeek = async (req, res) => {
 
         res.status(200).json(result);
     } catch (error) {
-        console.error("Error in favouritesOfWeek:", error);
+        logger.error({ err: error }, "Error in favouritesOfWeek:");
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -206,7 +207,7 @@ exports.getSuperSaverProducts = async (req, res) => {
 
         return res.status(200).json(result);
     } catch (err) {
-        console.error("Error in getSuperSaverProducts:", err);
+        logger.error({ err: err }, "Error in getSuperSaverProducts:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
 };

@@ -3,6 +3,7 @@ const userService = require("../../services/userService");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = require("../../config/jwtSecret");
 
+const logger = require("../../utilities/logger");
 const BACKEND_URL = process.env.BACKEND_URL;
 const WEB_URL = process.env.URL;
 
@@ -45,7 +46,7 @@ exports.register = async (req, res) => {
 
     return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    console.error("Register Error:", error);
+    logger.error({ err: error }, "Register Error:");
     const status = error.status || 500;
     res.status(status).json({
       message: error.message || "Server error",
@@ -72,7 +73,7 @@ exports.login = async (req, res) => {
       message: "Login successful",
     });
   } catch (error) {
-    console.error("Login Error:", error);
+    logger.error({ err: error }, "Login Error:");
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Server error" });
   }
@@ -97,7 +98,7 @@ exports.googleLogin = async (req, res) => {
       refreshToken: result.tokens.refreshToken,
     });
   } catch (error) {
-    console.error("Unhandled Error in googleLogin:", error);
+    logger.error({ err: error }, "Unhandled Error in googleLogin:");
     const status = error.status || 500;
     return res.status(status).json({
       message: error.message || "Server error during Google login",
@@ -139,7 +140,7 @@ exports.appleLogin = async (req, res) => {
 
     return res.redirect(`${successUrl}?apple_login=success`);
   } catch (error) {
-    console.error("Unhandled Error in appleLogin:", error);
+    logger.error({ err: error }, "Unhandled Error in appleLogin:");
 
     // Redirect to frontend failure URL (same as original)
     const failureUrl =
@@ -277,7 +278,7 @@ exports.updatePassword = async (req, res) => {
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
-    console.error("Error updating password:", error);
+    logger.error({ err: error }, "Error updating password:");
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Server error" });
   }
@@ -328,7 +329,7 @@ exports.deleteAccount = async (req, res) => {
 
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
-    console.error("Delete Account Error:", error);
+    logger.error({ err: error }, "Delete Account Error:");
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Server error" });
   }
@@ -341,7 +342,7 @@ exports.deleteAccountPublic = async (req, res) => {
 
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
-    console.error("Delete Account Error:", error);
+    logger.error({ err: error }, "Delete Account Error:");
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Server error" });
   }
@@ -356,7 +357,7 @@ exports.verifyRecoveryCode = async (req, res) => {
       .status(200)
       .json({ message: "Account recovered successfully. You can now log in." });
   } catch (error) {
-    console.error("Verify Recovery Code Error:", error);
+    logger.error({ err: error }, "Verify Recovery Code Error:");
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Server error" });
   }
@@ -373,7 +374,7 @@ exports.resendRecoveryCode = async (req, res) => {
       attemptsLeft: result.attemptsLeft,
     });
   } catch (error) {
-    console.error("Resend Recovery Code Error:", error);
+    logger.error({ err: error }, "Resend Recovery Code Error:");
     const status = error.status || 500;
     res.status(status).json({
       message: error.message || "Server error",
@@ -404,7 +405,7 @@ exports.getNotification = async (req, res) => {
       notifications: notifications,
     });
   } catch (err) {
-    console.error("Error fetching notifications:", err);
+    logger.error({ err: err }, "Error fetching notifications:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -434,7 +435,7 @@ exports.markNotificationsAsRead = async (req, res) => {
       .status(200)
       .json({ success: true, message: "Notifications marked as read." });
   } catch (err) {
-    console.error("Error updating notifications:", err);
+    logger.error({ err: err }, "Error updating notifications:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -625,7 +626,7 @@ exports.currentMonthOrderCategories = async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    console.error("Error fetching current month order categories:", error);
+    logger.error({ err: error }, "Error fetching current month order categories:");
     return res.status(500).json({
       success: false,
       message: "An error occurred while fetching current month order categories",

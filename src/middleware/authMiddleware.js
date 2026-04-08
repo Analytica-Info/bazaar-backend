@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Admin = require('../models/Admin');
 const JWT_SECRET = require('../config/jwtSecret');
 
+const logger = require("../utilities/logger");
 /**
  * Core authentication handler.
  * Extracts token from cookies (web) or Authorization header (mobile/admin),
@@ -57,7 +58,7 @@ const handler = (role = 'user') => {
       } else if (error.name === 'JsonWebTokenError') {
         return res.status(401).json({ message: 'Invalid token' });
       } else {
-        console.error('Auth middleware error:', error.message);
+        logger.error({ err: error }, 'Auth middleware error:');
         return res.status(500).json({ message: 'Internal server error' });
       }
     }

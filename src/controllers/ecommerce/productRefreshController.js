@@ -1,5 +1,6 @@
 const productSyncService = require("../../services/productSyncService");
 
+const logger = require("../../utilities/logger");
 exports.refreshSingleProductById = async (req, res) => {
     try {
         const productId =
@@ -25,7 +26,7 @@ exports.refreshSingleProductById = async (req, res) => {
                 message: error.message,
             });
         }
-        console.error('refreshSingleProductById error:', error.message);
+        logger.error({ err: error }, 'refreshSingleProductById error:');
         return res.status(500).json({
             success: false,
             message: error.message || 'Failed to refresh product',

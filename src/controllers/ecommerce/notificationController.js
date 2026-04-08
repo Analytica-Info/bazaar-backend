@@ -2,6 +2,7 @@ const notificationService = require("../../services/notificationService");
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require('../../config/jwtSecret');
 
+const logger = require("../../utilities/logger");
 const getAdminIdFromToken = (req) => {
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) return null;
@@ -41,7 +42,7 @@ exports.createNotification = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Create Notification Error:', error);
+        logger.error({ err: error }, 'Create Notification Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while creating notification',
@@ -63,7 +64,7 @@ exports.getNotifications = async (req, res) => {
             pagination: result.pagination
         });
     } catch (error) {
-        console.error('Get Notifications Error:', error);
+        logger.error({ err: error }, 'Get Notifications Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching notifications',
@@ -89,7 +90,7 @@ exports.getNotificationDetails = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Get Notification Details Error:', error);
+        logger.error({ err: error }, 'Get Notification Details Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching notification details',
@@ -123,7 +124,7 @@ exports.updateNotification = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Update Notification Error:', error);
+        logger.error({ err: error }, 'Update Notification Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while updating notification',
@@ -146,7 +147,7 @@ exports.searchUsers = async (req, res) => {
             pagination: result.pagination
         });
     } catch (error) {
-        console.error('Search Users Error:', error);
+        logger.error({ err: error }, 'Search Users Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while searching users',
@@ -172,7 +173,7 @@ exports.deleteNotification = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Delete Notification Error:', error);
+        logger.error({ err: error }, 'Delete Notification Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while deleting notification',
@@ -190,7 +191,7 @@ exports.getAllUsersForNotification = async (req, res) => {
             users
         });
     } catch (error) {
-        console.error('Get All Users Error:', error);
+        logger.error({ err: error }, 'Get All Users Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching users',

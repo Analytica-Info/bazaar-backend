@@ -6,6 +6,7 @@ const { sendNotificationToUsers } = require('../helpers/sendPushNotification');
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
+const logger = require("../utilities/logger");
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

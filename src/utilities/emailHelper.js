@@ -1,5 +1,6 @@
 const EmailConfig = require('../models/EmailConfig');
 
+const logger = require("/logger");
 /**
  * Get admin email - checks database first, then falls back to ENV
  * @returns {Promise<string>} Admin email address
@@ -11,7 +12,7 @@ async function getAdminEmail() {
             return emailConfig.adminEmail;
         }
     } catch (error) {
-        console.error('Error fetching admin email from database:', error);
+        logger.error({ err: error }, 'Error fetching admin email from database:');
     }
 
     return process.env.ADMIN_EMAIL || '';
@@ -28,7 +29,7 @@ async function getCcEmails() {
             return emailConfig.ccEmails.filter(email => email && email.trim());
         }
     } catch (error) {
-        console.error('Error fetching CC emails from database:', error);
+        logger.error({ err: error }, 'Error fetching CC emails from database:');
     }
 
     const ccMails = process.env.CC_MAILS;

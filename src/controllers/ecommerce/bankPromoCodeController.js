@@ -1,5 +1,6 @@
 const bankPromoCodeService = require("../../services/bankPromoCodeService");
 
+const logger = require("../../utilities/logger");
 /**
  * GET /admin/bank-promo-codes
  * List all bank promo codes (newest first)
@@ -10,7 +11,7 @@ exports.list = async (req, res) => {
         return res.status(200).json({ success: true, promos });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode list error:', err);
+        logger.error({ err: err }, 'BankPromoCode list error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch promo codes',
@@ -33,7 +34,7 @@ exports.create = async (req, res) => {
         });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode create error:', err);
+        logger.error({ err: err }, 'BankPromoCode create error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to create promo code',
@@ -51,7 +52,7 @@ exports.getById = async (req, res) => {
         return res.status(200).json({ success: true, promo });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode getById error:', err);
+        logger.error({ err: err }, 'BankPromoCode getById error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch promo code',
@@ -73,7 +74,7 @@ exports.update = async (req, res) => {
         });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode update error:', err);
+        logger.error({ err: err }, 'BankPromoCode update error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to update promo code',
@@ -96,7 +97,7 @@ exports.toggleActive = async (req, res) => {
         });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode toggleActive error:', err);
+        logger.error({ err: err }, 'BankPromoCode toggleActive error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to toggle promo code',
@@ -117,7 +118,7 @@ exports.delete = async (req, res) => {
         });
     } catch (err) {
         if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-        console.error('BankPromoCode delete error:', err);
+        logger.error({ err: err }, 'BankPromoCode delete error:');
         return res.status(500).json({
             success: false,
             message: 'Failed to delete promo code',

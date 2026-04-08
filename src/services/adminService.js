@@ -16,6 +16,7 @@ const BackendLog = require('../models/BackendLog');
 const mongoose = require('mongoose');
 const { sendEmail } = require("../mail/emailService");
 
+const logger = require("../utilities/logger");
 function getUaeDateTime() {
   const now = new Date();
 
@@ -1028,13 +1029,13 @@ exports.getOrders = async ({ page, limit, search, status, paymentStatus, payment
 };
 
 exports.getCoupons = async () => {
-    console.log('API - Coupons');
+    logger.info('API - Coupons');
     const coupons = await Coupon.find();
     if (coupons.length === 0) {
         throw { status: 404, message: 'No coupons found.' };
     }
 
-    console.log('Return - API - Coupons');
+    logger.info('Return - API - Coupons');
     return coupons;
 };
 

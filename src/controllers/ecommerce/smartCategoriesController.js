@@ -2,6 +2,7 @@ const smartCategoriesService = require("../../services/smartCategoriesService");
 const FlashSale = require("../../models/FlashSale");
 const Product = require("../../models/Product");
 
+const logger = require("../../utilities/logger");
 exports.hotOffers = async (req, res) => {
     try {
         const result = await smartCategoriesService.getHotOffers({ priceField: "tax_inclusive" });
@@ -25,7 +26,7 @@ exports.productsByPrice = async (req, res) => {
         if (error.responseBody) {
             return res.status(error.status).json(error.responseBody);
         }
-        console.error("Error fetching products by price:", error);
+        logger.error({ err: error }, "Error fetching products by price:");
         return res.status(500).json({
             success: false,
             message: "An error occurred while fetching products by price"
@@ -58,7 +59,7 @@ exports.todayDeal = async (req, res) => {
         const result = await smartCategoriesService.todayDeal();
         res.status(200).json(result);
     } catch (error) {
-        console.error("Error in todayDeal:", error);
+        logger.error({ err: error }, "Error in todayDeal:");
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -86,7 +87,7 @@ exports.getFlashSales = async (req, res) => {
         const result = await smartCategoriesService.getFlashSales({ paginated: false });
         return res.status(200).json(result);
     } catch (err) {
-        console.error("Error in getFlashSales:", err);
+        logger.error({ err: err }, "Error in getFlashSales:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
 };
@@ -96,7 +97,7 @@ exports.getSuperSaverProducts = async (req, res) => {
         const result = await smartCategoriesService.getSuperSaverProducts({ minItems: 20 });
         return res.status(200).json(result);
     } catch (err) {
-        console.error("Error in getSuperSaverProducts:", err);
+        logger.error({ err: err }, "Error in getSuperSaverProducts:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
 };
@@ -106,7 +107,7 @@ exports.favouritesOfWeek = async (req, res) => {
         const result = await smartCategoriesService.favouritesOfWeek();
         res.status(200).json(result);
     } catch (error) {
-        console.error("Error in favouritesOfWeek:", error);
+        logger.error({ err: error }, "Error in favouritesOfWeek:");
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -217,7 +218,7 @@ exports.exportProductsAvailability = async (req, res) => {
         res.write(csvStringifier.stringifyRecords(records));
         res.end();
     } catch (err) {
-        console.error('Error exporting products availability:', err);
+        logger.error({ err: err }, 'Error exporting products availability:');
         res.status(500).json({ success: false, message: 'Failed to export products availability' });
     }
 };

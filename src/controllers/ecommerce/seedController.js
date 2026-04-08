@@ -2,6 +2,7 @@ const Role = require('../../models/Role');
 const Permission = require('../../models/Permission');
 const Admin = require('../../models/Admin');
 
+const logger = require("../../utilities/logger");
 const permissions = [
     { name: 'Dashboard', slug: 'dashboard', module: 'Dashboard', action: 'view', description: 'Access dashboard' },
     { name: 'Products', slug: 'products', module: 'Products', action: 'view', description: 'Access products' },
@@ -104,7 +105,7 @@ exports.seedRolesAndPermissions = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Seed Error:', error);
+        logger.error({ err: error }, 'Seed Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while seeding roles and permissions.',

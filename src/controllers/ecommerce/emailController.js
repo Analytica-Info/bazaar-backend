@@ -1,12 +1,13 @@
 const emailConfigService = require("../../services/emailConfigService");
 
+const logger = require("../../utilities/logger");
 exports.getEmailConfig = async (req, res) => {
     try {
         const emailConfig = await emailConfigService.getEmailConfig();
         res.status(200).json({ success: true, emailConfig });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get Email Config Error:', error);
+        logger.error({ err: error }, 'Get Email Config Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching email configuration.',
@@ -26,7 +27,7 @@ exports.updateEmailConfig = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Update Email Config Error:', error);
+        logger.error({ err: error }, 'Update Email Config Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while updating email configuration.',
@@ -45,7 +46,7 @@ exports.syncFromEnv = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Sync Email Config Error:', error);
+        logger.error({ err: error }, 'Sync Email Config Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while syncing email configuration.',

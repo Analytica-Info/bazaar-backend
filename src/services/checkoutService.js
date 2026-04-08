@@ -17,6 +17,7 @@ const { getAdminEmail, getCcEmails } = require("../utilities/emailHelper");
 const { logActivity } = require("../utilities/activityLogger");
 const { logBackendActivity } = require("../utilities/backendLogger");
 
+const logger = require("../utilities/logger");
 const year = new Date().getFullYear();
 const API_KEY = process.env.API_KEY;
 const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
@@ -65,7 +66,7 @@ async function resolveCheckoutDiscountAED({
         };
       }
     } catch (e) {
-      console.error("resolveCheckoutDiscountAED bankPromoId", e);
+      logger.error({ err: e }, "resolveCheckoutDiscountAED bankPromoId");
     }
   }
   const pct = Number(discountPercent) || 0;
@@ -87,10 +88,10 @@ async function clearUserCart(user_id) {
     if (cart) {
       cart.items = [];
       await cart.save();
-      console.log(`Cart cleared for user: ${user_id}`);
+      logger.info(`Cart cleared for user: ${user_id}`);
     }
   } catch (err) {
-    console.error("Error clearing cart:", err);
+    logger.error({ err: err }, "Error clearing cart:");
   }
 }
 
@@ -579,7 +580,7 @@ async function updateQuantities(cartData, orderId = null) {
 
     return updateResults;
   } catch (error) {
-    console.error("Error in updating quantities for the cart:", error);
+    logger.error({ err: error }, "Error in updating quantities for the cart:");
 
     await logBackendActivity({
       platform: 'Website Backend',
@@ -656,7 +657,7 @@ async function createOrderAndSendEmails(payment, user_id) {
     if (coupon && coupon.status !== "used") {
       coupon.status = "used";
       await coupon.save();
-      console.log(`Coupon ${couponCode} status updated to 'used'.`);
+      logger.info(`Coupon ${couponCode} status updated to 'used'.`);
     }
   }
 
@@ -1072,7 +1073,7 @@ exports.createStripeCheckout = async (cartData, userId, metadata) => {
     const session = await stripe.checkout.sessions.create(sessionOptions);
     return { id: session.id };
   } catch (error) {
-    console.error("Error creating checkout session:", error);
+    logger.error({ err: error }, "Error creating checkout session:");
     throw { status: 500, message: "Internal Server Error" };
   }
 };
@@ -1210,7 +1211,7 @@ exports.createTabbyCheckout = async (cartData, userId, metadata) => {
     }
   } catch (error) {
     if (error.status) throw error;
-    console.error("Tabby checkout error:", error);
+    logger.error({ err: error }, "Tabby checkout error:");
     throw { status: 500, message: "Internal server error" };
   }
 };
@@ -1263,9 +1264,9 @@ exports.verifyStripePayment = async (sessionId, userId) => {
         if (coupon) {
           coupon.status = "used";
           await coupon.save();
-          console.log(`Coupon ${couponCode} status updated to 'used'.`);
+          logger.info(`Coupon ${couponCode} status updated to 'used'.`);
         } else {
-          console.log(`Coupon ${couponCode} not found or does not match the mobile number.`);
+          logger.info(`Coupon ${couponCode} not found or does not match the mobile number.`);
         }
       }
 
@@ -1278,11 +1279,11 @@ exports.verifyStripePayment = async (sessionId, userId) => {
               await BankPromoCodeUsage.create({ bankPromoCodeId: promo._id, userId: userId });
               promo.usageCount = (promo.usageCount || 0) + 1;
               await promo.save();
-              console.log(`Bank promo ${promo.code} usage recorded for user ${userId}.`);
+              logger.info(`Bank promo ${promo.code} usage recorded for user ${userId}.`);
             }
           }
         } catch (err) {
-          console.error("Error recording bank promo usage:", err);
+          logger.error({ err: err }, "Error recording bank promo usage:");
         }
       }
 
@@ -1422,13 +1423,13 @@ exports.verifyStripePayment = async (sessionId, userId) => {
       try {
         await sendEmail(adminEmailAddr, adminSubject, adminHtml, ccEmails);
       } catch (adminEmailError) {
-        console.error("Failed to send admin email:", adminEmailError.message);
+        logger.error({ err: adminEmailError }, "Failed to send admin email:");
       }
 
       try {
         await sendEmail(userEmail, userSubject, userHtml);
       } catch (userEmailError) {
-        console.error("Failed to send user email:", userEmailError.message);
+        logger.error({ err: userEmailError }, "Failed to send user email:");
       }
 
       await Notification.create({
@@ -1501,11 +1502,11 @@ exports.verifyTabbyPayment = async (paymentId, userId, bankPromoId) => {
               await BankPromoCodeUsage.create({ bankPromoCodeId: promo._id, userId: userId });
               promo.usageCount = (promo.usageCount || 0) + 1;
               await promo.save();
-              console.log(`Bank promo ${promo.code} usage recorded for user ${userId} (Tabby).`);
+              logger.info(`Bank promo ${promo.code} usage recorded for user ${userId} (Tabby).`);
             }
           }
         } catch (err) {
-          console.error("Error recording bank promo usage (Tabby):", err);
+          logger.error({ err: err }, "Error recording bank promo usage (Tabby):");
         }
       }
 
@@ -1531,7 +1532,7 @@ exports.verifyTabbyPayment = async (paymentId, userId, bankPromoId) => {
     throw { status: 400, message: `Payment status is ${status}` };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Tabby Payment error:", error);
+    logger.error({ err: error }, "Tabby Payment error:");
     throw { status: 500, message: "Internal server error" };
   }
 };
@@ -1627,7 +1628,7 @@ exports.handleTabbyWebhook = async (payload, userId, clientIP, webhookSecret) =>
     return { message: "Webhook received" };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Tabby webhook error:", error);
+    logger.error({ err: error }, "Tabby webhook error:");
     throw { status: 500, message: "Internal server error" };
   }
 };

@@ -1,12 +1,13 @@
 const permissionService = require("../../services/permissionService");
 
+const logger = require("../../utilities/logger");
 exports.getAllPermissions = async (req, res) => {
     try {
         const permissions = await permissionService.getAllPermissions();
         return res.status(200).json({ success: true, permissions });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get All Permissions Error:', error);
+        logger.error({ err: error }, 'Get All Permissions Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching permissions.',
@@ -25,7 +26,7 @@ exports.getPermissionsByModule = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get Permissions By Module Error:', error);
+        logger.error({ err: error }, 'Get Permissions By Module Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching permissions.',
@@ -41,7 +42,7 @@ exports.getPermissionById = async (req, res) => {
         return res.status(200).json({ success: true, permission });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get Permission By ID Error:', error);
+        logger.error({ err: error }, 'Get Permission By ID Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching permission.',
@@ -61,7 +62,7 @@ exports.createPermission = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Create Permission Error:', error);
+        logger.error({ err: error }, 'Create Permission Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while creating permission.',
@@ -82,7 +83,7 @@ exports.updatePermission = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Update Permission Error:', error);
+        logger.error({ err: error }, 'Update Permission Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while updating permission.',
@@ -101,7 +102,7 @@ exports.deletePermission = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Delete Permission Error:', error);
+        logger.error({ err: error }, 'Delete Permission Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while deleting permission.',

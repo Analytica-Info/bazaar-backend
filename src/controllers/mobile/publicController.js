@@ -1,6 +1,7 @@
 const contactService = require("../../services/contactService");
 const path = require('path');
 
+const logger = require("../../utilities/logger");
 exports.contactUs = async (req, res) => {
     try {
         const { email, name, subject, message, phone } = req.body;
@@ -32,7 +33,7 @@ exports.submitFeedback = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ message: error.message });
         }
-        console.error("Feedback submission error:", error);
+        logger.error({ err: error }, "Feedback submission error:");
         res.status(500).json({ message: "Server error" });
     }
 };
@@ -46,7 +47,7 @@ exports.downloadFile = async (req, res) => {
 
         res.download(fullPath, (err) => {
             if (err) {
-                console.error("Download error:", err);
+                logger.error({ err: err }, "Download error:");
                 res.status(500).send("Failed to download file.");
             }
         });
@@ -54,7 +55,7 @@ exports.downloadFile = async (req, res) => {
         if (error.status) {
             return res.status(error.status).send(error.message);
         }
-        console.error("Download error:", error);
+        logger.error({ err: error }, "Download error:");
         res.status(500).send("Failed to download file.");
     }
 };
@@ -81,7 +82,7 @@ exports.createMobileAppLog = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ message: error.message });
         }
-        console.error('Error creating mobile app log:', error);
+        logger.error({ err: error }, 'Error creating mobile app log:');
         res.status(500).json({
             success: false,
             message: "Server error",

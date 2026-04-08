@@ -1,5 +1,6 @@
 const adminService = require("../../services/adminService");
 
+const logger = require("../../utilities/logger");
 exports.orders = async (req, res) => {
     try {
         const result = await adminService.getOrders({
@@ -161,7 +162,7 @@ exports.updateOrderStatus = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Update Order Status Error:", error);
+        logger.error({ err: error }, "Update Order Status Error:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -202,7 +203,7 @@ exports.getAllUsers = async (req, res) => {
             pagination: result.pagination,
         });
     } catch (error) {
-        console.error("Get All Users Error:", error);
+        logger.error({ err: error }, "Get All Users Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching users.',
@@ -227,7 +228,7 @@ exports.exportUsers = async (req, res) => {
             users: users
         });
     } catch (error) {
-        console.error("Export Users Error:", error);
+        logger.error({ err: error }, "Export Users Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while exporting users.',
@@ -252,7 +253,7 @@ exports.getUserById = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Get User By ID Error:", error);
+        logger.error({ err: error }, "Get User By ID Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching user.',
@@ -278,7 +279,7 @@ exports.blockUser = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Block User Error:", error);
+        logger.error({ err: error }, "Block User Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while blocking user.',
@@ -304,7 +305,7 @@ exports.unblockUser = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Unblock User Error:", error);
+        logger.error({ err: error }, "Unblock User Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while unblocking user.',
@@ -330,7 +331,7 @@ exports.deleteUser = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Delete User Error:", error);
+        logger.error({ err: error }, "Delete User Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while deleting user.',
@@ -356,7 +357,7 @@ exports.restoreUser = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Restore User Error:", error);
+        logger.error({ err: error }, "Restore User Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while restoring user.',
@@ -382,7 +383,7 @@ exports.updateUser = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Update User Error:", error);
+        logger.error({ err: error }, "Update User Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while updating user.',
@@ -411,7 +412,7 @@ exports.getAllAdmins = async (req, res) => {
                 pagination: error.data?.pagination,
             });
         }
-        console.error("Get All Admins Error:", error);
+        logger.error({ err: error }, "Get All Admins Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching admins.',
@@ -435,7 +436,7 @@ exports.getCurrentAdmin = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Get Current Admin Error:", error);
+        logger.error({ err: error }, "Get Current Admin Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching admin.',
@@ -460,7 +461,7 @@ exports.getAdminById = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Get Admin By ID Error:", error);
+        logger.error({ err: error }, "Get Admin By ID Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching admin.',
@@ -482,7 +483,7 @@ exports.createSubAdmin = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ message: error.message });
         }
-        console.error("Create Sub-Admin Error:", error);
+        logger.error({ err: error }, "Create Sub-Admin Error:");
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
@@ -504,7 +505,7 @@ exports.updateSubAdmin = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Update Sub-Admin Error:", error);
+        logger.error({ err: error }, "Update Sub-Admin Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while updating admin.',
@@ -529,7 +530,7 @@ exports.deleteSubAdmin = async (req, res) => {
                 message: error.message
             });
         }
-        console.error("Delete Sub-Admin Error:", error);
+        logger.error({ err: error }, "Delete Sub-Admin Error:");
         return res.status(500).json({
             success: false,
             message: 'An error occurred while deleting admin.',
@@ -554,7 +555,7 @@ exports.getProductAnalytics = async (req, res) => {
             pagination: result.pagination
         });
     } catch (error) {
-        console.error('Error fetching product analytics:', error);
+        logger.error({ err: error }, 'Error fetching product analytics:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching product analytics.',
@@ -576,7 +577,7 @@ exports.exportProductAnalytics = async (req, res) => {
             analytics: analyticsData
         });
     } catch (error) {
-        console.error('Error exporting product analytics:', error);
+        logger.error({ err: error }, 'Error exporting product analytics:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while exporting product analytics.',
@@ -598,7 +599,7 @@ exports.getProductViewDetails = async (req, res) => {
             uniqueUsers: result.uniqueUsers
         });
     } catch (error) {
-        console.error('Error fetching product view details:', error);
+        logger.error({ err: error }, 'Error fetching product view details:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while fetching product view details.',
@@ -623,7 +624,7 @@ exports.getActivityLogs = async (req, res) => {
             pagination: result.pagination
         });
     } catch (error) {
-        console.error('Error fetching activity logs:', error);
+        logger.error({ err: error }, 'Error fetching activity logs:');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch activity logs',
@@ -648,7 +649,7 @@ exports.getActivityLogById = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Error fetching activity log:', error);
+        logger.error({ err: error }, 'Error fetching activity log:');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch activity log',
@@ -673,7 +674,7 @@ exports.getBackendLogs = async (req, res) => {
             pagination: result.pagination
         });
     } catch (error) {
-        console.error('Error fetching backend logs:', error);
+        logger.error({ err: error }, 'Error fetching backend logs:');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch backend logs',
@@ -698,7 +699,7 @@ exports.getBackendLogByDate = async (req, res) => {
                 message: error.message
             });
         }
-        console.error('Error fetching backend log:', error);
+        logger.error({ err: error }, 'Error fetching backend log:');
         res.status(500).json({
             success: false,
             message: 'Failed to fetch backend log',
@@ -743,7 +744,7 @@ exports.downloadBackendLogs = async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=backend_logs_${new Date().toISOString().split('T')[0]}.txt`);
         res.send(textContent);
     } catch (error) {
-        console.error('Error downloading backend logs:', error);
+        logger.error({ err: error }, 'Error downloading backend logs:');
         res.status(500).json({
             success: false,
             message: 'Failed to download backend logs',
@@ -786,7 +787,7 @@ exports.downloadActivityLogs = async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=activity_logs_${new Date().toISOString().split('T')[0]}.txt`);
         res.send(textContent);
     } catch (error) {
-        console.error('Error downloading activity logs:', error);
+        logger.error({ err: error }, 'Error downloading activity logs:');
         res.status(500).json({
             success: false,
             message: 'Failed to download activity logs',

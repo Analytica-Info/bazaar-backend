@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = require("../../config/jwtSecret");
 const { sendEmail } = require('../../mail/emailService');
 const axios = require('axios');
+const logger = require("../../utilities/logger");
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 const API_KEY = process.env.API_KEY;
 
@@ -53,7 +54,7 @@ exports.appleLogin = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Apple login error:', error);
+        logger.error({ err: error }, 'Apple login error:');
         const status = error.status || 500;
         return res.status(status).json({ message: error.message || 'Apple login failed' });
     }
@@ -88,7 +89,7 @@ exports.googleLogin = async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon,
         });
     } catch (error) {
-        console.error('Unhandled Error in googleLogin:', error);
+        logger.error({ err: error }, 'Unhandled Error in googleLogin:');
         const status = error.status || 500;
         return res.status(status).json({ message: error.message || 'Server error' });
     }
@@ -112,7 +113,7 @@ exports.register = async (req, res) => {
 
         return res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
-        console.error('Register Error:', error);
+        logger.error({ err: error }, 'Register Error:');
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error', existingUser: error.existingUser });
     }
@@ -146,7 +147,7 @@ exports.login = async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon,
         });
     } catch (error) {
-        console.error('Login Error:', error);
+        logger.error({ err: error }, 'Login Error:');
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
@@ -163,7 +164,7 @@ exports.getUserData = async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon,
         });
     } catch (error) {
-        console.error('Get User Data Error:', error);
+        logger.error({ err: error }, 'Get User Data Error:');
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
@@ -231,7 +232,7 @@ exports.updatePassword = async (req, res) => {
         await authService.updatePassword(userId, old_password, new_password);
         res.status(200).json({ message: 'Password updated successfully' });
     } catch (error) {
-        console.error("Error updating password:", error);
+        logger.error({ err: error }, "Error updating password:");
         const status = error.status || 500;
         res.status(status).json({ message: error.message || "Server error" });
     }
@@ -248,7 +249,7 @@ exports.refreshToken = async (req, res) => {
 
         return res.status(200).json({ accessToken: result.accessToken, refreshToken: result.refreshToken });
     } catch (error) {
-        console.error('Refresh Token Error:', error.message);
+        logger.error({ err: error }, 'Refresh Token Error:');
         return res.status(403).json({ message: error.message || 'Invalid or expired refresh token' });
     }
 };
@@ -509,7 +510,7 @@ const generateCouponCode = async () => {
         const newCoupon = `DH${nextNumber}YHZXB`;
         return newCoupon;
     } catch (error) {
-        console.error("Error generating the coupon code:", error);
+        logger.error({ err: error }, "Error generating the coupon code:");
         return "DH1YHZXB";
     }
 };
@@ -615,7 +616,7 @@ exports.checkCouponCode = async (req, res) => {
             });
         }
     } catch (error) {
-        console.error("Error checking coupon code:", error);
+        logger.error({ err: error }, "Error checking coupon code:");
         return res.status(500).json({ message: "Internal server error." });
     }
 };
@@ -627,7 +628,7 @@ exports.deleteAccount = async (req, res) => {
 
         res.status(200).json({ message: 'Account deleted successfully' });
     } catch (error) {
-        console.error('Delete Account Error:', error);
+        logger.error({ err: error }, 'Delete Account Error:');
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
@@ -640,7 +641,7 @@ exports.verifyRecoveryCode = async (req, res) => {
 
         res.status(200).json({ message: 'Account recovered successfully. You can now log in.' });
     } catch (error) {
-        console.error('Verify Recovery Code Error:', error);
+        logger.error({ err: error }, 'Verify Recovery Code Error:');
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
@@ -657,7 +658,7 @@ exports.resendRecoveryCode = async (req, res) => {
             attemptsLeft: result.attemptsLeft,
         });
     } catch (error) {
-        console.error('Resend Recovery Code Error:', error);
+        logger.error({ err: error }, 'Resend Recovery Code Error:');
         const status = error.status || 500;
         res.status(status).json({
             message: error.message || 'Server error',
@@ -677,7 +678,7 @@ exports.getPaymentHistory = async (req, res) => {
             data: result,
         });
     } catch (error) {
-        console.error('Payment history error:', error);
+        logger.error({ err: error }, 'Payment history error:');
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -702,7 +703,7 @@ const fetchCouponDetails = async (id) => {
             return response.data.data;
         }
 
-        console.error("Invalid promotion response format.");
+        logger.error("Invalid promotion response format.");
         return null;
 
     } catch (error) {

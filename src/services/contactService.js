@@ -5,6 +5,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
+const logger = require("../utilities/logger");
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ async function validateEmail(email) {
             return { valid: false, reason: data.deliverability, email };
         }
     } catch (error) {
-        console.error('Error validating email:', error.message);
+        logger.error({ err: error }, 'Error validating email:');
         return { valid: false, reason: 'API request failed', email };
     }
 }

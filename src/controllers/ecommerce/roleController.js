@@ -1,12 +1,13 @@
 const roleService = require("../../services/roleService");
 
+const logger = require("../../utilities/logger");
 exports.getAllRoles = async (req, res) => {
     try {
         const roles = await roleService.getAllRoles();
         return res.status(200).json({ success: true, roles });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get All Roles Error:', error);
+        logger.error({ err: error }, 'Get All Roles Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching roles.',
@@ -22,7 +23,7 @@ exports.getRoleById = async (req, res) => {
         return res.status(200).json({ success: true, role });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Get Role By ID Error:', error);
+        logger.error({ err: error }, 'Get Role By ID Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching role.',
@@ -42,7 +43,7 @@ exports.createRole = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Create Role Error:', error);
+        logger.error({ err: error }, 'Create Role Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while creating role.',
@@ -63,7 +64,7 @@ exports.updateRole = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Update Role Error:', error);
+        logger.error({ err: error }, 'Update Role Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while updating role.',
@@ -82,7 +83,7 @@ exports.deleteRole = async (req, res) => {
         });
     } catch (error) {
         if (error.status) return res.status(error.status).json({ success: false, message: error.message });
-        console.error('Delete Role Error:', error);
+        logger.error({ err: error }, 'Delete Role Error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while deleting role.',

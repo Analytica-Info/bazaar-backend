@@ -14,6 +14,7 @@ const deleteOldFile = require("../utils/deleteOldFile");
 const fs = require("fs");
 const path = require("path");
 
+const logger = require("../utilities/logger");
 const BACKEND_URL = process.env.BACKEND_URL;
 
 // ─── Exported Functions ──────────────────────────────────────────
@@ -51,7 +52,7 @@ exports.getCmsData = async () => {
       brandsLogoCmsData: brandsLogoCms,
     };
   } catch (error) {
-    console.error(`Error fetching Cms data: ${error.message}`);
+    logger.error(`Error fetching Cms data: ${error.message}`);
     throw {
       status: 500,
       message: "Error fetching Cms data",
@@ -128,7 +129,7 @@ exports.getCouponCms = async () => {
     return { couponCmsData: couponCms };
   } catch (error) {
     if (error.status) throw error;
-    console.error(`Error fetching CouponCms data: ${error.message}`);
+    logger.error(`Error fetching CouponCms data: ${error.message}`);
     throw {
       status: 500,
       message: "Error fetching CouponCms data",
@@ -591,7 +592,7 @@ exports.uploadEditorImage = async (filePath) => {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error uploading file:", error);
+    logger.error({ err: error }, "Error uploading file:");
     throw { status: 500, message: "Failed to upload file" };
   }
 };
@@ -630,7 +631,7 @@ exports.deleteEditorImage = async (fileUrl) => {
     }
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error deleting file:", error);
+    logger.error({ err: error }, "Error deleting file:");
     throw { status: 500, message: error.message };
   }
 };

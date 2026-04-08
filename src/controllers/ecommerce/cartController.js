@@ -1,11 +1,12 @@
 const cartService = require("../../services/cartService");
 
+const logger = require("../../utilities/logger");
 exports.getCart = async (req, res) => {
   try {
     const result = await cartService.getCart(req.user._id, { includeGiftLogic: false });
     res.status(200).json({ success: true, ...result });
   } catch (err) {
-    console.error("Error fetching cart:", err);
+    logger.error({ err: err }, "Error fetching cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -20,7 +21,7 @@ exports.addToCart = async (req, res) => {
     if (err.status) {
       return res.status(err.status).json({ success: false, message: err.message, cartCount: err.cartCount, cart: err.cart });
     }
-    console.error("Error adding to cart:", err);
+    logger.error({ err: err }, "Error adding to cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -31,7 +32,7 @@ exports.removeFromCart = async (req, res) => {
     res.status(200).json({ success: true, message: "Product removed from cart", ...result });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-    console.error("Error removing from cart:", err);
+    logger.error({ err: err }, "Error removing from cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -44,7 +45,7 @@ exports.increaseCartQty = async (req, res) => {
     res.status(200).json({ success: true, message: `Quantity increased by ${req.body.qty}`, ...result });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-    console.error("Error increasing quantity:", err);
+    logger.error({ err: err }, "Error increasing quantity:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -55,7 +56,7 @@ exports.decreaseCartQty = async (req, res) => {
     res.status(200).json({ success: true, message: result.message, cart: result.cart });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ success: false, message: err.message });
-    console.error("Error decreasing quantity:", err);
+    logger.error({ err: err }, "Error decreasing quantity:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

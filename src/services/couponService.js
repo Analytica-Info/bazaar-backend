@@ -7,6 +7,7 @@ const axios = require("axios");
 const { sendEmail } = require("../mail/emailService");
 const { getAdminEmail, getCcEmails } = require("../utilities/emailHelper");
 
+const logger = require("../utilities/logger");
 const API_KEY = process.env.API_KEY;
 const WEBURL = process.env.URL;
 
@@ -32,7 +33,7 @@ const generateCouponCode = async () => {
     const newCoupon = `DH${nextNumber}YHZXB`;
     return newCoupon;
   } catch (error) {
-    console.error("Error generating the coupon code:", error);
+    logger.error({ err: error }, "Error generating the coupon code:");
     return "DH1YHZXB";
   }
 };
@@ -53,7 +54,7 @@ const fetchCouponDetails = async (id) => {
       return response.data.data;
     }
 
-    console.error("Invalid promotion response format.");
+    logger.error("Invalid promotion response format.");
     return null;
   } catch (error) {
     console.error(
@@ -71,10 +72,10 @@ const fetchCouponDetails = async (id) => {
  */
 exports.getCoupons = async () => {
   try {
-    console.log("API - Coupons");
+    logger.info("API - Coupons");
     const couponCount = await Coupon.countDocuments();
 
-    console.log("Return - API - Coupons");
+    logger.info("Return - API - Coupons");
     return {
       success: true,
       count: couponCount,
@@ -239,7 +240,7 @@ exports.checkCouponCode = async (code, userId, cartData) => {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error checking coupon code:", error);
+    logger.error({ err: error }, "Error checking coupon code:");
     throw { status: 500, message: "Internal server error." };
   }
 };
@@ -321,7 +322,7 @@ exports.redeemCoupon = async (userId, coupon, phone) => {
     }
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error redeeming coupon:", error);
+    logger.error({ err: error }, "Error redeeming coupon:");
     throw { status: 500, message: "Internal server error." };
   }
 };

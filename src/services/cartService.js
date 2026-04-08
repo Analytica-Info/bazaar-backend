@@ -2,6 +2,7 @@ const Cart = require("../models/Cart");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 
+const logger = require("../utilities/logger");
 const GIFT_THRESHOLD_DEFAULT_AED = 400;
 const GIFT_MIN_STOCK = 5;
 
@@ -15,7 +16,7 @@ async function getCategoryNameById(id) {
     if (!item) return "";
     return item.name.split(/\s*\/\s*/)[0];
   } catch (error) {
-    console.error("Error fetching category name:", error);
+    logger.error({ err: error }, "Error fetching category name:");
     return "";
   }
 }

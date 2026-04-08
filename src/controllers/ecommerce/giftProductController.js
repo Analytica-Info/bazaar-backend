@@ -1,5 +1,6 @@
 const giftProductService = require("../../services/giftProductService");
 
+const logger = require("../../utilities/logger");
 exports.setGiftProduct = async (req, res) => {
     try {
         const { productId, variantId, giftThreshold } = req.body;
@@ -18,7 +19,7 @@ exports.setGiftProduct = async (req, res) => {
                 message: error.message,
             });
         }
-        console.error("setGiftProduct error:", error);
+        logger.error({ err: error }, "setGiftProduct error:");
         return res.status(500).json({
             success: false,
             message: error.message || "Failed to set gift product",
@@ -43,7 +44,7 @@ exports.getGiftProduct = async (req, res) => {
             giftProduct,
         });
     } catch (error) {
-        console.error("getGiftProduct error:", error);
+        logger.error({ err: error }, "getGiftProduct error:");
         return res.status(500).json({
             success: false,
             message: error.message || "Failed to get gift product",

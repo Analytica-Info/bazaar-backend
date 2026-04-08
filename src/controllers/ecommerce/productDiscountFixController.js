@@ -1,5 +1,6 @@
 const productSyncService = require("../../services/productSyncService");
 
+const logger = require("../../utilities/logger");
 exports.getProductsWithProductUpdateWebhook = async (req, res) => {
     try {
         const result = await productSyncService.getProductsWithWebhookUpdate();
@@ -11,7 +12,7 @@ exports.getProductsWithProductUpdateWebhook = async (req, res) => {
             products: result.products,
         });
     } catch (err) {
-        console.error("[getProductsWithProductUpdateWebhook]", err.message);
+        logger.error({ err: err }, "[getProductsWithProductUpdateWebhook]");
         return res.status(500).json({
             success: false,
             message: err.message || "Server error",
@@ -32,7 +33,7 @@ exports.syncProductUpdateWebhookDiscounts = async (req, res) => {
             bulkWriteOperations: result.bulkWriteOperations,
         });
     } catch (err) {
-        console.error("[syncProductUpdateWebhookDiscounts]", err.message);
+        logger.error({ err: err }, "[syncProductUpdateWebhookDiscounts]");
         return res.status(500).json({
             success: false,
             message: err.message || "Server error",

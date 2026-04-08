@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Product = require('../models/Product');
 const ProductId = require('../models/ProductId');
+const logger = require("../utilities/logger");
 const {
     applyDiscountFieldsForParentProductId,
     syncDiscountFieldsForParentIds,
@@ -342,7 +343,7 @@ async function fetchProductDetailsForRefresh(id) {
     let totalQty = 0;
 
     if (product.variants.length === 0) {
-        console.log('[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/' + id + '/inventory');
+        logger.info('[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/' + id + '/inventory');
         const inventoryResponse = await axios.get(
             `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${id}/inventory`,
             {
@@ -379,7 +380,7 @@ async function fetchProductDetailsForRefresh(id) {
             if (variantDefinitions && variantDefinitions.length > 0) {
                 sku = variantDefinitions.map(d => d.value).join(' - ');
             }
-            console.log('[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/' + variantId + '/inventory');
+            logger.info('[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/' + variantId + '/inventory');
             const inventoryResponse = await axios.get(
                 `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
                 {
@@ -475,9 +476,9 @@ async function refreshSingleProductById(productId) {
     const existingProductId = await ProductId.findOne({ productId: id });
     if (!existingProductId) {
         await ProductId.create({ productId: id });
-        console.log('[Refresh Product] ProductId was missing in DB — created.');
+        logger.info('[Refresh Product] ProductId was missing in DB — created.');
     } else {
-        console.log('[Refresh Product] ProductId already in ProductId collection.');
+        logger.info('[Refresh Product] ProductId already in ProductId collection.');
     }
 
     const { product, variantsData, totalQty } = await fetchProductDetailsForRefresh(id);
@@ -487,9 +488,9 @@ async function refreshSingleProductById(productId) {
 
     const existingEntry = await Product.findOne({ 'product.id': product.id });
     if (existingEntry) {
-        console.log('[Refresh Product] Product already exists in DB (product.id=' + product.id + '). Will update.');
+        logger.info('[Refresh Product] Product already exists in DB (product.id=' + product.id + '). Will update.');
     } else {
-        console.log('[Refresh Product] Product not in DB. Will create new.');
+        logger.info('[Refresh Product] Product not in DB. Will create new.');
     }
 
     if (!existingEntry) {
@@ -610,7 +611,7 @@ async function handleProductUpdate(data) {
         : updateProduct.id;
 
     if (processedProductIds.has(updateProductId)) {
-        console.log(`Skipping Duplicate Update Product Id : ${updateProductId}`);
+        logger.info(`Skipping Duplicate Update Product Id : ${updateProductId}`);
         return { success: true, skipped: true };
     }
 
@@ -622,7 +623,7 @@ async function handleProductUpdate(data) {
     }
 
     const timeFormatted = await currentTime();
-    console.log(`${timeFormatted} ${type} - Received Product Update for ID : ${updateProductId}`);
+    logger.info(`${timeFormatted} ${type} - Received Product Update for ID : ${updateProductId}`);
 
     const response = await axios.get(
         `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${updateProductId}`,
@@ -660,7 +661,7 @@ async function handleProductUpdate(data) {
     try {
         await applyDiscountFieldsForParentProductId(parentProductId, type, timeFormatted);
     } catch (discountErr) {
-        console.error('product.update discount sync failed:', discountErr.message);
+        logger.error({ err: discountErr }, 'product.update discount sync failed:');
     }
 
     return { success: true };
@@ -696,7 +697,7 @@ async function handleInventoryUpdate(data) {
     }
 
     const timeFormatted = await currentTime();
-    console.log(`${timeFormatted} ${type} - Received Inventory Update for ID : ${updateProductId}`);
+    logger.info(`${timeFormatted} ${type} - Received Inventory Update for ID : ${updateProductId}`);
 
     const allParkedProductIds = await filterParkProducts();
     console.log('All Parked ProductIds : ', allParkedProductIds.length);
@@ -744,7 +745,7 @@ async function handleInventoryUpdate(data) {
     try {
         await applyDiscountFieldsForParentProductId(itemId, type, timeFormatted);
     } catch (discountErr) {
-        console.error('inventoryUpdate discount sync failed:', discountErr.message);
+        logger.error({ err: discountErr }, 'inventoryUpdate discount sync failed:');
     }
 
     return { success: true };
@@ -788,7 +789,7 @@ async function handleSaleUpdate(data) {
     });
 
     if (matchedProduct) {
-        console.log(`Parent Parked Product Id: ${matchedProduct.product.id}`);
+        logger.info(`Parent Parked Product Id: ${matchedProduct.product.id}`);
         const itemId = matchedProduct.product.id;
         const existingProductId = await ProductId.findOne({ productId: itemId });
         const productDoc = await Product.findOne({ 'product.id': itemId });
@@ -827,7 +828,7 @@ async function handleSaleUpdate(data) {
             try {
                 await applyDiscountFieldsForParentProductId(itemId, type, timeFormatted);
             } catch (discountErr) {
-                console.error('saleUpdate discount sync failed:', discountErr.message);
+                logger.error({ err: discountErr }, 'saleUpdate discount sync failed:');
             }
         }
     } else {

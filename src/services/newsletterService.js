@@ -5,6 +5,7 @@ const axios = require("axios");
 const nodemailer = require("nodemailer");
 const async = require("async");
 
+const logger = require("../utilities/logger");
 const WEBURL = process.env.URL;
 
 // ─── Exported Functions ──────────────────────────────────────────
@@ -343,13 +344,13 @@ exports.sendBulkEmails = async ({ emails, subject, htmlContent, cc, bcc }) => {
       (err) => {
         transporter.close();
         if (err) {
-          console.error("Error in bulk email sending:", err);
+          logger.error({ err: err }, "Error in bulk email sending:");
           reject({
             status: 500,
             message: "Failed to send emails",
           });
         } else {
-          console.log("Bulk email sending completed");
+          logger.info("Bulk email sending completed");
           resolve({
             message: "Emails sent successfully",
           });

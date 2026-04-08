@@ -24,6 +24,7 @@ const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
+const logger = require("../utilities/logger");
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.gif', '.webp'];
 const ALLOWED_IMAGE_MIMETYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
 
@@ -240,7 +241,7 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
                 continue;
             }
         } catch (error) {
-            console.error('Error finding product in MongoDB:', error);
+            logger.error({ err: error }, 'Error finding product in MongoDB:');
             validationResults.push({
                 productId,
                 productName: 'Unknown',
@@ -269,7 +270,7 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
                 localMongoValid = false;
             }
         } catch (error) {
-            console.error('Error checking local MongoDB:', error);
+            logger.error({ err: error }, 'Error checking local MongoDB:');
             localMongoQty = 0;
             localMongoValid = false;
         }
@@ -290,7 +291,7 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
             lightspeedQty = inventoryResponse.data.data?.[0]?.inventory_level || 0;
             lightspeedValid = lightspeedQty >= requestedQty;
         } catch (error) {
-            console.error('Error checking Lightspeed API:', error);
+            logger.error({ err: error }, 'Error checking Lightspeed API:');
             lightspeedQty = 0;
             lightspeedValid = false;
             lightspeedApiError = {
@@ -845,7 +846,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
         );
 
         if (coupon) {
-            console.log(`Coupon ${couponCode} status updated to 'used' after order creation.`);
+            logger.info(`Coupon ${couponCode} status updated to 'used' after order creation.`);
         } else {
             console.log(
                 `Coupon ${couponCode} not found, already used, or does not match the mobile number.`
@@ -858,7 +859,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
         if (user) {
             user.usedFirst15Coupon = true;
             await user.save();
-            console.log(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
+            logger.info(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
         }
     }
 
@@ -867,7 +868,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
         if (user && !user.usedUAE10Coupon) {
             user.usedUAE10Coupon = true;
             await user.save();
-            console.log(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
+            logger.info(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
         }
     }
 
@@ -1173,7 +1174,7 @@ exports.createTabbyCheckoutSession = async (userId, bodyData, metadata) => {
 
     await pendingPayment.save();
 
-    console.log("✅ [Tabby] Order data stored successfully, ready for payment");
+    logger.info("✅ [Tabby] Order data stored successfully, ready for payment");
 
     return {
         message: "Order data stored successfully",
@@ -1213,27 +1214,27 @@ exports.verifyTabbyPayment = async (paymentId) => {
 };
 
 exports.handleTabbyWebhook = async (payload) => {
-    console.log("🚀 [Tabby Webhook] Webhook endpoint hit");
+    logger.info("🚀 [Tabby Webhook] Webhook endpoint hit");
     const { clientIP, secret, data } = payload;
 
     const allowedIPs = process.env.TABBY_IPS.split(',');
 
     console.log("🌍 Client IP:", clientIP);
     if (!allowedIPs.includes(clientIP)) {
-        console.log("❌ Returning 403: Forbidden IP");
+        logger.info("❌ Returning 403: Forbidden IP");
         throw { status: 403, message: 'Forbidden IP' };
     }
 
     console.log("🔑 Expected secret:", process.env.TABBY_WEBHOOK_SECRET);
     console.log("📬 Received secret:", secret);
     if (secret !== process.env.TABBY_WEBHOOK_SECRET) {
-        console.log("❌ Returning 401: Unauthorized (Invalid Secret)");
+        logger.info("❌ Returning 401: Unauthorized (Invalid Secret)");
         throw { status: 401, message: 'Unauthorized' };
     }
 
     const { id: paymentId } = data;
     if (!paymentId) {
-        console.log("⚠️ Returning 400: paymentId missing");
+        logger.info("⚠️ Returning 400: paymentId missing");
         throw { status: 400, message: 'paymentId missing' };
     }
 
@@ -1248,7 +1249,7 @@ exports.handleTabbyWebhook = async (payload) => {
     console.log("📊 Payment status:", status);
 
     if (status === 'AUTHORIZED') {
-        console.log("💰 Payment authorized — attempting capture...");
+        logger.info("💰 Payment authorized — attempting capture...");
         const captureResp = await axios.post(
             `https://api.tabby.ai/api/v2/payments/${paymentId}/captures`,
             { amount: payment.amount },
@@ -1256,7 +1257,7 @@ exports.handleTabbyWebhook = async (payload) => {
         );
 
         if (captureResp.data.status?.toUpperCase() !== 'CLOSED') {
-            console.log("❌ Returning 500: Capture failed");
+            logger.info("❌ Returning 500: Capture failed");
             throw { status: 500, message: 'Capture failed' };
         }
     }
@@ -1267,7 +1268,7 @@ exports.handleTabbyWebhook = async (payload) => {
     console.log("✅ Final Status:", finalStatus);
 
     if (finalStatus === 'CLOSED') {
-        console.log("🎉 Payment successful, checking for pending payments...");
+        logger.info("🎉 Payment successful, checking for pending payments...");
 
         // Check if there's a pending payment for this payment ID
         const pendingPayment = await PendingPayment.findOne({
@@ -1276,21 +1277,21 @@ exports.handleTabbyWebhook = async (payload) => {
         });
 
         if (pendingPayment) {
-            console.log("📋 [Webhook] Found pending payment, processing order creation...");
+            logger.info("📋 [Webhook] Found pending payment, processing order creation...");
             // Process the pending payment and create the order
             await processPendingPayment(paymentId, payment);
         } else {
-            console.log("📋 [Webhook] No pending payment found, payment was processed normally");
+            logger.info("📋 [Webhook] No pending payment found, payment was processed normally");
         }
 
         return { message: 'Order processed' };
     } else if (status === 'CREATED') {
-        console.log("🎉 ================================================");
-        console.log("🎉 ========== PAYMENT PROCEEDED SUCCESSFULLY ==========");
-        console.log("🎉 ================================================");
-        console.log(`🎉 Payment ID: ${paymentId}`);
-        console.log(`🎉 Status: ${status}`);
-        console.log("🎉 ================================================");
+        logger.info("🎉 ================================================");
+        logger.info("🎉 ========== PAYMENT PROCEEDED SUCCESSFULLY ==========");
+        logger.info("🎉 ================================================");
+        logger.info(`🎉 Payment ID: ${paymentId}`);
+        logger.info(`🎉 Status: ${status}`);
+        logger.info("🎉 ================================================");
 
         // Check if there's a pending payment for this payment ID
         const pendingPayment = await PendingPayment.findOne({
@@ -1299,17 +1300,17 @@ exports.handleTabbyWebhook = async (payload) => {
         });
 
         if (pendingPayment) {
-            console.log("📋 [Webhook] Found pending payment, processing order creation...");
+            logger.info("📋 [Webhook] Found pending payment, processing order creation...");
             // Process the pending payment and create the order
             await processPendingPayment(paymentId, payment);
         } else {
-            console.log("📋 [Webhook] No pending payment found for CREATED status");
+            logger.info("📋 [Webhook] No pending payment found for CREATED status");
         }
 
         return { message: 'Order processed' };
     }
 
-    console.log("📥 Returning 200: Webhook received");
+    logger.info("📥 Returning 200: Webhook received");
     return { message: 'Webhook received' };
 };
 
@@ -1547,7 +1548,7 @@ async function processPendingPayment(paymentId, payment) {
             );
 
             if (coupon) {
-                console.log(`Coupon ${orderData.couponCode} status updated to 'used' after order creation.`);
+                logger.info(`Coupon ${orderData.couponCode} status updated to 'used' after order creation.`);
             } else {
                 console.log(
                     `Coupon ${orderData.couponCode} not found, already used, or does not match the mobile number.`
@@ -1560,7 +1561,7 @@ async function processPendingPayment(paymentId, payment) {
             if (user) {
                 user.usedFirst15Coupon = true;
                 await user.save();
-                console.log(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
+                logger.info(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
             }
         }
 
@@ -1569,7 +1570,7 @@ async function processPendingPayment(paymentId, payment) {
             if (user && !user.usedUAE10Coupon) {
                 user.usedUAE10Coupon = true;
                 await user.save();
-                console.log(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
+                logger.info(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
             }
         }
 
@@ -1674,13 +1675,13 @@ async function processPendingPayment(paymentId, payment) {
         });
 
         // Send emails
-        console.log("📧 ================================================");
-        console.log("📧 ========== SENDING EMAIL NOTIFICATIONS ==========");
-        console.log("📧 ================================================");
-        console.log(`📧 Admin Email: ${adminEmail}`);
-        console.log(`📧 User Email: ${orderData.user_email}`);
-        console.log(`📧 Order ID: ${nextOrderId}`);
-        console.log("📧 ================================================");
+        logger.info("📧 ================================================");
+        logger.info("📧 ========== SENDING EMAIL NOTIFICATIONS ==========");
+        logger.info("📧 ================================================");
+        logger.info(`📧 Admin Email: ${adminEmail}`);
+        logger.info(`📧 User Email: ${orderData.user_email}`);
+        logger.info(`📧 Order ID: ${nextOrderId}`);
+        logger.info("📧 ================================================");
 
         try {
             await sendEmail(adminEmail, adminSubject, html);
@@ -1775,22 +1776,22 @@ async function processPendingPayment(paymentId, payment) {
             });
         }
 
-        console.log("✅ ================================================");
-        console.log("✅ ========== EMAILS SENT SUCCESSFULLY ==========");
-        console.log("✅ ================================================");
+        logger.info("✅ ================================================");
+        logger.info("✅ ========== EMAILS SENT SUCCESSFULLY ==========");
+        logger.info("✅ ================================================");
 
         // Clear user's cart
         await Cart.findOneAndDelete({ user: user_id });
 
         // Send push notification
-        console.log("🔔 ================================================");
-        console.log("🔔 ========== SENDING PUSH NOTIFICATION ==========");
-        console.log("🔔 ================================================");
+        logger.info("🔔 ================================================");
+        logger.info("🔔 ========== SENDING PUSH NOTIFICATION ==========");
+        logger.info("🔔 ================================================");
 
         if (user && user.fcmToken) {
-            console.log(`🔔 User FCM Token: ${user.fcmToken.substring(0, 20)}...`);
-            console.log(`🔔 Order ID: ${nextOrderId}`);
-            console.log(`🔔 User: ${orderData.name}`);
+            logger.info(`🔔 User FCM Token: ${user.fcmToken.substring(0, 20)}...`);
+            logger.info(`🔔 Order ID: ${nextOrderId}`);
+            logger.info(`🔔 User: ${orderData.name}`);
 
             // await sendPushNotification(
             //     user.fcmToken,
@@ -1800,11 +1801,11 @@ async function processPendingPayment(paymentId, payment) {
             //     order._id
             // );
 
-            console.log("✅ ================================================");
-            console.log("✅ ========== PUSH NOTIFICATION SENT ==========");
-            console.log("✅ ================================================");
+            logger.info("✅ ================================================");
+            logger.info("✅ ========== PUSH NOTIFICATION SENT ==========");
+            logger.info("✅ ================================================");
         } else {
-            console.log("⚠️ No FCM token found for user");
+            logger.info("⚠️ No FCM token found for user");
         }
 
         // Mark pending payment as completed
@@ -1814,7 +1815,7 @@ async function processPendingPayment(paymentId, payment) {
         console.log("✅ [Pending Payment] Order created successfully:", order._id);
 
     } catch (error) {
-        console.error("❌ [Pending Payment] Error processing pending payment:", error);
+        logger.error({ err: error }, "❌ [Pending Payment] Error processing pending payment:");
 
         // Log error
         await logActivity({
@@ -2101,7 +2102,7 @@ async function updateQuantities(cartData, orderId = null) {
 
         return updateResults;
     } catch (error) {
-        console.error("Error in updating quantities for the cart:", error);
+        logger.error({ err: error }, "Error in updating quantities for the cart:");
 
         await logBackendActivity({
             platform: 'Mobile App Backend',
@@ -2140,7 +2141,7 @@ async function updateQuantity(id, updateQty, productName = null, productId = nul
         );
 
         if (productsResponse.status === 200) {
-            console.log(`Successfully updated quantity for product with ID: ${id}`);
+            logger.info(`Successfully updated quantity for product with ID: ${id}`);
 
             await logBackendActivity({
                 platform: 'Mobile App Backend',
@@ -2154,7 +2155,7 @@ async function updateQuantity(id, updateQty, productName = null, productId = nul
 
             return true;
         } else {
-            console.warn(`Unexpected response status: ${productsResponse.status}`);
+            logger.warn(`Unexpected response status: ${productsResponse.status}`);
 
             await logBackendActivity({
                 platform: 'Mobile App Backend',

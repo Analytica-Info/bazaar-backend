@@ -2,6 +2,7 @@ const orderService = require("../../services/orderService");
 const { logActivity } = require('../../utilities/activityLogger');
 const { logBackendActivity } = require('../../utilities/backendLogger');
 
+const logger = require("../../utilities/logger");
 exports.checkoutSession = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -13,7 +14,7 @@ exports.checkoutSession = async (req, res) => {
             orderId: result.orderId,
         });
     } catch (error) {
-        console.log('sendPushNotification Error' || 'fcmToken not available');
+        logger.info('sendPushNotification Error' || 'fcmToken not available');
         console.error(error);
 
         if (error.status) {
@@ -61,7 +62,7 @@ exports.checkoutSessionTabby = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ error: error.message });
         }
-        console.error("Error storing order data:", error);
+        logger.error({ err: error }, "Error storing order data:");
         await logBackendActivity({
             platform: 'Mobile App Backend',
             activity_name: 'Checkout Session Tabby API Hit',
@@ -87,7 +88,7 @@ exports.verifyTabbyPayment = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ error: error.message });
         }
-        console.error('Tabby Payment error:', error);
+        logger.error({ err: error }, 'Tabby Payment error:');
         return res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -103,7 +104,7 @@ exports.getOrders = async (req, res) => {
             data: ordersWithDetails
         });
     } catch (error) {
-        console.error("Error fetching orders:", error);
+        logger.error({ err: error }, "Error fetching orders:");
         res.status(500).json({
             success: false,
             message: "Failed to retrieve orders",
@@ -150,7 +151,7 @@ exports.updateOrderStatus = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Update Order Status Error:", error);
+        logger.error({ err: error }, "Update Order Status Error:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -196,7 +197,7 @@ exports.deleteAddress = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Error deleting address:", error);
+        logger.error({ err: error }, "Error deleting address:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -220,7 +221,7 @@ exports.setPrimaryAddress = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Error setting primary address:", error);
+        logger.error({ err: error }, "Error setting primary address:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -283,7 +284,7 @@ exports.tabbyWebhook = async (req, res) => {
         if (error.status === 500) {
             return res.status(500).send(error.message);
         }
-        console.error('Tabby webhook error:', error);
+        logger.error({ err: error }, 'Tabby webhook error:');
         return res.status(500).send('Internal server error');
     }
 };
@@ -304,7 +305,7 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
         if (error.status && error.data) {
             return res.status(error.status).json(error.data);
         }
-        console.error('Error validating inventory:', error);
+        logger.error({ err: error }, 'Error validating inventory:');
         const user = req.user || {};
         await logActivity({
             platform: 'Website Backend',

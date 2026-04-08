@@ -1,5 +1,6 @@
 const axios = require("axios");
 
+const logger = require("../utilities/logger");
 async function verifyEmailWithVeriEmail(email) {
     try {
         const apiKey = process.env.VERIEMAIL_API_KEY;

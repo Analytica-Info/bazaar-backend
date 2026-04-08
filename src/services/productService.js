@@ -13,6 +13,7 @@ const dictionary = new Typo("en_US");
 const fs = require("fs");
 const path = require("path");
 
+const logger = require("../utilities/logger");
 const API_KEY = process.env.API_KEY;
 const CATEGORIES_URL = process.env.CATEGORIES_URL;
 const BRANDS_URL = process.env.BRANDS_URL;
@@ -83,11 +84,11 @@ const logStatusFalseItems = (endpoint, requestData, responseData) => {
           `ALERT: ${falseStatusItems.length} items with status: false found in ${endpoint}`
         );
       } catch (fileError) {
-        console.error("Error writing to status log file:", fileError);
+        logger.error({ err: fileError }, "Error writing to status log file:");
       }
     }
   } catch (error) {
-    console.error("Error in status logging:", error);
+    logger.error({ err: error }, "Error in status logging:");
   }
 };
 
@@ -110,7 +111,7 @@ async function trackProductView(productId, userId = null) {
       });
     }
   } catch (error) {
-    console.error("Error tracking product view:", error.message);
+    logger.error({ err: error }, "Error tracking product view:");
   }
 }
 
@@ -120,11 +121,11 @@ async function fetchAndCacheCategories() {
   try {
     const cachedCategories = cache.get(cacheKey);
     if (cachedCategories) {
-      console.log("Fetching categories from cache");
+      logger.info("Fetching categories from cache");
       return cachedCategories;
     }
 
-    console.log("Fetching categories from Lightspeed API");
+    logger.info("Fetching categories from Lightspeed API");
 
     const categoriesResponse = await axios.get(CATEGORIES_URL, {
       headers: {
@@ -195,7 +196,7 @@ const checkSpelling = async (word) => {
     spellingCache.set(cacheKey, suggestion);
     return suggestion;
   } catch (error) {
-    console.error("Error in checkSpelling:", error);
+    logger.error({ err: error }, "Error in checkSpelling:");
     return null;
   }
 };
@@ -285,7 +286,7 @@ exports.getProducts = async (query) => {
         });
       }
     } catch (error) {
-      console.error("Error parsing filter:", error);
+      logger.error({ err: error }, "Error parsing filter:");
     }
   }
 
@@ -319,7 +320,7 @@ exports.getProducts = async (query) => {
 
     return responseData;
   } catch (error) {
-    console.error("Error fetching products:", error);
+    logger.error({ err: error }, "Error fetching products:");
     throw { status: 500, message: "An error occurred while fetching products" };
   }
 };
@@ -396,7 +397,7 @@ exports.getProductDetails = async (productId, userId) => {
  */
 exports.getHomeProducts = async () => {
   try {
-    console.log("API - Fetch Home Products");
+    logger.info("API - Fetch Home Products");
     const categories = await fetchAndCacheCategories();
     let products = await Product.find();
     products = products.filter((product) => product.status === true);
@@ -480,10 +481,10 @@ exports.getHomeProducts = async () => {
       };
     }
 
-    console.log("Return - API - Fetch Home Products");
+    logger.info("Return - API - Fetch Home Products");
     return { result };
   } catch (error) {
-    console.error("Error fetching products:", error);
+    logger.error({ err: error }, "Error fetching products:");
     throw { status: 500, message: "Failed to fetch home products" };
   }
 };
@@ -709,7 +710,7 @@ exports.searchProducts = async (query) => {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error processing search request:", error);
+    logger.error({ err: error }, "Error processing search request:");
 
     if (
       error.code === 40324 ||
@@ -747,7 +748,7 @@ exports.searchSingleProduct = async (name) => {
     return { filteredProducts };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error searching for product:", error);
+    logger.error({ err: error }, "Error searching for product:");
     throw { status: 500, message: "Internal Server Error" };
   }
 };
@@ -895,7 +896,7 @@ exports.getCategoriesProduct = async (categoryId, query) => {
 
     return responseData;
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     throw {
       status: 500,
       message: "Failed to fetch categories or products",
@@ -987,7 +988,7 @@ exports.getSubCategoriesProduct = async (subCategoryId, query) => {
 
     return responseData;
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     throw {
       status: 500,
       message: "Failed to fetch categories or products",
@@ -1064,7 +1065,7 @@ exports.getSubSubCategoriesProduct = async (subSubCategoryId, query) => {
 
     return responseData;
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     throw {
       status: 500,
       message: "Failed to fetch categories or products",
@@ -1077,7 +1078,7 @@ exports.getSubSubCategoriesProduct = async (subSubCategoryId, query) => {
  */
 exports.getAllCategories = async () => {
   try {
-    console.log("API - All Categories");
+    logger.info("API - All Categories");
 
     const categories = await Category.find();
     let allProducts = await Product.find();
@@ -1161,13 +1162,13 @@ exports.getAllCategories = async () => {
 
     flatCategoryList.sort((a, b) => a.name.localeCompare(b.name));
 
-    console.log("Return - API - All Categories");
+    logger.info("Return - API - All Categories");
     return {
       side_bar_categories: finalCategoryTree,
       search_categoriesList: flatCategoryList,
     };
   } catch (error) {
-    console.error("Error fetching categories or products:", error);
+    logger.error({ err: error }, "Error fetching categories or products:");
     throw {
       status: 500,
       message: "Failed to fetch categories or products",
@@ -1198,7 +1199,7 @@ exports.getBrands = async () => {
     }));
     await Brand.bulkWrite(bulkOps);
 
-    console.log("Return - API - All Brands");
+    logger.info("Return - API - All Brands");
     return {
       success: true,
       message:
@@ -1206,7 +1207,7 @@ exports.getBrands = async () => {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Brands API error:", error);
+    logger.error({ err: error }, "Brands API error:");
     throw { status: 500, message: "Failed to fetch or save brands" };
   }
 };
@@ -1228,7 +1229,7 @@ exports.getBrandNameById = async (id) => {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error fetching brand name:", error);
+    logger.error({ err: error }, "Error fetching brand name:");
     throw { status: 500, message: "Server error" };
   }
 };
@@ -1262,7 +1263,7 @@ exports.getCategoryNameById = async (id) => {
     return { name: mainCategory };
   } catch (error) {
     if (error.status) throw error;
-    console.error("Error fetching category name:", error);
+    logger.error({ err: error }, "Error fetching category name:");
     throw { status: 500, message: "Server error" };
   }
 };
@@ -1316,7 +1317,7 @@ exports.getRandomProducts = async (excludeId) => {
     const randomProducts = getRandomItems(filteredProducts, 10);
     return { randomProducts };
   } catch (error) {
-    console.error("Error fetching product details:", error.message);
+    logger.error({ err: error }, "Error fetching product details:");
     throw { status: 500, message: "Failed to fetch product details" };
   }
 };
@@ -1478,7 +1479,7 @@ exports.fetchDbProducts = async (query) => {
       products,
     };
   } catch (error) {
-    console.error("Error fetching products:", error);
+    logger.error({ err: error }, "Error fetching products:");
     throw { status: 500, message: "Failed to fetch products" };
   }
 };
@@ -1544,7 +1545,7 @@ exports.fetchProductsNoImages = async (query) => {
       products,
     };
   } catch (error) {
-    console.error("Error fetching products with no images:", error);
+    logger.error({ err: error }, "Error fetching products with no images:");
     throw {
       status: 500,
       message: "Failed to fetch products with no images",
@@ -1557,14 +1558,14 @@ exports.fetchProductsNoImages = async (query) => {
  */
 exports.getAllProducts = async () => {
   try {
-    console.log("API - Fetch All Products");
+    logger.info("API - Fetch All Products");
     let allProducts = await Product.find();
     allProducts = allProducts.filter((product) => product.status === true);
 
-    console.log("Return - API - Fetch All Products");
+    logger.info("Return - API - Fetch All Products");
     return allProducts;
   } catch (error) {
-    console.error("Error fetching data from API:", error.message);
+    logger.error({ err: error }, "Error fetching data from API:");
     throw { status: 500, message: "Internal Server Error" };
   }
 };

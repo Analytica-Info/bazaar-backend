@@ -1,5 +1,6 @@
 const orderService = require("../../services/orderService");
 
+const logger = require("../../utilities/logger");
 exports.storeAddress = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -37,7 +38,7 @@ exports.deleteAddress = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Error deleting address:", error);
+        logger.error({ err: error }, "Error deleting address:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -61,7 +62,7 @@ exports.setPrimaryAddress = async (req, res) => {
         if (error.status) {
             return res.status(error.status).json({ success: false, message: error.message });
         }
-        console.error("Error setting primary address:", error);
+        logger.error({ err: error }, "Error setting primary address:");
         res.status(500).json({
             success: false,
             message: "Server error",
@@ -109,7 +110,7 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
         if (error.status && error.data) {
             return res.status(error.status).json(error.data);
         }
-        console.error('Error validating inventory:', error);
+        logger.error({ err: error }, 'Error validating inventory:');
         const user = req.user || {};
         const { logActivity } = require("../../utilities/activityLogger");
         const { logBackendActivity } = require("../../utilities/backendLogger");
@@ -162,7 +163,7 @@ exports.uploadProofOfDelivery = async (req, res) => {
                 message: error.message,
             });
         }
-        console.error('uploadProofOfDelivery error:', error);
+        logger.error({ err: error }, 'uploadProofOfDelivery error:');
         return res.status(500).json({
             success: false,
             message: error.message || 'Failed to save proof of delivery',

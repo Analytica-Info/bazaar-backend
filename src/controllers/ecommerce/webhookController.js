@@ -1,5 +1,6 @@
 const productSyncService = require("../../services/productSyncService");
 
+const logger = require("../../utilities/logger");
 exports.productUpdate = async (req, res) => {
     try {
         const { payload, type } = req.body;

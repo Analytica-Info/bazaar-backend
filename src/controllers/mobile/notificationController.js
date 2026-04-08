@@ -1,5 +1,6 @@
 const notificationService = require("../../services/notificationService");
 
+const logger = require("../../utilities/logger");
 exports.getNotification = async (req, res) => {
     const user_id = req.user._id;
 
@@ -13,7 +14,7 @@ exports.getNotification = async (req, res) => {
             notifications: result.notifications
         });
     } catch (err) {
-        console.error("Error fetching notifications:", err);
+        logger.error({ err: err }, "Error fetching notifications:");
         res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -34,7 +35,7 @@ exports.markNotificationsAsRead = async (req, res) => {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });
         }
-        console.error("Error updating notifications:", err);
+        logger.error({ err: err }, "Error updating notifications:");
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
@@ -57,7 +58,7 @@ exports.trackNotificationClick = async (req, res) => {
                 message: err.message
             });
         }
-        console.error("Error tracking notification click:", err);
+        logger.error({ err: err }, "Error tracking notification click:");
         res.status(500).json({
             success: false,
             message: "Internal server error"
