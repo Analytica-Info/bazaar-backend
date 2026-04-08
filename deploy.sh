@@ -1,20 +1,47 @@
 #!/bin/bash
 set -e
 
-# Usage:
-#   ./deploy.sh prod                    Deploy main to production (port 5051)
-#   ./deploy.sh test                    Deploy main to test (port 5050)
-#   ./deploy.sh test feat/shipping      Deploy feat/shipping to test
-#   ./deploy.sh all                     Deploy both (main)
-#   ./deploy.sh all feat/new-feature    Test: feature branch, Prod: main
+# =========================================================================
+# Bazaar Backend Deploy Script
+# =========================================================================
+#
+# METHOD 1 — Run ON the VPS (git pull):
+#   ./deploy.sh prod
+#   ./deploy.sh test feat/shipping
+#   ./deploy.sh all feat/new-feature
+#
+# METHOD 2 — Run FROM your LOCAL machine (rsync upload):
+#   ./deploy.sh prod --push
+#   ./deploy.sh test --push
+#   ./deploy.sh test feat/shipping --push
+#   ./deploy.sh all --push
+#
+# Production always deploys main branch.
+# Test branch is configurable (defaults to main).
+# =========================================================================
 
 ENV=${1:-prod}
-TEST_BRANCH=${2:-main}
+PUSH_MODE=false
+TEST_BRANCH="main"
 PROD_BRANCH="main"
-PROJECT_DIR="/home/bazaar-backend"
+
+# Parse arguments
+for arg in "$@"; do
+  case $arg in
+    --push) PUSH_MODE=true ;;
+    prod|test|all) ENV=$arg ;;
+    *) TEST_BRANCH=$arg ;;
+  esac
+done
+
+# VPS config — update these
+VPS_USER="root"
+VPS_HOST="89.116.33.22"
+VPS_PATH="/home/bazaar-backend"
 
 echo "========================================="
 echo "  Bazaar Backend Deploy — $ENV"
+echo "  Mode: $([ "$PUSH_MODE" = true ] && echo 'PUSH (local → VPS)' || echo 'PULL (git on VPS)')"
 if [ "$ENV" = "test" ] || [ "$ENV" = "all" ]; then
   echo "  Test branch:  $TEST_BRANCH"
 fi
@@ -23,7 +50,65 @@ if [ "$ENV" = "prod" ] || [ "$ENV" = "all" ]; then
 fi
 echo "========================================="
 
-cd $PROJECT_DIR
+# ─────────────────────────────────────────────
+# METHOD 2: Push from local machine via rsync
+# ─────────────────────────────────────────────
+if [ "$PUSH_MODE" = true ]; then
+  LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+  push_and_deploy() {
+    local branch=$1
+    local env_file=$2
+    local services=$3
+
+    echo "→ Checking out $branch locally..."
+    git -C "$LOCAL_DIR" fetch origin
+    git -C "$LOCAL_DIR" checkout $branch
+    git -C "$LOCAL_DIR" pull origin $branch
+
+    echo "→ Uploading to VPS ($VPS_HOST:$VPS_PATH)..."
+    rsync -avz --delete \
+      --exclude='node_modules' \
+      --exclude='.git' \
+      --exclude='uploads' \
+      --exclude='temp' \
+      --exclude='.env' \
+      --exclude='.env.test' \
+      --exclude='.env.production' \
+      "$LOCAL_DIR/" "$VPS_USER@$VPS_HOST:$VPS_PATH/"
+
+    echo "→ Building and restarting on VPS..."
+    ssh "$VPS_USER@$VPS_HOST" "cd $VPS_PATH && docker compose build $services && docker compose up -d $services"
+  }
+
+  if [ "$ENV" = "test" ]; then
+    push_and_deploy "$TEST_BRANCH" ".env.test" "api-test"
+  elif [ "$ENV" = "prod" ]; then
+    push_and_deploy "$PROD_BRANCH" ".env" "api-prod cron"
+  elif [ "$ENV" = "all" ]; then
+    push_and_deploy "$TEST_BRANCH" ".env.test" "api-test"
+    push_and_deploy "$PROD_BRANCH" ".env" "api-prod cron"
+  fi
+
+  echo ""
+  echo "→ Health check..."
+  sleep 5
+  if [ "$ENV" = "test" ] || [ "$ENV" = "all" ]; then
+    echo "  Test (5050):  $(ssh $VPS_USER@$VPS_HOST 'curl -s http://localhost:5050/health 2>/dev/null | head -c 80')"
+  fi
+  if [ "$ENV" = "prod" ] || [ "$ENV" = "all" ]; then
+    echo "  Prod (5051):  $(ssh $VPS_USER@$VPS_HOST 'curl -s http://localhost:5051/health 2>/dev/null | head -c 80')"
+  fi
+
+  echo ""
+  echo "✓ Backend deploy complete (push mode) — $(date)"
+  exit 0
+fi
+
+# ─────────────────────────────────────────────
+# METHOD 1: Pull on VPS via git
+# ─────────────────────────────────────────────
+cd "$VPS_PATH" 2>/dev/null || { echo "ERROR: $VPS_PATH not found. Are you running this on the VPS?"; exit 1; }
 git fetch origin
 
 if [ "$ENV" = "test" ]; then
@@ -62,13 +147,19 @@ elif [ "$ENV" = "all" ]; then
   echo "✓ Production API + Cron deployed"
 
 else
-  echo "Usage: ./deploy.sh [prod|test|all] [test-branch]"
+  echo "Usage:"
   echo ""
-  echo "  ./deploy.sh prod                    Deploy main to production"
-  echo "  ./deploy.sh test                    Deploy main to test"
-  echo "  ./deploy.sh test feat/shipping      Deploy feat/shipping to test"
-  echo "  ./deploy.sh all                     Deploy main to both"
-  echo "  ./deploy.sh all feat/new-feature    Deploy feat/new-feature to test, main to prod"
+  echo "  ON VPS (git pull):"
+  echo "    ./deploy.sh prod                    Deploy main to production"
+  echo "    ./deploy.sh test                    Deploy main to test"
+  echo "    ./deploy.sh test feat/shipping      Deploy feat/shipping to test"
+  echo "    ./deploy.sh all                     Deploy main to both"
+  echo ""
+  echo "  FROM LOCAL (rsync push):"
+  echo "    ./deploy.sh prod --push             Push main to production"
+  echo "    ./deploy.sh test --push             Push main to test"
+  echo "    ./deploy.sh test feat/shipping --push"
+  echo "    ./deploy.sh all --push              Push both"
   exit 1
 fi
 
