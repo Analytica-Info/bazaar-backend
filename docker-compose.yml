@@ -1,27 +1,50 @@
-version: "3.8"
-
 services:
-  api-dev:
+  # ==========================================
+  # TEST ENVIRONMENT (replaces bazaar-react-server-dev on port 5050)
+  # ==========================================
+  api-test:
     build:
       context: .
-      target: dev
+      target: prod
     ports:
-      - "5000:5000"
+      - "0.0.0.0:5050:5000"
     volumes:
-      - .:/app
-      - /app/node_modules
       - ./uploads:/app/uploads
     env_file:
-      - .env
+      - .env.test
     environment:
       - NODE_ENV=development
+    restart: unless-stopped
+    networks:
+      - app-network
 
+  # ==========================================
+  # PRODUCTION (replaces bazaar-react-server-prod on port 5051)
+  # ==========================================
   api-prod:
     build:
       context: .
       target: prod
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5051:5000"
+    volumes:
+      - ./uploads:/app/uploads
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ==========================================
+  # CRON WORKER (production only)
+  # ==========================================
+  cron:
+    build:
+      context: .
+      target: prod
+    command: ["node", "src/scripts/cronWorker.js"]
     volumes:
       - ./uploads:/app/uploads
     env_file:

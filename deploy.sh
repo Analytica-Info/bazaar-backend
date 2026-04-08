@@ -2,15 +2,16 @@
 set -e
 
 # Usage:
-#   ./deploy.sh                          # Deploy production (always main)
-#   ./deploy.sh test                     # Deploy test (default: main)
-#   ./deploy.sh test feat/shipping       # Deploy test from specific branch
-#   ./deploy.sh all                      # Both (main for prod, main for test)
-#   ./deploy.sh all feat/new-feature     # Both (main for prod, feature branch for test)
+#   ./deploy.sh prod                    Deploy main to production (port 5051)
+#   ./deploy.sh test                    Deploy main to test (port 5050)
+#   ./deploy.sh test feat/shipping      Deploy feat/shipping to test
+#   ./deploy.sh all                     Deploy both (main)
+#   ./deploy.sh all feat/new-feature    Test: feature branch, Prod: main
 
 ENV=${1:-prod}
 TEST_BRANCH=${2:-main}
 PROD_BRANCH="main"
+PROJECT_DIR="/home/bazaar-backend"
 
 echo "========================================="
 echo "  Bazaar Backend Deploy — $ENV"
@@ -22,57 +23,43 @@ if [ "$ENV" = "prod" ] || [ "$ENV" = "all" ]; then
 fi
 echo "========================================="
 
-cd /var/www/bazaar-backend
+cd $PROJECT_DIR
 git fetch origin
 
 if [ "$ENV" = "test" ]; then
   echo "→ Checking out $TEST_BRANCH..."
   git checkout $TEST_BRANCH
   git pull origin $TEST_BRANCH
-  echo "→ Installing dependencies..."
-  npm install --production
-  echo "→ Validating..."
-  npm run validate
-  echo "→ Restarting TEST API (port 5001)..."
-  pm2 restart bazaar-api-test --update-env 2>/dev/null || pm2 start start-test.js --name bazaar-api-test
-  pm2 save
-  echo "✓ Test API restarted"
+  echo "→ Building and starting TEST API (port 5050)..."
+  docker compose build api-test
+  docker compose up -d api-test
+  echo "✓ Test API deployed"
 
 elif [ "$ENV" = "prod" ]; then
   echo "→ Checking out $PROD_BRANCH..."
   git checkout $PROD_BRANCH
   git pull origin $PROD_BRANCH
-  echo "→ Installing dependencies..."
-  npm install --production
-  echo "→ Validating..."
-  npm run validate
-  echo "→ Restarting PRODUCTION API (port 5000)..."
-  pm2 restart bazaar-api-prod --update-env 2>/dev/null || pm2 start src/server.js --name bazaar-api-prod
-  echo "→ Restarting CRON worker..."
-  pm2 restart bazaar-cron --update-env 2>/dev/null || pm2 start src/scripts/cronWorker.js --name bazaar-cron
-  pm2 save
-  echo "✓ Production API + Cron restarted"
+  echo "→ Building and starting PRODUCTION API (port 5051)..."
+  docker compose build api-prod cron
+  docker compose up -d api-prod cron
+  echo "✓ Production API + Cron deployed"
 
 elif [ "$ENV" = "all" ]; then
   echo ""
   echo "── TEST ($TEST_BRANCH) ──"
   git checkout $TEST_BRANCH
   git pull origin $TEST_BRANCH
-  npm install --production
-  npm run validate
-  pm2 restart bazaar-api-test --update-env 2>/dev/null || pm2 start start-test.js --name bazaar-api-test
-  echo "✓ Test API restarted"
+  docker compose build api-test
+  docker compose up -d api-test
+  echo "✓ Test API deployed"
 
   echo ""
   echo "── PRODUCTION ($PROD_BRANCH) ──"
   git checkout $PROD_BRANCH
   git pull origin $PROD_BRANCH
-  npm install --production
-  npm run validate
-  pm2 restart bazaar-api-prod --update-env 2>/dev/null || pm2 start src/server.js --name bazaar-api-prod
-  pm2 restart bazaar-cron --update-env 2>/dev/null || pm2 start src/scripts/cronWorker.js --name bazaar-cron
-  pm2 save
-  echo "✓ Production API + Cron restarted"
+  docker compose build api-prod cron
+  docker compose up -d api-prod cron
+  echo "✓ Production API + Cron deployed"
 
 else
   echo "Usage: ./deploy.sh [prod|test|all] [test-branch]"
@@ -87,13 +74,16 @@ fi
 
 echo ""
 echo "→ Health check..."
-sleep 3
+sleep 5
 if [ "$ENV" = "test" ] || [ "$ENV" = "all" ]; then
-  echo "  Test:  $(curl -s http://localhost:5001/health 2>/dev/null | head -c 80)"
+  echo "  Test (5050):  $(curl -s http://localhost:5050/health 2>/dev/null | head -c 80)"
 fi
 if [ "$ENV" = "prod" ] || [ "$ENV" = "all" ]; then
-  echo "  Prod:  $(curl -s http://localhost:5000/health 2>/dev/null | head -c 80)"
+  echo "  Prod (5051):  $(curl -s http://localhost:5051/health 2>/dev/null | head -c 80)"
 fi
 
+echo ""
+echo "→ Running containers:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep bazaar-backend || true
 echo ""
 echo "✓ Backend deploy complete — $(date)"
