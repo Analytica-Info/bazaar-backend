@@ -1,6 +1,6 @@
 const EmailConfig = require('../models/EmailConfig');
 
-const logger = require("/logger");
+const logger = require("./logger");
 /**
  * Get admin email - checks database first, then falls back to ENV
  * @returns {Promise<string>} Admin email address

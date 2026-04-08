@@ -1,6 +1,6 @@
 const ActivityLog = require('../models/ActivityLog');
 
-const logger = require("/logger");
+const logger = require("./logger");
 /**
  * Helper function to log activities
  * @param {Object} logData - Log data object

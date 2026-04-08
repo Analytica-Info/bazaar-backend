@@ -1,6 +1,6 @@
 const BackendLog = require('../models/BackendLog');
 
-const logger = require("/logger");
+const logger = require("./logger");
 /**
  * Helper function to log backend activities (grouped by date)
  * @param {Object} logData - Log data object
