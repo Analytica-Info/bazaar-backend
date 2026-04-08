@@ -15,6 +15,10 @@
     "migrate:cleanup": "node src/scripts/migrateOrderFields.js --cleanup",
     "seed:roles": "node src/scripts/seedRolesAndPermissions.js",
     "seed:shipping": "node src/scripts/seedShippingCountries.js",
+    "sync:reset": "node src/scripts/resetSyncState.js",
+    "sync:reset:products": "node src/scripts/resetSyncState.js products",
+    "sync:reset:inventory": "node src/scripts/resetSyncState.js inventory",
+    "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
     "check": "npm run validate && npm test"
   },
