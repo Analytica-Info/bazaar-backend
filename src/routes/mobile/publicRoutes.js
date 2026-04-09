@@ -8,6 +8,13 @@ const path = require("path");
 const uploadPath = path.join(__dirname, "../../uploads/contact");
 const upload = createUpload(allowedFileTypes, uploadPath);
 
+const shippingCtrl = require('../../controllers/ecommerce/shippingCountryController');
+
+// Public shipping endpoints
+router.get('/shipping-countries', shippingCtrl.listActive);
+router.get('/shipping-countries/:code/cities', shippingCtrl.getCities);
+router.get('/shipping-cost', shippingCtrl.getShippingCost);
+
 router.post('/contact-us', publicController.contactUs);
 router.post('/feedback', authMiddleware, publicController.submitFeedback);
 router.post('/mobile-app-log', publicController.createMobileAppLog);

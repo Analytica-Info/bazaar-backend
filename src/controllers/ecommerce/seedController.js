@@ -2,6 +2,7 @@ const Role = require('../../models/Role');
 const Permission = require('../../models/Permission');
 const Admin = require('../../models/Admin');
 
+const logger = require("../../utilities/logger");
 const permissions = [
     { name: 'Dashboard', slug: 'dashboard', module: 'Dashboard', action: 'view', description: 'Access dashboard' },
     { name: 'Products', slug: 'products', module: 'Products', action: 'view', description: 'Access products' },
@@ -38,6 +39,7 @@ const permissions = [
     { name: 'CMS Shop', slug: 'cms-shop', module: 'CMS', action: 'view', description: 'Access CMS shop' },
     { name: 'CMS Contact', slug: 'cms-contact', module: 'CMS', action: 'view', description: 'Access CMS contact' },
     { name: 'CMS Brands Logo', slug: 'cms-brands', module: 'CMS', action: 'view', description: 'Access CMS brands logo' },
+    { name: 'Shipping Management', slug: 'shipping-management', module: 'Shipping', action: 'manage', description: 'Manage shipping countries, cities, areas and rates' },
     { name: 'Activity Logs', slug: 'activity-logs', module: 'Logs', action: 'view', description: 'Access mobile app frontend activity logs' },
     { name: 'Backend Logs', slug: 'backend-logs', module: 'Logs', action: 'view', description: 'Access backend API logs' },
 ];
@@ -104,7 +106,7 @@ exports.seedRolesAndPermissions = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Seed Error:', error);
+        logger.error({ err: error }, 'Seed Error:');
         res.status(500).json({
             success: false,
             message: 'An error occurred while seeding roles and permissions.',

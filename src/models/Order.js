@@ -3,12 +3,13 @@ const mongoose = require('mongoose');
 const orderSchema = new mongoose.Schema(
     {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        order_id: { type: String, unique: true },
-        order_no: { type: Number, unique: true },
+        order_id: { type: String, unique: true }, // Unique professional order ID
+        order_no: { type: Number, unique: true }, // Sequential order number
         order_datetime: { type: String },
         name: { type: String, required: true },
         phone: { type: String, default: '-' },
+        country: { type: String, default: 'AE' },
+        currency: { type: String, default: 'AED' },
         state: { type: String, default: '-' },
         address: { type: String, required: true },
         city: { type: String, default: '-' },
@@ -28,12 +29,11 @@ const orderSchema = new mongoose.Schema(
         payment_method: { type: String, required: true },
         payment_status: { type: String, required: true },
         checkout_session_id: { type: String, required: false },
-        stripe_checkout_session_id: { type: String, required: false },
-        orderfrom: { type: String, default: '-', index: true },
+        orderfrom: { type: String, default: '-' },
         orderTracks: [
             {
                 status: { type: String, required: true },
-                dateTime: {},
+                dateTime: { type: String },
                 image: { type: String },
             }
         ],
@@ -41,6 +41,7 @@ const orderSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
+        strict: false, // Allow fields from both ecommerce (userId) and mobile (user_id) backends
     }
 );
 

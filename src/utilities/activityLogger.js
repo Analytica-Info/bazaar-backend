@@ -1,5 +1,6 @@
 const ActivityLog = require('../models/ActivityLog');
 
+const logger = require("./logger");
 /**
  * Helper function to log activities
  * @param {Object} logData - Log data object
@@ -50,7 +51,7 @@ async function logActivity(logData) {
 
         await ActivityLog.create(logEntry);
     } catch (error) {
-        console.error('Error logging activity:', error.message);
+        logger.error({ err: error }, 'Error logging activity:');
     }
 }
 

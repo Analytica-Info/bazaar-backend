@@ -8,6 +8,7 @@ const {
 } = require('../../controllers/ecommerce/productDiscountFixController');
 const { setGiftProduct, getGiftProduct } = require('../../controllers/ecommerce/giftProductController');
 const { list: listBankPromoCodes, create: createBankPromoCode, getById: getBankPromoCodeById, update: updateBankPromoCode, toggleActive: toggleBankPromoCodeActive, delete: deleteBankPromoCode } = require('../../controllers/ecommerce/bankPromoCodeController');
+const shippingCtrl = require('../../controllers/ecommerce/shippingCountryController');
 const adminMiddleware = require('../../middleware/adminMiddleware');
 const { checkPermission } = require('../../middleware/permissionMiddleware');
 const createUpload = require("../../utilities/fileUpload");
@@ -80,5 +81,24 @@ router.get("/bank-promo-codes/:id", adminMiddleware, checkPermission('bank-promo
 router.put("/bank-promo-codes/:id", adminMiddleware, checkPermission('bank-promo-codes'), updateBankPromoCode);
 router.patch("/bank-promo-codes/:id/toggle-active", adminMiddleware, checkPermission('bank-promo-codes'), toggleBankPromoCodeActive);
 router.delete("/bank-promo-codes/:id", adminMiddleware, checkPermission('bank-promo-codes'), deleteBankPromoCode);
+
+// Shipping Countries
+router.get("/shipping-countries", adminMiddleware, shippingCtrl.list);
+router.post("/shipping-countries", adminMiddleware, shippingCtrl.create);
+router.get("/shipping-countries/:id", adminMiddleware, shippingCtrl.getById);
+router.put("/shipping-countries/:id", adminMiddleware, shippingCtrl.update);
+router.patch("/shipping-countries/:id/toggle-active", adminMiddleware, shippingCtrl.toggleActive);
+router.delete("/shipping-countries/:id", adminMiddleware, shippingCtrl.remove);
+// Bulk Import
+router.post("/shipping-countries/:id/bulk-cities", adminMiddleware, shippingCtrl.bulkImportCities);
+router.post("/shipping-countries/:id/cities/:cityId/bulk-areas", adminMiddleware, shippingCtrl.bulkImportAreas);
+// Cities
+router.post("/shipping-countries/:id/cities", adminMiddleware, shippingCtrl.addCity);
+router.put("/shipping-countries/:id/cities/:cityId", adminMiddleware, shippingCtrl.updateCity);
+router.delete("/shipping-countries/:id/cities/:cityId", adminMiddleware, shippingCtrl.removeCity);
+// Areas
+router.post("/shipping-countries/:id/cities/:cityId/areas", adminMiddleware, shippingCtrl.addArea);
+router.put("/shipping-countries/:id/cities/:cityId/areas/:areaId", adminMiddleware, shippingCtrl.updateArea);
+router.delete("/shipping-countries/:id/cities/:cityId/areas/:areaId", adminMiddleware, shippingCtrl.removeArea);
 
 module.exports =  router;

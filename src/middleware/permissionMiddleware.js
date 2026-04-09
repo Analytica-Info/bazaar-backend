@@ -2,6 +2,7 @@ const Admin = require('../models/Admin');
 const Role = require('../models/Role');
 const Permission = require('../models/Permission');
 
+const logger = require("../utilities/logger");
 /**
  * Middleware to check if admin has a specific required permission.
  * Must be used after adminMiddleware (expects req.user to be set).
@@ -57,7 +58,7 @@ const checkPermission = (requiredPermission) => {
 
       next();
     } catch (error) {
-      console.error('Permission Middleware Error:', error);
+      logger.error({ err: error }, 'Permission Middleware Error:');
       return res.status(500).json({
         success: false,
         message: 'Error checking permissions.',
@@ -117,7 +118,7 @@ const checkAnyPermission = (requiredPermissions) => {
 
       next();
     } catch (error) {
-      console.error('Permission Middleware Error:', error);
+      logger.error({ err: error }, 'Permission Middleware Error:');
       return res.status(500).json({
         success: false,
         message: 'Error checking permissions.',

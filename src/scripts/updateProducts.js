@@ -2,16 +2,37 @@ const axios = require("axios");
 require("dotenv").config();
 const Product = require("../models/Product");
 const ProductId = require("../models/ProductId");
+const SyncState = require("../models/SyncState");
 const fs = require("fs");
 const API_KEY = process.env.API_KEY;
 const PRODUCTS_URL = process.env.PRODUCTS_URL;
 
 const LOG_FILE = "cron.log";
+const SYNC_KEY_PRODUCTS = "lightspeed_products_v3";
+const SYNC_KEY_INVENTORY = "lightspeed_inventory_v2";
 
 const updateProducts = async () => {
   try {
-    console.log('start updateProducts');
-    let products = await fetchProducts();
+    console.log('start updateProducts (incremental)');
+
+    // Get last sync version
+    const syncState = await SyncState.findOne({ key: SYNC_KEY_PRODUCTS });
+    const lastVersion = syncState?.lastVersion || "";
+
+    if (lastVersion) {
+      console.log(`Incremental sync from version: ${lastVersion}`);
+    } else {
+      console.log('Full sync (first run or reset)');
+    }
+
+    let products = await fetchProducts(lastVersion);
+
+    if (products.length === 0) {
+      console.log('No new/updated products since last sync');
+      return { storedCount: 0, updatedCount: 0 };
+    }
+
+    console.log(`Fetched ${products.length} changed products`);
     products = await filterProductsByInventory(products);
 
     const productIds = products.map((product) => product.id);
@@ -23,84 +44,80 @@ const updateProducts = async () => {
       }
     }
 
-    let productIdss = await ProductId.find({}, "productId");
-    productIdss = productIdss.map((item) => item.productId);
-
-    if (productIdss.length > 0) {
-      // await storeProductDetails(productIdss);
-      const { storedCount, updatedCount } = await storeProductDetails(
-        productIdss
-      );
+    // Only process the changed product IDs, not all
+    if (productIds.length > 0) {
+      const { storedCount, updatedCount } = await storeProductDetails(productIds);
       return { storedCount, updatedCount };
-      // console.log("Product details updated successfully.");
     } else {
-      console.warn("No product IDs found.");
+      console.warn("No product IDs to process after inventory filter.");
+      return { storedCount: 0, updatedCount: 0 };
     }
   } catch (error) {
     console.error("Error fetching and storing product IDs:", error.message);
+    return { storedCount: 0, updatedCount: 0 };
   }
 };
 
-// connectAndRun();
-// updateProducts();
-
-const storeProductDetails = async (productIds, res) => {
+const storeProductDetails = async (productIds) => {
   console.log('storeProductDetails');
   try {
-    let storedCount = 0; // Count of newly stored products
-    let updatedCount = 0; // Count of updated products
+    let storedCount = 0;
+    let updatedCount = 0;
     const totalProducts = productIds.length;
     console.log(`Starting to process ${totalProducts} products...`);
 
     for (const id of productIds) {
-      const { product, variantsData, totalQty } = await fetchProductDetails(id);
-      const timeFormatted = await currentTime();
-      const type = "cron";
+      try {
+        const result = await fetchProductDetails(id);
+        if (!result) continue; // inactive product
 
-      const existingEntry = await Product.findOne({ "product.id": product.id });
-      const productStatus = totalQty > 0 ? true : false;
+        const { product, variantsData, totalQty } = result;
+        const timeFormatted = await currentTime();
+        const type = "cron";
 
-      if (!existingEntry) {
-        const newProductDetails = new Product({
-          product,
-          variantsData,
-          totalQty,
-          webhook: type,
-          webhookTime: timeFormatted,
-          status: productStatus,
-        });
-        await newProductDetails.save();
-        storedCount++; // Increment stored count
-        // console.log(`Added new product with ID: ${product.id} - Total Stored Products: ${count}`);
-      } else {
-        await Product.updateOne(
-          { "product.id": product.id },
-          {
-            $set: {
-              product,
-              variantsData,
-              totalQty,
-              webhook: type,
-              webhookTime: timeFormatted,
-              status: productStatus,
-            },
-          }
-        );
-        updatedCount++; // Increment updated count
-        // console.log(`Updated product with ID: ${product.id} - Total Updated Products: ${count}`);
+        const existingEntry = await Product.findOne({ "product.id": product.id });
+        const productStatus = totalQty > 0 ? true : false;
+
+        if (!existingEntry) {
+          const newProductDetails = new Product({
+            product,
+            variantsData,
+            totalQty,
+            webhook: type,
+            webhookTime: timeFormatted,
+            status: productStatus,
+          });
+          await newProductDetails.save();
+          storedCount++;
+        } else {
+          await Product.updateOne(
+            { "product.id": product.id },
+            {
+              $set: {
+                product,
+                variantsData,
+                totalQty,
+                webhook: type,
+                webhookTime: timeFormatted,
+                status: productStatus,
+              },
+            }
+          );
+          updatedCount++;
+        }
+      } catch (err) {
+        console.error(`Error processing product ${id}:`, err.message);
+        // Continue with next product instead of failing entire batch
       }
     }
 
-    // Log the total counts to file
     const summaryMessage = `Total New Products: ${storedCount} | Total Updated Products: ${updatedCount}\n`;
     fs.appendFileSync(LOG_FILE, summaryMessage);
     return { storedCount, updatedCount };
   } catch (error) {
     console.error("Error processing product details:", error.message);
-    fs.appendFileSync(
-      LOG_FILE,
-      `Error processing product details: ${error.message}\n`
-    );
+    fs.appendFileSync(LOG_FILE, `Error processing product details: ${error.message}\n`);
+    return { storedCount: 0, updatedCount: 0 };
   }
 };
 
@@ -133,7 +150,7 @@ const fetchProductDetails = async (id) => {
         }
       );
       const is_active = product.is_active;
-      if (is_active !== true) return;
+      if (is_active !== true) return null;
       const inventoryLevel =
         inventoryResponse.data.data?.[0]?.inventory_level || 0;
 
@@ -196,10 +213,16 @@ const fetchProductDetails = async (id) => {
   }
 };
 
-async function fetchProducts() {
+/**
+ * Fetch products from Lightspeed API v3.0
+ * Uses since_version for incremental sync — only fetches products changed since last run.
+ * On first run (no lastVersion), fetches everything.
+ */
+async function fetchProducts(startVersion) {
   try {
     const allProducts = [];
-    let after = "";
+    let after = startVersion || "";
+    let latestVersion = "";
 
     do {
       let productsResponse = null;
@@ -207,7 +230,6 @@ async function fetchProducts() {
       const maxRetries = 5;
       let success = false;
 
-      // Retry logic for 502 errors
       while (retryCount < maxRetries && !success) {
         try {
           productsResponse = await axios.get(
@@ -221,26 +243,21 @@ async function fetchProducts() {
           );
           success = true;
         } catch (error) {
-          // Check if it's a 502 error
           if (error.response && error.response.status === 502) {
             retryCount++;
             if (retryCount < maxRetries) {
               console.log(`502 error on request. Retrying (${retryCount}/${maxRetries}) with same version: ${after}`);
-              // Wait 5 seconds before retry
               await new Promise(resolve => setTimeout(resolve, 5000));
             } else {
               console.error(`Failed after ${maxRetries} retries with 502 error. Moving to next page.`);
-              // Break out of retry loop and continue to next page
               break;
             }
           } else {
-            // If it's not a 502 error, throw it
             throw error;
           }
         }
       }
 
-      // Only process if we got a successful response
       if (success && productsResponse) {
         const products = productsResponse.data;
         if (products.data && products.data.length > 0) {
@@ -248,19 +265,31 @@ async function fetchProducts() {
         }
 
         after = products.version?.max || "";
+        if (after) latestVersion = after;
       } else {
-        // If all retries failed, move to next page by incrementing after
-        // or break if we can't continue
         console.log('Skipping this page due to repeated 502 errors');
-        after = ""; // Break the loop if we can't get the next version
+        after = "";
       }
 
-      // Add 5 second delay before next request (except after last request)
       if (after) {
         console.log('Waiting 5 seconds before next request...');
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
     } while (after);
+
+    // Save the latest version for next incremental sync
+    if (latestVersion) {
+      await SyncState.findOneAndUpdate(
+        { key: SYNC_KEY_PRODUCTS },
+        {
+          lastVersion: latestVersion,
+          lastSyncAt: new Date(),
+          lastProductCount: allProducts.length,
+        },
+        { upsert: true, new: true }
+      );
+      console.log(`Saved sync version: ${latestVersion} (${allProducts.length} products)`);
+    }
 
     const activeProducts = allProducts.filter(
       (product) => product.is_active === true
@@ -277,8 +306,13 @@ async function fetchProducts() {
 async function filterProductsByInventory(productsResponse) {
   const allProducts = productsResponse || [];
 
+  // Get last inventory sync version
+  const inventorySync = await SyncState.findOne({ key: SYNC_KEY_INVENTORY });
+  const inventoryStartVersion = inventorySync?.lastVersion || "";
+
   const allInventories = [];
-  let after = "";
+  let after = inventoryStartVersion;
+  let latestInventoryVersion = "";
 
   do {
     const inventoryResponse = await axios.get(
@@ -297,7 +331,44 @@ async function filterProductsByInventory(productsResponse) {
     }
 
     after = inventories.version?.max || "";
+    if (after) latestInventoryVersion = after;
   } while (after);
+
+  // Save inventory version
+  if (latestInventoryVersion) {
+    await SyncState.findOneAndUpdate(
+      { key: SYNC_KEY_INVENTORY },
+      {
+        lastVersion: latestInventoryVersion,
+        lastSyncAt: new Date(),
+        lastProductCount: allInventories.length,
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  // If no inventory data fetched (incremental returned nothing), fetch full for matching
+  // This handles the case where products changed but inventory didn't
+  if (allInventories.length === 0 && allProducts.length > 0) {
+    console.log('No incremental inventory changes — fetching full inventory for product matching');
+    let fullAfter = "";
+    do {
+      const inventoryResponse = await axios.get(
+        `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/inventory?page_size=5000&after=${fullAfter}`,
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            Accept: "application/json",
+          },
+        }
+      );
+      const inventories = inventoryResponse.data;
+      if (inventories.data && inventories.data.length > 0) {
+        allInventories.push(...inventories.data);
+      }
+      fullAfter = inventories.version?.max || "";
+    } while (fullAfter);
+  }
 
   const filteredProducts = [];
 
@@ -366,27 +437,13 @@ const currentTime = async () => {
 
   parts.forEach((part) => {
     switch (part.type) {
-      case "hour":
-        hour = part.value;
-        break;
-      case "minute":
-        minute = part.value;
-        break;
-      case "second":
-        second = part.value;
-        break;
-      case "dayPeriod":
-        period = part.value;
-        break;
-      case "day":
-        day = part.value;
-        break;
-      case "month":
-        month = part.value;
-        break;
-      case "year":
-        year = part.value;
-        break;
+      case "hour": hour = part.value; break;
+      case "minute": minute = part.value; break;
+      case "second": second = part.value; break;
+      case "dayPeriod": period = part.value; break;
+      case "day": day = part.value; break;
+      case "month": month = part.value; break;
+      case "year": year = part.value; break;
     }
   });
 
@@ -395,7 +452,3 @@ const currentTime = async () => {
 };
 
 module.exports = updateProducts;
-
-// app.listen(PORT, () => {
-//     console.log(`Server is running Sucessfully on ${PORT}`);
-// });

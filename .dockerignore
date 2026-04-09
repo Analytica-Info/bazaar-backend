@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.*
+.git
+.gitignore
+tests
+coverage
+uploads
+logs
+temp
+*.md
+*.log
+docker-compose.yml
+deploy.sh
+jest.config.js

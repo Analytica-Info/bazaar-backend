@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const JWT_SECRET = require('../config/jwtSecret');
 
+const logger = require("../utilities/logger");
 const adminMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -24,7 +25,7 @@ const adminMiddleware = async (req, res, next) => {
     } else if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token. Please log in again.' });
     } else {
-      console.error('Unexpected error:', error.message);
+      logger.error({ err: error }, 'Unexpected error:');
       res.status(500).json({ message: 'Internal server error' });
     }
   }

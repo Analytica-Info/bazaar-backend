@@ -1,5 +1,6 @@
 const BackendLog = require('../models/BackendLog');
 
+const logger = require("./logger");
 /**
  * Helper function to log backend activities (grouped by date)
  * @param {Object} logData - Log data object
@@ -68,7 +69,7 @@ async function logBackendActivity(logData) {
             });
         }
     } catch (error) {
-        console.error('Error logging backend activity:', error.message);
+        logger.error({ err: error }, 'Error logging backend activity:');
     }
 }
 

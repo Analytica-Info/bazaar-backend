@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const bannerController = require("../../controllers/mobile/bannerImageController");
+const bannerController = require("../../controllers/shared/bannerImageController");
 const createUpload = require("../../utilities/fileUpload");
 
 const allowedFileTypes = /jpeg|jpg|png|webp/;

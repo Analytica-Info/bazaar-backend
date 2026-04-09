@@ -8,14 +8,16 @@ const notificationSchema = new mongoose.Schema({
     orderId: String,
     read: { type: Boolean, default: false },
     scheduledDateTime: { type: Date },
-    targetUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    targetUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array of user IDs for specific users
     sendToAll: { type: Boolean, default: false },
-    clickedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    clickedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Users who clicked on notification
+    // sentAt: no default — set only when we actually send (pending/scheduled stay undefined until send)
     sentAt: { type: Date },
+    // status: pending (default) → sent only if ALL target users got it; failed if any one fails or past time unsent
     status: { type: String, enum: ['pending', 'sent', 'failed'], default: 'pending' },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }, // Admin who created the notification
     createdAt: { type: Date, default: Date.now }
-});
+}, { strict: false });
 
 const Notification = mongoose.model('Notification', notificationSchema);
 

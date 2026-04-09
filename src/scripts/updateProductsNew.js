@@ -2,10 +2,13 @@ const axios = require("axios");
 require("dotenv").config();
 const Product = require("../models/Product");
 const ProductId = require("../models/ProductId");
+const SyncState = require("../models/SyncState");
 const fs = require("fs");
 const API_KEY = process.env.API_KEY;
 
 const LOG_FILE = "cron.log";
+const SYNC_KEY_PRODUCTS_V2 = "lightspeed_products_v2";
+const SYNC_KEY_SALES = "lightspeed_sales_v2";
 
 const updateProductsNew = async () => {
   try {
@@ -211,8 +214,16 @@ async function filterParkProducts() {
 }
 
 async function filterActiveProducts() {
+  const syncState = await SyncState.findOne({ key: SYNC_KEY_PRODUCTS_V2 });
+  const startVersion = syncState?.lastVersion || "";
+
+  if (startVersion) {
+    console.log(`Incremental product v2 fetch from version: ${startVersion}`);
+  }
+
   const allStoredProducts = [];
-  let after = "";
+  let after = startVersion;
+  let latestVersion = "";
 
   do {
     const inventoryResponse = await axios.get(
@@ -226,10 +237,21 @@ async function filterActiveProducts() {
     );
 
     const inventories = inventoryResponse.data;
-    allStoredProducts.push(...inventories.data);
+    if (inventories.data && inventories.data.length > 0) {
+      allStoredProducts.push(...inventories.data);
+    }
 
     after = inventories.version?.max || "";
+    if (after) latestVersion = after;
   } while (after);
+
+  if (latestVersion) {
+    await SyncState.findOneAndUpdate(
+      { key: SYNC_KEY_PRODUCTS_V2 },
+      { lastVersion: latestVersion, lastSyncAt: new Date(), lastProductCount: allStoredProducts.length },
+      { upsert: true, new: true }
+    );
+  }
 
   const inactiveProducts = allStoredProducts.filter(
     (product) => product.ecwid_enabled_webstore === false
@@ -238,7 +260,7 @@ async function filterActiveProducts() {
   const inactiveProductsIds = inactiveProducts.map((product) => product.id);
 
   console.log(
-    `Found ${inactiveProductsIds.length} inactive OR webstore-disabled products (from input list).`
+    `Found ${inactiveProductsIds.length} inactive OR webstore-disabled products (from ${allStoredProducts.length} fetched).`
   );
 
   return inactiveProductsIds;
@@ -357,8 +379,16 @@ async function updateSoldItems() {
 }
 
 async function getSalesItem() {
+  const syncState = await SyncState.findOne({ key: SYNC_KEY_SALES });
+  const startVersion = syncState?.lastVersion || "";
+
+  if (startVersion) {
+    console.log(`Incremental sales fetch from version: ${startVersion}`);
+  }
+
   const saleItems = [];
-  let after = "";
+  let after = startVersion;
+  let latestVersion = "";
 
   do {
     const salesResponse = await axios.get(
@@ -377,7 +407,16 @@ async function getSalesItem() {
     }
 
     after = data.version?.max || "";
+    if (after) latestVersion = after;
   } while (after);
+
+  if (latestVersion) {
+    await SyncState.findOneAndUpdate(
+      { key: SYNC_KEY_SALES },
+      { lastVersion: latestVersion, lastSyncAt: new Date(), lastProductCount: saleItems.length },
+      { upsert: true, new: true }
+    );
+  }
 
   return saleItems;
 }
