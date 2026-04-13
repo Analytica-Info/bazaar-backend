@@ -55,7 +55,8 @@ exports.getAddresses = async (userId) => {
 };
 
 exports.storeAddress = async (userId, addressData) => {
-    const { _id, name, email, city, area, floorNo, apartmentNo, landmark, buildingName, mobile, state } = addressData;
+    const { _id, name, email, city, area, floorNo, apartmentNo, landmark, buildingName, mobile, state, country, countryCode } = addressData;
+    const resolvedCountry = country || countryCode || 'AE';
 
     const user = await User.findById(userId);
 
@@ -80,7 +81,8 @@ exports.storeAddress = async (userId, addressData) => {
             landmark,
             buildingName,
             mobile,
-            state
+            state,
+            country: resolvedCountry,
         };
     } else {
         user.address.push({
@@ -94,6 +96,7 @@ exports.storeAddress = async (userId, addressData) => {
             buildingName,
             mobile,
             state,
+            country: resolvedCountry,
             isPrimary: user.address.length === 0
         });
     }
