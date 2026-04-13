@@ -804,8 +804,9 @@ exports.appleLogin = async ({ idToken, code, authorizationCode, userData, name, 
             throw { status: 400, message: 'Missing Apple identity token' };
         }
 
+        const appleClientId = process.env.APPLE_CLIENT_ID; // mobile: com.analytica.bazaarECommerce
         const appleResponse = await appleSignin.verifyIdToken(idToken, {
-            audience: process.env.APPLE_CLIENT_ID,
+            audience: appleClientId,
             ignoreExpiration: true
         });
 
@@ -922,8 +923,9 @@ exports.appleLogin = async ({ idToken, code, authorizationCode, userData, name, 
         throw { status: 401, message: 'Invalid token issuer' };
     }
 
-    const appleClientId = process.env.APPLE_CLIENT_ID;
-    if (appleClientId && payload.aud !== appleClientId) {
+    // Web Apple Sign-In uses a different client ID than mobile
+    const appleWebClientId = process.env.APPLE_WEB_CLIENT_ID || process.env.APPLE_CLIENT_ID;
+    if (appleWebClientId && payload.aud !== appleWebClientId) {
         throw { status: 401, message: 'Invalid token audience' };
     }
 
