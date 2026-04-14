@@ -1,5 +1,5 @@
 const express = require('express');
-const { orders, coupons, adminRegister, adminLogin, forgotPassword, verifyCode, resetPassword, updatePassword, updateOrderStatus, getAllUsers, exportUsers, getUserById, blockUser, unblockUser, deleteUser, restoreUser, updateUser, getAllAdmins, getAdminById, getCurrentAdmin, createSubAdmin, updateSubAdmin, deleteSubAdmin, getProductAnalytics, exportProductAnalytics, getProductViewDetails, getActivityLogs, getActivityLogById, getBackendLogs, getBackendLogByDate, downloadBackendLogs, downloadActivityLogs } = require('../../controllers/ecommerce/adminController');
+const { orders, coupons, adminRegister, adminLogin, forgotPassword, verifyCode, resetPassword, updatePassword, updateOrderStatus, getAllUsers, exportUsers, getUserById, blockUser, unblockUser, deleteUser, restoreUser, updateUser, getAllAdmins, getAdminById, getCurrentAdmin, createSubAdmin, updateSubAdmin, deleteSubAdmin, getProductAnalytics, exportProductAnalytics, getProductViewDetails, getActivityLogs, getActivityLogById, getBackendLogs, getBackendLogByDate, downloadBackendLogs, downloadActivityLogs, getLiveUsers } = require('../../controllers/ecommerce/adminController');
 const { createNotification, getNotifications, getNotificationDetails, updateNotification, deleteNotification, searchUsers, getAllUsersForNotification } = require('../../controllers/ecommerce/notificationController');
 const { refreshSingleProductById } = require('../../controllers/ecommerce/productRefreshController');
 const {
@@ -20,6 +20,7 @@ const router = express.Router();
 router.get('/orders', adminMiddleware, checkPermission('orders'), orders);
 router.get('/coupon', adminMiddleware, coupons);
 router.get('/users', adminMiddleware, checkPermission('users'), getAllUsers);
+router.get('/users/live', adminMiddleware, getLiveUsers);
 router.get('/users/export', adminMiddleware, checkPermission('users-export'), exportUsers);
 router.get('/users/:userId', adminMiddleware, checkPermission('users-view-detail'), getUserById);
 router.put('/users/:userId/block', adminMiddleware, checkPermission('users-update-status'), blockUser);

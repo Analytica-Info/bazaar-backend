@@ -1,5 +1,5 @@
 const adminService = require("../../services/adminService");
-
+const User = require("../../models/User");
 const logger = require("../../utilities/logger");
 exports.orders = async (req, res) => {
     try {
@@ -793,5 +793,27 @@ exports.downloadActivityLogs = async (req, res) => {
             message: 'Failed to download activity logs',
             error: error.message
         });
+    }
+};
+
+exports.getLiveUsers = async (req, res) => {
+    try {
+        const minutes = parseInt(req.query.minutes) || 15;
+        const since = new Date(Date.now() - minutes * 60 * 1000);
+
+        const users = await User.find(
+            { lastSeen: { $gte: since }, isDeleted: false },
+            { name: 1, email: 1, avatar: 1, platform: 1, lastSeen: 1 }
+        ).sort({ lastSeen: -1 }).limit(200).lean();
+
+        return res.status(200).json({
+            success: true,
+            minutes,
+            count: users.length,
+            users,
+        });
+    } catch (error) {
+        logger.error({ err: error }, 'Get Live Users Error:');
+        return res.status(500).json({ success: false, message: 'Failed to fetch live users', error: error.message });
     }
 };
