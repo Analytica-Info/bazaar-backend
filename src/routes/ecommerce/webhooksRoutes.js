@@ -1,12 +1,12 @@
 const express = require('express');
 const { saleUpdate, inventoryUpdate, productUpdate } = require('../../controllers/ecommerce/webhookController');
 const adminMiddleware = require('../../middleware/adminMiddleware');
-const bodyParser = require('body-parser');
 
 const router = express.Router();
 
-router.post('/product-update', bodyParser.urlencoded({ extended: true }), productUpdate);
-router.post('/inventory-update', bodyParser.urlencoded({ extended: true }), inventoryUpdate);
-router.post('/sale-update', bodyParser.urlencoded({ extended: true }), saleUpdate);
+// Body already parsed by global express.urlencoded() in server.js — no route-level parser needed
+router.post('/product-update', productUpdate);
+router.post('/inventory-update', inventoryUpdate);
+router.post('/sale-update', saleUpdate);
 
 module.exports =  router;

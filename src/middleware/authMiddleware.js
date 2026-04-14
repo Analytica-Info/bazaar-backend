@@ -49,6 +49,12 @@ const handler = (role = 'user') => {
 
       req.user = userData;
       req.userRole = role;
+
+      // Update lastSeen for user requests — fire-and-forget, never blocks the response
+      if (role === 'user') {
+        User.updateOne({ _id: userData._id }, { $set: { lastSeen: new Date() } }).catch(() => {});
+      }
+
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {

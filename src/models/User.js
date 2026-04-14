@@ -19,6 +19,17 @@ const addressSchema = new mongoose.Schema({
     isPrimary: { type: Boolean, default: false },
 });
 
+const sessionSchema = new mongoose.Schema({
+    deviceId: { type: String },
+    refreshToken: { type: String },
+    fcmToken: { type: String, default: null },
+    userAgent: { type: String, default: null },
+    ip: { type: String, default: null },
+    createdAt: { type: Date, default: Date.now },
+    lastUsed: { type: Date, default: Date.now },
+    revokedAt: { type: Date, default: null }
+}, { _id: true });
+
 const userSchema = new mongoose.Schema({
     name: String,
     email: { type: String, unique: true },
@@ -32,24 +43,27 @@ const userSchema = new mongoose.Schema({
     refreshToken: { type: String },
     customerId: { type: String },
     appleId: { type: String },
-    address: { type: String },
     username: { type: String },
     fcmToken: { type: String, default: null },
-    recoveryCode: {type: String, default: null},
-    recoveryCodeExpires: {type: Date, default: null},
+    recoveryCode: { type: String, default: null },
+    recoveryCodeExpires: { type: Date, default: null },
     recoveryAttempts: { type: Number, default: 0 },
     lastRecoveryRequest: { type: Date, default: null },
-    isDeleted: { type: Boolean, default: false},
-    deletedAt: {type: Date, default: null },
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
     deletedBy: { type: String, enum: ['user', 'admin'], default: null },
-    isBlocked: { type: Boolean, default: false},
-    blockedAt: {type: Date, default: null },
+    isBlocked: { type: Boolean, default: false },
+    blockedAt: { type: Date, default: null },
     platform: { type: String, default: null },
+    lastSeen: { type: Date, default: null },
+    sessions: [sessionSchema],
     cart: [cartItemSchema],
     address: [addressSchema],
-    wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],    
+    wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }]
 }, { timestamps: true, strict: false });
+
+userSchema.index({ lastSeen: -1 });
 
 const User = mongoose.model('User', userSchema);
 
