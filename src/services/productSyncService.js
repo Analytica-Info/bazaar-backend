@@ -15,6 +15,25 @@ const WEBHOOK_AFTER_SYNC = 'updateProductDiscounts';
 const processedProductIds = new Set();
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * When Lightspeed parent has tax_inclusive=0 but variants have real prices,
+ * patch the product object so frontend displays the correct price.
+ */
+function fixZeroTaxInclusive(product, variantsData) {
+    const taxIncl = parseFloat(product.price_standard?.tax_inclusive) || 0;
+    if (taxIncl === 0 && variantsData.length > 0) {
+        const firstVariantPrice = parseFloat(variantsData[0].price) || 0;
+        if (firstVariantPrice > 0) {
+            product.price_standard.tax_inclusive = firstVariantPrice;
+            product.price_standard.tax_exclusive = (firstVariantPrice / 1.05).toFixed(5);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Lightspeed API helpers
 // ---------------------------------------------------------------------------
 
@@ -482,6 +501,7 @@ async function refreshSingleProductById(productId) {
     }
 
     const { product, variantsData, totalQty } = await fetchProductDetailsForRefresh(id);
+    fixZeroTaxInclusive(product, variantsData);
     const timeFormatted = await currentTime();
     const type = 'api';
     const productStatus = totalQty > 0;
@@ -642,7 +662,8 @@ async function handleProductUpdate(data) {
     const webhook = type;
     const webhookTime = timeFormatted;
     if (existingProductId) {
-        const { product } = await fetchProductDetails(updateProductId, 0);
+        const { product, variantsData } = await fetchProductDetails(updateProductId, 0);
+        fixZeroTaxInclusive(product, variantsData);
         await Product.updateOne(
             { 'product.id': product.id },
             {

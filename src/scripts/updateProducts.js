@@ -72,6 +72,18 @@ const storeProductDetails = async (productIds) => {
         if (!result) continue; // inactive product
 
         const { product, variantsData, totalQty } = result;
+
+        // Fix: when parent tax_inclusive is 0 but variants have real prices,
+        // use the first variant's price so frontend displays correctly
+        const taxIncl = parseFloat(product.price_standard?.tax_inclusive) || 0;
+        if (taxIncl === 0 && variantsData.length > 0) {
+          const firstVariantPrice = parseFloat(variantsData[0].price) || 0;
+          if (firstVariantPrice > 0) {
+            product.price_standard.tax_inclusive = firstVariantPrice;
+            product.price_standard.tax_exclusive = (firstVariantPrice / 1.05).toFixed(5);
+          }
+        }
+
         const timeFormatted = await currentTime();
         const type = "cron";
 
