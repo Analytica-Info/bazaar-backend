@@ -11,7 +11,7 @@ const categories = createUpload(allowedFileTypes, "uploads/categories");
 router.get('/categories', productController.getCategories);
 router.post('/search-categories', productController.getSearchCategories);
 router.get('/products', productController.products);
-router.get('/product-details/:id', authMiddleware, productController.productsDetails);
+router.get('/product-details/:id', productController.productsDetails);
 router.post('/search-product', productController.searchProduct);
 router.post('/search', productController.search);
 router.get('/categories-product/:id',  productController.categoriesProduct);
