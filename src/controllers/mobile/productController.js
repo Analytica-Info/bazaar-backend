@@ -52,7 +52,7 @@ exports.products = async (req, res) => {
 
 exports.productsDetails = async (req, res) => {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user?._id || null;
     try {
         const result = await productService.getProductDetails(id, userId);
         return res.json(result);

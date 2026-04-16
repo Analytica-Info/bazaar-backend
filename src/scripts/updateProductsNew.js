@@ -291,17 +291,18 @@ async function updateAllProductDiscounts() {
       const webhook = "updateProductDiscounts";
       const webhookTime = await currentTime();
 
-      const originalPrice = Number(
-        (product.product.price_standard?.tax_inclusive / 0.65).toFixed(2)
-      );
+      const taxInclusive = parseFloat(product.product.price_standard?.tax_inclusive) || 0;
+      const fallbackPrice = product.variantsData?.[0]?.price ? parseFloat(product.variantsData[0].price) : 0;
+      const basePrice = taxInclusive > 0 ? taxInclusive : fallbackPrice;
+      const originalPrice = basePrice > 0 ? Number((basePrice / 0.65).toFixed(2)) : 0;
 
       let highestDiscountPercentage = 0;
       let highestDiscountVariant = null;
       if (product.variantsData && product.variantsData.length > 0) {
         product.variantsData.forEach((variant) => {
-          const discountPercentage = Number(
-            (((originalPrice - variant.price) / originalPrice) * 100).toFixed(2)
-          );
+          const discountPercentage = originalPrice > 0
+            ? Number((((originalPrice - variant.price) / originalPrice) * 100).toFixed(2))
+            : 0;
 
           if (discountPercentage > highestDiscountPercentage) {
             highestDiscountPercentage = discountPercentage;
@@ -317,7 +318,7 @@ async function updateAllProductDiscounts() {
             discount: product.discount,
             isHighest: product.discount === maxDiscount,
             originalPrice: originalPrice,
-            discountedPrice: highestDiscountVariant?.price,
+            discountedPrice: highestDiscountVariant?.price || fallbackPrice || 0,
             webhook,
             webhookTime,
           },
@@ -518,9 +519,12 @@ const currentTime = async () => {
 };
 
 const calculateDiscount = (product) => {
-  const originalPrice = Math.round(
-    product.product?.price_standard?.tax_inclusive / 0.65
-  );
+  const taxInclusive = parseFloat(product.product?.price_standard?.tax_inclusive) || 0;
+  const fallbackPrice = product.variantsData?.[0]?.price ? parseFloat(product.variantsData[0].price) : 0;
+  const basePrice = taxInclusive > 0 ? taxInclusive : fallbackPrice;
+  const originalPrice = basePrice > 0 ? Math.round(basePrice / 0.65) : 0;
+
+  if (originalPrice <= 0) return 0;
 
   let discount = 0;
 
