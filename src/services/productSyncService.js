@@ -27,7 +27,7 @@ function fixZeroTaxInclusive(product, variantsData) {
     if (taxIncl === 0 && variantsData.length > 0) {
         const firstVariantPrice = parseFloat(variantsData[0].price) || 0;
         if (firstVariantPrice > 0) {
-            product.price_standard.tax_inclusive = firstVariantPrice;
+            product.price_standard.tax_inclusive = String(firstVariantPrice);
             product.price_standard.tax_exclusive = (firstVariantPrice / 1.05).toFixed(5);
         }
     }
