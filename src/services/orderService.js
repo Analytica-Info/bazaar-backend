@@ -392,12 +392,24 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
                 ? `Lightspeed API issues: ${JSON.stringify(lightspeedApiIssues.map(i => i.lightspeedApiError))}`
                 : `Validation failed: ${JSON.stringify(failedResults.map(r => ({ productId: r.productId, message: r.message })))}`
         });
+        const outOfStock = failedResults.filter(r => !r.lightspeedApiError);
+        const apiErrored = failedResults.filter(r => r.lightspeedApiError);
+        let topMessage;
+        if (apiErrored.length > 0 && outOfStock.length === 0) {
+            topMessage = 'Unable to verify stock for some items. Please try again.';
+        } else {
+            const names = outOfStock.map(r => r.productName || 'an item');
+            topMessage = names.length === 1
+                ? `"${names[0]}" is out of stock. Please remove it from your cart to continue.`
+                : `${names.length} items are out of stock: ${names.join(', ')}. Please remove them from your cart to continue.`;
+        }
         throw {
             status: 400,
             data: {
                 success: false,
                 isValid: false,
-                message: 'Some items have insufficient quantity',
+                message: topMessage,
+                outOfStockProductIds: outOfStock.map(r => r.productId),
                 results: validationResults
             }
         };
