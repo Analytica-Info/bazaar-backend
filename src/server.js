@@ -68,6 +68,7 @@ const mobileCouponsRoutes = require("./routes/mobile/couponsRoutes.js");
 const mobileNotificationRoutes = require("./routes/mobile/notificationRoutes.js");
 const mobilePublicRoutes = require("./routes/mobile/publicRoutes.js");
 const mobileBannerImages = require("./routes/mobile/bannerImages.js");
+const mobileV2HomeRoutes = require("./routes/mobile/v2/homeRoutes.js");
 
 // ==========================================
 // APP SETUP
@@ -243,6 +244,10 @@ const connectAndRun = async () => {
   app.use("/api", mobileCouponsRoutes);
   app.use("/api", mobilePublicRoutes);
   app.use("/api", mobileBannerImages);
+
+  // v2 mobile routes — new design aggregate endpoints. v1 routes above
+  // stay unchanged so the published mobile app (v1.0.23) is unaffected.
+  app.use("/api/v2/home", mobileV2HomeRoutes);
 
   // ==========================================
   // GLOBAL ERROR HANDLER (must be after all routes)
