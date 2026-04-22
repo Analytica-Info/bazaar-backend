@@ -293,7 +293,7 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
     try {
         const { products } = req.body;
         const user = req.user || {};
-        const result = await orderService.validateInventoryBeforeCheckout(products, user, 'Website Backend');
+        const result = await orderService.validateInventoryBeforeCheckout(products, user, 'Mobile App Backend');
 
         return res.status(200).json({
             success: true,
@@ -308,7 +308,7 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
         logger.error({ err: error }, 'Error validating inventory:');
         const user = req.user || {};
         await logActivity({
-            platform: 'Website Backend',
+            platform: 'Mobile App Backend',
             log_type: 'backend_activity',
             action: 'Inventory Validation',
             status: 'failure',
@@ -322,7 +322,7 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
             }
         });
         await logBackendActivity({
-            platform: 'Website Backend',
+            platform: 'Mobile App Backend',
             activity_name: 'Inventory Validation Before Checkout',
             status: 'failure',
             message: `Internal server error: ${error.message}`,
