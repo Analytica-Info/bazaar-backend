@@ -86,8 +86,17 @@ function _jobFor(section, { user, limit }) {
 
     case "categories":
       return async () => {
+        // getCategories returns { side_bar_categories, search_categoriesList }
+        // Return shape: { sidebar: [...], searchList: [...] } so the mobile
+        // client doesn't need to know the backend's internal key names.
         const data = await productService.getCategories();
-        return _unwrapList(data, "categories", limit);
+        const sidebar = Array.isArray(data?.side_bar_categories)
+          ? _cap(data.side_bar_categories, limit)
+          : [];
+        const searchList = Array.isArray(data?.search_categoriesList)
+          ? data.search_categoriesList
+          : [];
+        return { sidebar, searchList };
       };
 
     case "trending":
