@@ -302,6 +302,13 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
             results: result.results
         });
     } catch (error) {
+        if (error.status === 400 && error.data) {
+            // Published mobile app (v1.0.23) only reads data['message'] on
+            // HTTP 200 responses; non-200 falls through to a generic "Failed
+            // to validate inventory" banner. Return 200 here (with isValid:
+            // false) so users actually see which product is out of stock.
+            return res.status(200).json(error.data);
+        }
         if (error.status && error.data) {
             return res.status(error.status).json(error.data);
         }
