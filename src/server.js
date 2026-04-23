@@ -68,6 +68,7 @@ const mobileCouponsRoutes = require("./routes/mobile/couponsRoutes.js");
 const mobileNotificationRoutes = require("./routes/mobile/notificationRoutes.js");
 const mobilePublicRoutes = require("./routes/mobile/publicRoutes.js");
 const mobileBannerImages = require("./routes/mobile/bannerImages.js");
+const mobileConfigRoutes = require("./routes/mobile/configRoutes.js");
 
 // ==========================================
 // APP SETUP
@@ -243,6 +244,7 @@ const connectAndRun = async () => {
   app.use("/api", mobileCouponsRoutes);
   app.use("/api", mobilePublicRoutes);
   app.use("/api", mobileBannerImages);
+  app.use("/api/mobile", mobileConfigRoutes);
 
   // ==========================================
   // GLOBAL ERROR HANDLER (must be after all routes)
