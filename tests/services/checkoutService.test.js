@@ -89,6 +89,8 @@ describe("checkoutService", () => {
     expect(checkoutService).toBeDefined();
     expect(checkoutService.createStripeCheckout).toBeFunction;
     expect(checkoutService.createTabbyCheckout).toBeFunction;
+    expect(checkoutService.createNomodCheckout).toBeFunction;
+    expect(checkoutService.verifyNomodPayment).toBeFunction;
   });
 
   // ---- createStripeCheckout ----
@@ -266,6 +268,130 @@ describe("checkoutService", () => {
       expect(items).toHaveLength(2);
       expect(items[0].quantity).toBe(2);
       expect(items[1].quantity).toBe(3);
+    });
+  });
+
+  // ---- createNomodCheckout / verifyNomodPayment ----
+  // These tests use the already-loaded checkoutService instance (no resetModules)
+  // and control PaymentProviderFactory via direct property injection on the module.
+  describe("createNomodCheckout", () => {
+    let PaymentProviderFactory;
+    const mockProvider = {
+      createCheckout: jest.fn(),
+      getCheckout: jest.fn(),
+    };
+
+    beforeAll(() => {
+      PaymentProviderFactory = require("../../src/services/payments/PaymentProviderFactory");
+      jest.spyOn(PaymentProviderFactory, "create").mockReturnValue(mockProvider);
+    });
+
+    afterAll(() => {
+      PaymentProviderFactory.create.mockRestore();
+    });
+
+    beforeEach(() => {
+      mockProvider.createCheckout.mockReset();
+      mockProvider.getCheckout.mockReset();
+    });
+
+    it("throws 400 when cartData is missing", async () => {
+      const mockReq = { user: { _id: "user-001" }, body: {} };
+      await expect(checkoutService.createNomodCheckout(mockReq)).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("returns status and checkout_url on success", async () => {
+      mockProvider.createCheckout.mockResolvedValue({
+        id: "chk_abc",
+        redirectUrl: "https://pay.nomod.com/chk_abc",
+      });
+
+      const mongoose = require("mongoose");
+      const userId = new mongoose.Types.ObjectId();
+
+      const user = await User.create({
+        name: "Ali Hassan",
+        email: "ali@test.com",
+        password: "hashed",
+        phone: "+97150",
+      });
+
+      const CartData = require("../../src/models/CartData");
+      CartData.create = jest.fn().mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+
+      const mockReq = {
+        user: { _id: user._id },
+        body: {
+          cartData: [{ name: "Widget", price: 50, qty: 1 }],
+          shippingCost: 10,
+          name: "Ali",
+          phone: "+97150",
+          currency: "AED",
+        },
+      };
+
+      const result = await checkoutService.createNomodCheckout(mockReq);
+      expect(result.status).toBe("created");
+      expect(result.checkout_url).toBe("https://pay.nomod.com/chk_abc");
+    });
+
+    it("propagates provider errors", async () => {
+      mockProvider.createCheckout.mockRejectedValue({ status: 503, message: "Nomod down" });
+
+      const CartData = require("../../src/models/CartData");
+      CartData.create = jest.fn().mockResolvedValue({ _id: "cart-id-002" });
+
+      const mockReq = {
+        user: { _id: "user-001" },
+        body: {
+          cartData: [{ name: "Widget", price: 50, qty: 1 }],
+          shippingCost: 0,
+          name: "Ali",
+          phone: "+97150",
+          currency: "AED",
+        },
+      };
+
+      await expect(checkoutService.createNomodCheckout(mockReq)).rejects.toMatchObject({ status: 503 });
+    });
+  });
+
+  describe("verifyNomodPayment", () => {
+    let PaymentProviderFactory;
+    const mockProvider = { getCheckout: jest.fn() };
+
+    beforeAll(() => {
+      PaymentProviderFactory = require("../../src/services/payments/PaymentProviderFactory");
+      jest.spyOn(PaymentProviderFactory, "create").mockReturnValue(mockProvider);
+    });
+
+    afterAll(() => {
+      PaymentProviderFactory.create.mockRestore();
+    });
+
+    beforeEach(() => {
+      mockProvider.getCheckout.mockReset();
+    });
+
+    it("throws 400 when paymentId is missing", async () => {
+      const mockReq = { user: { _id: "user-001" }, body: {} };
+      await expect(checkoutService.verifyNomodPayment(mockReq)).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("throws 400 when payment is not paid", async () => {
+      mockProvider.getCheckout.mockResolvedValue({ paid: false, status: "created" });
+      const mockReq = { user: { _id: "user-001" }, body: { paymentId: "chk_unpaid" } };
+      await expect(checkoutService.verifyNomodPayment(mockReq)).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("throws 404 when PendingPayment not found", async () => {
+      mockProvider.getCheckout.mockResolvedValue({ paid: true, status: "paid" });
+
+      const PendingPayment = require("../../src/models/PendingPayment");
+      PendingPayment.findOne = jest.fn().mockResolvedValue(null);
+
+      const mockReq = { user: { _id: "user-001" }, body: { paymentId: "chk_orphan" } };
+      await expect(checkoutService.verifyNomodPayment(mockReq)).rejects.toMatchObject({ status: 404 });
     });
   });
 });
