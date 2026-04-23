@@ -93,6 +93,52 @@ exports.verifyTabbyPayment = async (req, res) => {
     }
 };
 
+exports.checkoutSessionNomod = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const headers = { fcmToken: req.user?.fcmToken || null };
+        const result = await orderService.createNomodCheckoutSession(userId, req.body, headers);
+
+        return res.status(200).json({
+            message: result.message,
+            paymentId: result.paymentId,
+            status: result.status,
+        });
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ error: error.message });
+        }
+        logger.error({ err: error }, 'Error storing Nomod order data:');
+        await logBackendActivity({
+            platform: 'Mobile App Backend',
+            activity_name: 'Checkout Session Nomod API Hit',
+            status: 'failure',
+            message: `Nomod checkoutSessionNomod failed: ${error.message}`,
+            execution_path: 'orderController.checkoutSessionNomod (catch)',
+            error_details: error.message,
+        });
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.verifyNomodPayment = async (req, res) => {
+    try {
+        const { paymentId } = req.query;
+        const result = await orderService.verifyNomodPayment(paymentId);
+
+        if (result.finalStatus) {
+            return res.status(200).json({ message: result.message, finalStatus: result.finalStatus });
+        }
+        return res.status(200).json({ message: result.message });
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ error: error.message });
+        }
+        logger.error({ err: error }, 'Nomod Payment error:');
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 exports.getOrders = async (req, res) => {
     try {
         const userId = req.user._id;
