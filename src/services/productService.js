@@ -223,21 +223,26 @@ async function fetchAndCacheCategories() {
 }
 
 async function fetchCategoriesType(id) {
-  try {
-    const categoriesResponse = await axios.get(PRODUCT_TYPE + "/" + id, {
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        Accept: "application/json",
-      },
-    });
-    return categoriesResponse.data || [];
-  } catch (error) {
-    console.warn(
-      "Error fetching products from Lightspeed:",
-      error.message
-    );
-    return [];
-  }
+  // Lightspeed call for a product_type (category) — one external HTTP hit per
+  // category view. Categories change rarely; 30 min TTL is safe.
+  const cacheKey = cache.key("lightspeed", "product-type", String(id), "v1");
+  return cache.getOrSet(cacheKey, 1800, async () => {
+    try {
+      const categoriesResponse = await axios.get(PRODUCT_TYPE + "/" + id, {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      });
+      return categoriesResponse.data || [];
+    } catch (error) {
+      console.warn(
+        "Error fetching products from Lightspeed:",
+        error.message
+      );
+      return [];
+    }
+  });
 }
 
 const checkSpelling = async (word) => {
