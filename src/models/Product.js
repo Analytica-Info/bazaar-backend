@@ -29,5 +29,8 @@ ProductSchema.index({ isHighest: 1 }, { sparse: true });
 ProductSchema.index({ createdAt: -1 });
 // variantsData.sku — used by getProductByVariant (color filter)
 ProductSchema.index({ "variantsData.sku": 1 });
+// variantsData.id — used on every checkout line item, order update, webhook,
+// and cron (checkoutService, orderService, productSyncService, updateProductsNew).
+ProductSchema.index({ "variantsData.id": 1 });
 
 module.exports = mongoose.model("Product", ProductSchema);
