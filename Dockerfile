@@ -11,7 +11,7 @@ COPY --chown=bazaar:bazaar src/ ./src/
 COPY --chown=bazaar:bazaar server.js ./
 
 # uploads/, logs/, .env, and Firebase creds are mounted at runtime
-RUN mkdir -p uploads logs && chown bazaar:bazaar uploads logs
+RUN mkdir -p uploads logs temp && chown bazaar:bazaar . uploads logs temp
 
 USER bazaar
 
