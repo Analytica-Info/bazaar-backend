@@ -20,11 +20,15 @@ const notificationSchema = new mongoose.Schema({
 }, { strict: false });
 
 // Compound index for scheduled-notification cron query
-// Without this, the cron scanned all 61,976 notifications every minute
-// (~43 GB/day Atlas egress). See reports/2026-04-24-mongodb-traffic-analysis.md.
 notificationSchema.index({ sentAt: 1, scheduledDateTime: 1 });
-// User notifications tab — was scanning all 61,976 notifications
+// User notifications tab
 notificationSchema.index({ userId: 1, createdAt: -1 });
+// Partial index — scheduler query after simplification only looks at pending docs.
+// With 62K total but <100 pending at any time, this collapses the scan to ~O(pending).
+notificationSchema.index(
+    { scheduledDateTime: 1 },
+    { partialFilterExpression: { status: "pending" } }
+);
 
 const Notification = mongoose.model('Notification', notificationSchema);
 

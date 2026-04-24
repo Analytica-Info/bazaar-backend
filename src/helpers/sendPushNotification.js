@@ -268,9 +268,11 @@ exports.checkAndSendScheduledNotifications = async () => {
             const now = new Date();
             console.log('[Scheduled Notifications] ENTER runId=', runId, 'attempt=', attempt + 1, '| now (UTC):', now.toISOString());
 
+            // After status backfill migration, every scheduled-and-unsent doc has status='pending'.
+            // This query hits the partial index on { scheduledDateTime: 1 } filtered by status='pending',
+            // collapsing a 62K doc scan to ~O(pending).
             const allPending = await Notification.find({
-                $or: [ { status: 'pending' }, { status: { $exists: false } }, { status: null } ],
-                sentAt: null,
+                status: 'pending',
                 scheduledDateTime: { $ne: null }
             }).read('primary').lean().exec();
 
@@ -316,7 +318,7 @@ exports.checkAndSendScheduledNotifications = async () => {
         const now = new Date();
         const marked = await Notification.updateMany(
             {
-                $or: [ { status: 'pending' }, { status: { $exists: false } }, { status: null } ],
+                status: 'pending',
                 scheduledDateTime: { $lt: now }
             },
             { $set: { status: 'failed' } }
