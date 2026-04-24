@@ -94,9 +94,6 @@ exports.getHotOffers = async ({ priceField }) => {
             // For Mobile (tax_exclusive), we still use discountedPrice as it's the primary price index.
             const query = {
                 discountedPrice: { $gte: range.min, $lte: range.max },
-                totalQty: { $gt: 0 },
-                status: true,
-                "product.images.0": { $exists: true }
             };
 
             const products = await Product.aggregate([
@@ -105,16 +102,15 @@ exports.getHotOffers = async ({ priceField }) => {
                 {
                     $project: {
                         images: "$product.images.sizes.original",
-                        rawImages: "$product.images"
                     }
                 }
             ]);
 
             let photos;
             if (priceField === "tax_exclusive") {
-                // Mobile filter: exclude .webp and prefer tax_exclusive logic
+                // Mobile filter: exclude .webp
                 photos = products
-                    .flatMap((p) => p.rawImages || [])
+                    .flatMap((p) => p.images || [])
                     .filter(
                         (img) =>
                             typeof img === "string" &&
@@ -123,7 +119,7 @@ exports.getHotOffers = async ({ priceField }) => {
             } else {
                 // Ecommerce filter: must have valid image extension
                 photos = products
-                    .flatMap((p) => p.rawImages || [])
+                    .flatMap((p) => p.images || [])
                     .filter((img) => {
                         if (typeof img !== "string" || !img.trim()) return false;
                         const lower = img.toLowerCase();

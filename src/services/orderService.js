@@ -1945,7 +1945,9 @@ async function updateQuantities(cartData, orderId = null) {
                     if (mainProductId) {
                         // Use cache to avoid redundant LS API calls for variants of the same product
                         if (lsProductDetailsCache.has(mainProductId)) {
-                            variantsData = lsProductDetailsCache.get(mainProductId);
+                            // Bug 2 Fix: Deep clone cached array to avoid cross-item mutation in Promise.all
+                            const cached = lsProductDetailsCache.get(mainProductId);
+                            variantsData = Array.isArray(cached) ? cached.map((v) => ({ ...v })) : [];
                         } else {
                             try {
                                 const fetched = await fetchProductDetails(mainProductId);
@@ -2001,6 +2003,17 @@ async function updateQuantities(cartData, orderId = null) {
                             }
                         });
 
+                        await logBackendActivity({
+                            platform: 'Mobile App Backend',
+                            activity_name: 'Product Database Update',
+                            status: 'success',
+                            message: `Product ${name} updated. ${qtyMsg}`,
+                            product_id: lightspeedVariantId?.toString?.(),
+                            product_name: name,
+                            order_id: orderId,
+                            execution_path: 'orderController.updateQuantities -> Product.findOneAndUpdate'
+                        });
+
                         emailDetails.push({
                             productName: name,
                             variantId: lightspeedVariantId,
@@ -2011,9 +2024,61 @@ async function updateQuantities(cartData, orderId = null) {
 
                         console.log(`Update for product ID ${lightspeedVariantId}, Name ${name} was successful`);
                         return true;
+                    } else {
+                        // DB sync FAILED
+                        const afterDiag = await getDiagnosticInventory(lightspeedVariantId);
+                        const qtyMsgFail = `BEFORE: Lightspeed=${beforeDiag.lightspeedQty} Local=${beforeDiag.localQty} | AFTER: Lightspeed=${afterDiag.lightspeedQty} Local=${afterDiag.localQty} | Expected=${updateQty}. Local DB sync FAILED.`;
+                        await logActivity({
+                            platform: 'Mobile App Backend',
+                            log_type: 'backend_activity',
+                            action: 'Inventory Update',
+                            status: 'failure',
+                            message: `Product ${name} - Lightspeed updated but local DB NOT synced. ${qtyMsgFail}`,
+                            user: null,
+                            details: {
+                                order_id: orderId,
+                                product_id: lightspeedVariantId?.toString?.(),
+                                product_name: name,
+                                error_details: 'findOneAndUpdate returned null - product may not exist in local DB',
+                                qty_before: { lightspeed: beforeDiag.lightspeedQty, local: beforeDiag.localQty },
+                                qty_after: { lightspeed: afterDiag.lightspeedQty, local: afterDiag.localQty },
+                                expected_after: updateQty,
+                                qty_sold: item.qty,
+                            }
+                        });
+                        await logBackendActivity({
+                            platform: 'Mobile App Backend',
+                            activity_name: 'Product Database Update',
+                            status: 'failure',
+                            message: `Product ${name} - local DB sync failed. ${qtyMsgFail}`,
+                            product_id: lightspeedVariantId?.toString?.(),
+                            product_name: name,
+                            order_id: orderId,
+                            execution_path: 'orderController.updateQuantities -> Product.findOneAndUpdate',
+                            error_details: `findOneAndUpdate returned null. ${qtyMsgFail}`
+                        });
                     }
                 } catch (err) {
                     logger.error({ err, product: name }, "Error updating product quantity");
+                    const afterDiagOnThrow = await getDiagnosticInventory(lightspeedVariantId);
+                    const qtyMsgThrow = `BEFORE: Local=${beforeDiag.localQty} | AFTER (unchanged): Local=${afterDiagOnThrow.localQty} | Expected=${updateQty}. Error: ${err?.message}`;
+                    await logActivity({
+                        platform: 'Mobile App Backend',
+                        log_type: 'backend_activity',
+                        action: 'Inventory Update',
+                        status: 'failure',
+                        message: `Product ${name} - Update threw error. ${qtyMsgThrow}`,
+                        user: null,
+                        details: {
+                            order_id: orderId,
+                            product_id: lightspeedVariantId?.toString?.(),
+                            product_name: name,
+                            error_details: err?.message,
+                            qty_before: { local: beforeDiag.localQty },
+                            qty_after: { local: afterDiagOnThrow.localQty },
+                        }
+                    });
+                    throw err; // Bug 3 Fix: Re-throw to prevent silent failures
                 }
                 
                 emailDetails.push({
