@@ -546,63 +546,71 @@ exports.getAllUsers = async ({ page, limit, search, status, platform, authProvid
     const totalCount = await User.countDocuments(query);
     const totalPages = Math.ceil(totalCount / limit);
 
-    const usersWithOrders = await Promise.all(
-        users.map(async (user) => {
-            const userId = new mongoose.Types.ObjectId(user._id);
+    // Optimized batch fetching to avoid N+1 issues
+    const userIds = users.map(u => u._id);
+    
+    // 1. Fetch all orders for these users (handling both userId and user_id for mobile/web compatibility)
+    const allOrders = await Order.find({
+        $or: [
+            { userId: { $in: userIds } },
+            { user_id: { $in: userIds } }
+        ]
+    }).sort({ createdAt: -1 }).lean().exec();
 
-            const orders = await Order.find({ userId: userId })
-                .sort({ createdAt: -1 })
-                .exec();
+    const orderIds = allOrders.map(o => o._id);
 
-            const ordersWithDetails = await Promise.all(
-                orders.map(async (order) => {
-                    const orderDetails = await OrderDetail.find({
-                        order_id: new mongoose.Types.ObjectId(order._id)
-                    }).exec();
+    // 2. Fetch all order details for these orders
+    const allOrderDetails = await OrderDetail.find({
+        order_id: { $in: orderIds }
+    }).lean().exec();
 
-                    const productIds = orderDetails
-                        .map(detail => detail.product_id)
-                        .filter(id => id)
-                        .map(id => new mongoose.Types.ObjectId(id));
+    // 3. Fetch all products associated with these details for SKU lookup
+    const productIds = [...new Set(allOrderDetails.map(d => d.product_id).filter(Boolean))];
+    const allProducts = await Product.find({
+        _id: { $in: productIds }
+    }).select('_id product.sku_number').lean().exec();
 
-                    const products = await Product.find({
-                        _id: { $in: productIds }
-                    }).exec();
-
-                    const productSkuMap = {};
-                    products.forEach(product => {
-                        const productId = product._id.toString();
-                        const sku = product.product?.sku_number || null;
-                        productSkuMap[productId] = sku;
-                    });
-
-                    const orderDetailsWithSku = orderDetails.map(detail => {
-                        const productId = detail.product_id?.toString();
-                        const sku = productSkuMap[productId] || null;
-                        return {
-                            ...detail.toObject(),
-                            sku: sku
-                        };
-                    });
-
-                    return {
-                        ...order.toObject(),
-                        order_details: orderDetailsWithSku || []
-                    };
-                })
-            );
-
-            const userObj = user.toObject();
-            const platformFromOrder = ordersWithDetails?.[0]?.orderfrom;
-            const displayPlatform = userObj.platform || platformFromOrder || null;
-            return {
-                ...userObj,
-                platform: displayPlatform,
-                orders: ordersWithDetails,
-                totalOrders: ordersWithDetails.length
-            };
-        })
+    // Create lookup maps
+    const productSkuMap = Object.fromEntries(
+        allProducts.map(p => [p._id.toString(), p.product?.sku_number || null])
     );
+
+    const detailsByOrderId = allOrderDetails.reduce((acc, detail) => {
+        const oid = detail.order_id.toString();
+        if (!acc[oid]) acc[oid] = [];
+        acc[oid].push({
+            ...detail,
+            sku: productSkuMap[detail.product_id?.toString()] || null
+        });
+        return acc;
+    }, {});
+
+    const ordersByUserId = allOrders.reduce((acc, order) => {
+        const uid = (order.userId || order.user_id)?.toString();
+        if (!uid) return acc;
+        if (!acc[uid]) acc[uid] = [];
+        acc[uid].push({
+            ...order,
+            order_details: detailsByOrderId[order._id.toString()] || []
+        });
+        return acc;
+    }, {});
+
+    const usersWithOrders = users.map((user) => {
+        const userObj = user.toObject ? user.toObject() : user;
+        const userIdStr = userObj._id.toString();
+        const userOrders = ordersByUserId[userIdStr] || [];
+        
+        const platformFromOrder = userOrders?.[0]?.orderfrom;
+        const displayPlatform = userObj.platform || platformFromOrder || null;
+        
+        return {
+            ...userObj,
+            platform: displayPlatform,
+            orders: userOrders,
+            totalOrders: userOrders.length
+        };
+    });
 
     return {
         users: usersWithOrders,

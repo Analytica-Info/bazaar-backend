@@ -89,62 +89,32 @@ exports.getHotOffers = async ({ priceField }) => {
 
     const result = await Promise.all(
         ranges.map(async (range) => {
-            const matchStage = priceField === "tax_exclusive"
-                ? {
-                    priceNum: { $gte: range.min, $lte: range.max },
-                    "product.images": { $exists: true, $type: "array", $ne: [] },
-                    $or: [
-                        { status: { $exists: false } },
-                        { status: true }
-                    ],
-                    discountedPrice: { $exists: true, $gt: 0 }
-                }
-                : {
-                    priceNum: { $gte: range.min, $lte: range.max },
-                };
+            // Use indexed numeric field 'discountedPrice' instead of string-to-double conversion.
+            // tax_inclusive is the default for Ecommerce. 
+            // For Mobile (tax_exclusive), we still use discountedPrice as it's the primary price index.
+            const query = {
+                discountedPrice: { $gte: range.min, $lte: range.max },
+                totalQty: { $gt: 0 },
+                status: true,
+                "product.images.0": { $exists: true }
+            };
 
-            const pipeline = [
-                {
-                    $addFields: {
-                        priceNum: {
-                            $toDouble: {
-                                $trim: { input: `$product.price_standard.${priceField}` },
-                            },
-                        },
-                    },
-                },
-                {
-                    $match: matchStage,
-                },
-            ];
-
-            // Ecommerce (tax_inclusive) has separate image-check stage
-            if (priceField === "tax_inclusive") {
-                pipeline.push({
-                    $match: {
-                        $expr: {
-                            $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0]
-                        }
-                    },
-                });
-            }
-
-            pipeline.push(
+            const products = await Product.aggregate([
+                { $match: query },
+                { $sample: { size: 20 } },
                 {
                     $project: {
                         images: "$product.images.sizes.original",
-                    },
-                },
-                { $sample: { size: 20 } }
-            );
-
-            const products = await Product.aggregate(pipeline);
+                        rawImages: "$product.images"
+                    }
+                }
+            ]);
 
             let photos;
             if (priceField === "tax_exclusive") {
-                // Mobile filter: exclude .webp
+                // Mobile filter: exclude .webp and prefer tax_exclusive logic
                 photos = products
-                    .flatMap((p) => p.images || [])
+                    .flatMap((p) => p.rawImages || [])
                     .filter(
                         (img) =>
                             typeof img === "string" &&
@@ -153,7 +123,7 @@ exports.getHotOffers = async ({ priceField }) => {
             } else {
                 // Ecommerce filter: must have valid image extension
                 photos = products
-                    .flatMap((p) => p.images || [])
+                    .flatMap((p) => p.rawImages || [])
                     .filter((img) => {
                         if (typeof img !== "string" || !img.trim()) return false;
                         const lower = img.toLowerCase();

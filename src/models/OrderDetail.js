@@ -16,6 +16,8 @@ const orderDetailSchema = new mongoose.Schema({
 // order_id lookup is the primary access pattern for order detail pages,
 // admin order views, and smartCategoriesService aggregations (sold products).
 orderDetailSchema.index({ order_id: 1 });
+// createdAt lookup used for trending products aggregation
+orderDetailSchema.index({ createdAt: -1 });
 
 const OrderDetail = mongoose.model('OrderDetail', orderDetailSchema);
 module.exports = OrderDetail;

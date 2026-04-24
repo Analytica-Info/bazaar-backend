@@ -45,9 +45,10 @@ const orderSchema = new mongoose.Schema(
     }
 );
 
-// User order history — frequently used as Order.find({ user_id }).sort({ createdAt: -1 })
+// User order history — frequently used as Order.find({ user_id / userId }).sort({ createdAt: -1 })
 // `user_id` is written with strict: false (mobile writes user_id, web writes userId)
 orderSchema.index({ user_id: 1, createdAt: -1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
 
 const Order = mongoose.model('Order', orderSchema);
 module.exports = Order;
