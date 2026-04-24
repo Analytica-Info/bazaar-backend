@@ -4,14 +4,14 @@ RUN addgroup -S bazaar && adduser -S bazaar -G bazaar
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY --chown=bazaar:bazaar package*.json ./
+RUN npm install --omit=dev && chown -R bazaar:bazaar node_modules
 
-COPY src/ ./src/
-COPY server.js ./
+COPY --chown=bazaar:bazaar src/ ./src/
+COPY --chown=bazaar:bazaar server.js ./
 
 # uploads/, logs/, .env, and Firebase creds are mounted at runtime
-RUN mkdir -p uploads logs && chown -R bazaar:bazaar /app
+RUN mkdir -p uploads logs && chown bazaar:bazaar uploads logs
 
 USER bazaar
 
