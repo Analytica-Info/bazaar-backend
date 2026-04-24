@@ -268,10 +268,15 @@ async function filterActiveProducts() {
 
 async function updateAllProductDiscounts() {
   try {
+    // Projection: only the fields used by calculateDiscount, the bulkWrite ops
+    // builder, and the return $set. Drops product.variants, product.attributes,
+    // product.description, product.product_codes, etc. — ~90% ingress cut.
     const products = await Product.find({
       $or: [{ status: { $exists: false } }, { status: true }],
       totalQty: { $gt: 0 },
-    }).lean();
+    })
+      .select("_id status totalQty variantsData product.id product.price_standard")
+      .lean();
 
     if (products.length === 0) return;
 

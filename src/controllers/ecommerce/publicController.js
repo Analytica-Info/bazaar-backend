@@ -52,6 +52,62 @@ const PendingPayment = require("../../models/PendingPayment");
 
 // ─── Phase 4 Service Imports ─────────────────────────────────────
 const productService = require("../../services/productService");
+
+// Bandwidth optimization: list-endpoint projections.
+// LIST_EXCLUDE_SELECT is the canonical slim projection (strips variants,
+// description, attributes, etc.). Use this when the response only ships
+// product cards.
+// LIST_EXCLUDE_SELECT_KEEP_DESCRIPTION keeps product.description for endpoints
+// that legitimately return description text (e.g. search results).
+// See src/services/productService.js for the canonical definition.
+const LIST_EXCLUDE_SELECT = [
+  "product.variants",
+  "product.product_codes",
+  "product.suppliers",
+  "product.composite_bom",
+  "product.tag_ids",
+  "product.attributes",
+  "product.account_code_sales",
+  "product.account_code_purchase",
+  "product.price_outlet",
+  "product.brand_id",
+  "product.deleted_at",
+  "product.version",
+  "product.created_at",
+  "product.updated_at",
+  "webhook",
+  "webhookTime",
+  "__v",
+  "updatedAt",
+  "product.description",
+]
+  .map((f) => `-${f}`)
+  .join(" ");
+
+// Same as LIST_EXCLUDE_SELECT but keeps product.description (needed by endpoints
+// that surface description text in their response).
+const LIST_EXCLUDE_SELECT_KEEP_DESCRIPTION = [
+  "product.variants",
+  "product.product_codes",
+  "product.suppliers",
+  "product.composite_bom",
+  "product.tag_ids",
+  "product.attributes",
+  "product.account_code_sales",
+  "product.account_code_purchase",
+  "product.price_outlet",
+  "product.brand_id",
+  "product.deleted_at",
+  "product.version",
+  "product.created_at",
+  "product.updated_at",
+  "webhook",
+  "webhookTime",
+  "__v",
+  "updatedAt",
+]
+  .map((f) => `-${f}`)
+  .join(" ");
 const cmsService = require("../../services/cmsService");
 const couponService = require("../../services/couponService");
 const checkoutService = require("../../services/checkoutService");
@@ -436,7 +492,9 @@ exports.search = async (req, res) => {
         { "product.name": { $regex: search, $options: "i" } },
         { "product.description": { $regex: search, $options: "i" } },
       ],
-    });
+    })
+      .select(LIST_EXCLUDE_SELECT_KEEP_DESCRIPTION)
+      .lean();
     products = products.filter((product) => product.status === true);
 
     const filteredProducts = products.filter((product) => {
@@ -1383,7 +1441,9 @@ exports.getIdsss = async (req, res) => {
 exports.categories = async (req, res) => {
   try {
     const categories = await fetchCategories();
-    let allProducts = await Product.find();
+    let allProducts = await Product.find()
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
     allProducts = allProducts.filter((product) => product.status === true);
 
     const productCountMap = {};
@@ -1969,7 +2029,9 @@ async function fetchAndCacheCategories() {
 async function autoCacheProducts() {
   try {
     logger.info("Running scheduled cache refresh...");
-    let productsResponse = await Product.find();
+    let productsResponse = await Product.find()
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
     productsResponse = productsResponse.filter(
       (product) => product.status === true
     );

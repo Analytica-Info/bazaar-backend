@@ -2,8 +2,18 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const JWT_SECRET = require('../config/jwtSecret');
+const cache = require('../utilities/cache');
 
 const logger = require("../utilities/logger");
+
+// Fields actually consumed by downstream req.user readers across mobile + web
+// user routes. Audited 2026-04-24. Always includes _id and isBlocked.
+// Keep this list in sync with consumers under src/controllers, src/services,
+// src/routes, src/helpers, src/middleware.
+const USER_AUTH_PROJECTION =
+  '_id isBlocked name first_name email username avatar role phone authProvider fcmToken createdAt';
+
+const LAST_SEEN_TTL_SECONDS = 300;
 /**
  * Core authentication handler.
  * Extracts token from cookies (web) or Authorization header (mobile/admin),
@@ -36,7 +46,7 @@ const handler = (role = 'user') => {
       if (role === 'admin') {
         userData = await Admin.findById(decoded.id).populate('role');
       } else {
-        userData = await User.findById(decoded.id);
+        userData = await User.findById(decoded.id).select(USER_AUTH_PROJECTION);
       }
 
       if (!userData) {
@@ -50,9 +60,17 @@ const handler = (role = 'user') => {
       req.user = userData;
       req.userRole = role;
 
-      // Update lastSeen for user requests — fire-and-forget, never blocks the response
+      // Update lastSeen for user requests — throttled via Redis (5 min per user)
+      // and fire-and-forget, so it never blocks the response. Cache util fails
+      // gracefully when Redis is unavailable; in that case we skip the write
+      // rather than stampede Mongo.
       if (role === 'user') {
-        User.updateOne({ _id: userData._id }, { $set: { lastSeen: new Date() } }).catch(() => {});
+        const throttleKey = cache.key('lastSeen', String(userData._id));
+        const recent = await cache.get(throttleKey);
+        if (!recent) {
+          await cache.set(throttleKey, '1', LAST_SEEN_TTL_SECONDS);
+          User.updateOne({ _id: userData._id }, { $set: { lastSeen: new Date() } }).catch(() => {});
+        }
       }
 
       next();
