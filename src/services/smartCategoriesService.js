@@ -89,54 +89,31 @@ exports.getHotOffers = async ({ priceField }) => {
 
     const result = await Promise.all(
         ranges.map(async (range) => {
-            const matchStage = priceField === "tax_exclusive"
-                ? {
-                    priceNum: { $gte: range.min, $lte: range.max },
-                    "product.images": { $exists: true, $type: "array", $ne: [] },
-                    $or: [
-                        { status: { $exists: false } },
-                        { status: true }
-                    ],
-                    discountedPrice: { $exists: true, $gt: 0 }
-                }
-                : {
-                    priceNum: { $gte: range.min, $lte: range.max },
-                };
-
+            // Pre-fix: used $addFields { $toDouble($trim($product.price_standard.<field>)) }
+            // + $match on the computed field, which forced a full collection scan every call
+            // (4,883 docs / 126ms each per range × 6 ranges per request).
+            //
+            // Fixed: filter on the indexed numeric `discountedPrice` field. Covered by the
+            // compound {status, totalQty, discountedPrice} index after Product.status migration.
+            //
+            // Semantic: discountedPrice is the lowest variant's final price (post-discount),
+            // which is what the customer actually pays — the right basis for a hot-offers grid.
             const pipeline = [
                 {
-                    $addFields: {
-                        priceNum: {
-                            $toDouble: {
-                                $trim: { input: `$product.price_standard.${priceField}` },
-                            },
-                        },
-                    },
-                },
-                {
-                    $match: matchStage,
-                },
-            ];
-
-            // Ecommerce (tax_inclusive) has separate image-check stage
-            if (priceField === "tax_inclusive") {
-                pipeline.push({
                     $match: {
-                        $expr: {
-                            $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0]
-                        }
+                        status: true,
+                        totalQty: { $gt: 0 },
+                        discountedPrice: { $gte: range.min, $lte: range.max },
+                        "product.images.0": { $exists: true },
                     },
-                });
-            }
-
-            pipeline.push(
+                },
+                { $sample: { size: 20 } },
                 {
                     $project: {
                         images: "$product.images.sizes.original",
                     },
                 },
-                { $sample: { size: 20 } }
-            );
+            ];
 
             const products = await Product.aggregate(pipeline);
 
