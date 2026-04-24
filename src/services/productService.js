@@ -900,16 +900,10 @@ exports.getCategoriesProduct = async (categoryId, query) => {
   try {
     let categories = await fetchAndCacheCategories();
     const categoriesTypes = await fetchCategoriesType(categoryId);
-    const products = await Product.find({
-      totalQty: { $gt: 0 },
-      status: true,
-      discountedPrice: { $exists: true, $gt: 0 },
-    })
-      .select(LIST_EXCLUDE_SELECT)
-      .lean();
 
+    // Build the list of category IDs that are descendants of `categoryId`
+    // BEFORE we touch the DB, so we can push the filter down to Mongo.
     const categoryIds = [];
-
     categories.forEach((category) => {
       if (
         category.category_path[0] &&
@@ -938,21 +932,40 @@ exports.getCategoriesProduct = async (categoryId, query) => {
 
     const uniqueCategoryIds = [...new Set(categoryIds)];
 
-    const filteredProducts = products.filter(
-      (product) =>
-        uniqueCategoryIds.includes(product.product.product_type_id) &&
-        product.totalQty > 0 &&
-        product.product?.images &&
-        Array.isArray(product.product.images) &&
-        product.product.images.length > 0
-    );
+    // If no categories resolved, short-circuit — nothing to return.
+    if (uniqueCategoryIds.length === 0) {
+      return {
+        success: true,
+        categories,
+        categoryId,
+        pagination: { currentPage: page, totalPages: 0, totalProducts: 0, productsPerPage: limit },
+        filteredProductsCount: 0,
+        filteredProducts: [],
+      };
+    }
 
-    const filteredProductsCount = filteredProducts.length;
+    // Push every filter to MongoDB. Uses:
+    //   - { status, totalQty, discountedPrice } compound index
+    //   - { "product.product_type_id": 1 } index
+    // We get only the page we need instead of loading ~2000 docs + slicing.
+    const baseQuery = {
+      totalQty: { $gt: 0 },
+      status: true,
+      discountedPrice: { $exists: true, $gt: 0 },
+      "product.product_type_id": { $in: uniqueCategoryIds },
+      "product.images.0": { $exists: true },
+    };
+
+    const [paginatedProducts, filteredProductsCount] = await Promise.all([
+      Product.find(baseQuery)
+        .select(LIST_EXCLUDE_SELECT)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(baseQuery),
+    ]);
+
     const totalPages = Math.ceil(filteredProductsCount / limit);
-    const paginatedProducts = filteredProducts.slice(
-      (page - 1) * limit,
-      page * limit
-    );
 
     const responseData = {
       success: true,

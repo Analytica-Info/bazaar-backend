@@ -212,43 +212,81 @@ exports.getSuperSaverProducts = async (req, res) => {
     }
 };
 
+// SKU values that map to each color badge.
+// Inverted mapping of getColorFromSku so we can query Mongo with $in.
+const SKUS_BY_COLOR = {
+    orange: ["Slightly Used - UAE Specs", "Slightly Used - Converted to UAE Specs"],
+    green:  ["New - UAE Specs",           "New - Converted to UAE Specs"],
+    yellow: ["Open Box - UAE Specs",      "Open Box - Converted to UAE Specs"],
+    red:    ["Used - UAE Specs",          "Used - Converted to UAE Specs"],
+};
+
+// LIST_EXCLUDE_PROJECTION mirror — keeps list payloads slim (see productService.js)
+const LIST_EXCLUDE_PROJECTION = {
+    "product.variants": 0, "product.product_codes": 0, "product.suppliers": 0,
+    "product.composite_bom": 0, "product.tag_ids": 0, "product.attributes": 0,
+    "product.account_code_sales": 0, "product.account_code_purchase": 0,
+    "product.price_outlet": 0, "product.brand_id": 0, "product.deleted_at": 0,
+    "product.version": 0, "product.created_at": 0, "product.updated_at": 0,
+    webhook: 0, webhookTime: 0, __v: 0, updatedAt: 0, "product.description": 0,
+};
+
+const cache = require("../../utilities/cache");
+const PRODUCTS_BY_VARIANT_TTL = 300; // 5 min
+
 exports.getProductByVariant = async (req, res) => {
     try {
         const color = req.query.color;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 54;
 
-        let products = await Product.find({
-            $or: [
-                { status: { $exists: false } },
-                { status: true }
-            ],
-            discountedPrice: { $exists: true, $gt: 0 }
-        }).lean();
+        const matchingSkus = SKUS_BY_COLOR[color];
+        if (!matchingSkus) {
+            return res.json({
+                success: true,
+                products: [],
+                pagination: { currentPage: page, totalPages: 0, totalProducts: 0, productsPerPage: limit, filterColor: color }
+            });
+        }
 
-        let filteredProducts = products.filter(product => {
-            if (!product.product?.images || !Array.isArray(product.product.images) || product.product.images.length === 0) {
-                return false;
-            }
-            if (!product.variantsData) return false;
-            return product.variantsData.some(variant => getColorFromSku(variant.sku) === color);
+        // Redis cache — low-cardinality args (4 colors × page × limit)
+        const cacheKey = cache.key("catalog", "by-variant", color, `p${page}`, `l${limit}`, "v1");
+
+        const responseData = await cache.getOrSet(cacheKey, PRODUCTS_BY_VARIANT_TTL, async () => {
+            // Push every filter to Mongo; only fetch the page we need.
+            const baseQuery = {
+                $or: [
+                    { status: { $exists: false } },
+                    { status: true }
+                ],
+                discountedPrice: { $exists: true, $gt: 0 },
+                "product.images.0": { $exists: true },
+                "variantsData.sku": { $in: matchingSkus },
+            };
+
+            const [products, totalCount] = await Promise.all([
+                Product.find(baseQuery)
+                    .select(LIST_EXCLUDE_PROJECTION)
+                    .skip((page - 1) * limit)
+                    .limit(limit)
+                    .lean(),
+                Product.countDocuments(baseQuery),
+            ]);
+
+            const totalPages = Math.ceil(totalCount / limit);
+
+            return {
+                success: true,
+                products,
+                pagination: {
+                    currentPage: page,
+                    totalPages,
+                    totalProducts: totalCount,
+                    productsPerPage: limit,
+                    filterColor: color,
+                }
+            };
         });
-
-        const totalCount = filteredProducts.length;
-        const totalPages = Math.ceil(totalCount / limit);
-        const paginatedProducts = filteredProducts.slice((page - 1) * limit, page * limit);
-
-        const responseData = {
-            success: true,
-            products: paginatedProducts,
-            pagination: {
-                currentPage: page,
-                totalPages,
-                totalProducts: totalCount,
-                productsPerPage: limit,
-                filterColor: color
-            }
-        };
 
         logStatusFalseItems('/api/products/getProductByVariant', req, res, responseData);
 
@@ -258,15 +296,10 @@ exports.getProductByVariant = async (req, res) => {
     }
 };
 
+// Kept for any remaining internal callers — maps SKU string to colour name.
 function getColorFromSku(sku) {
-    if (sku === "Slightly Used - UAE Specs" || sku === "Slightly Used - Converted to UAE Specs") {
-        return "orange";
-    } else if (sku === "New - UAE Specs" || sku === "New - Converted to UAE Specs") {
-        return "green";
-    } else if (sku === "Open Box - UAE Specs" || sku === "Open Box - Converted to UAE Specs") {
-        return "yellow";
-    } else if (sku === "Used - UAE Specs" || sku === "Used - Converted to UAE Specs") {
-        return "red";
+    for (const [color, skus] of Object.entries(SKUS_BY_COLOR)) {
+        if (skus.includes(sku)) return color;
     }
     return null;
 }

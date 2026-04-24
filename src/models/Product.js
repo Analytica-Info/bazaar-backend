@@ -27,5 +27,7 @@ ProductSchema.index({ "product.product_type_id": 1 });
 ProductSchema.index({ isHighest: 1 }, { sparse: true });
 // createdAt desc — used by getNewArrivals aggregation (was in-memory sort)
 ProductSchema.index({ createdAt: -1 });
+// variantsData.sku — used by getProductByVariant (color filter)
+ProductSchema.index({ "variantsData.sku": 1 });
 
 module.exports = mongoose.model("Product", ProductSchema);
