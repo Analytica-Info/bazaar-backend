@@ -273,6 +273,9 @@ async function updateAllProductDiscounts() {
       totalQty: { $gt: 0 },
     }).lean();
 
+    if (products.length === 0) return;
+
+    // Compute discounts in parallel (no DB calls in calculateDiscount)
     const productsWithDiscounts = await Promise.all(
       products.map(async (product) => {
         const discount = await calculateDiscount(product);
@@ -284,15 +287,20 @@ async function updateAllProductDiscounts() {
       ...productsWithDiscounts.map((p) => p.discount || 0)
     );
 
-    let count = 0;
-    for (let product of productsWithDiscounts) {
-      count++;
+    // Single snapshot of the timestamp for the entire batch — avoids
+    // N async calls to currentTime() inside the hot loop and means every
+    // product updated in this run carries an identical webhookTime.
+    const webhook = "updateProductDiscounts";
+    const webhookTime = await currentTime();
 
-      const webhook = "updateProductDiscounts";
-      const webhookTime = await currentTime();
-
+    // Build all operations for a single bulkWrite roundtrip.
+    // Was: N individual updateOne awaits (one Mongo roundtrip each).
+    // Now: 1 unordered bulkWrite (one roundtrip; ops applied in parallel on the server).
+    const ops = productsWithDiscounts.map((product) => {
       const taxInclusive = parseFloat(product.product.price_standard?.tax_inclusive) || 0;
-      const fallbackPrice = product.variantsData?.[0]?.price ? parseFloat(product.variantsData[0].price) : 0;
+      const fallbackPrice = product.variantsData?.[0]?.price
+        ? parseFloat(product.variantsData[0].price)
+        : 0;
       const basePrice = taxInclusive > 0 ? taxInclusive : fallbackPrice;
       const originalPrice = basePrice > 0 ? Number((basePrice / 0.65).toFixed(2)) : 0;
 
@@ -311,20 +319,38 @@ async function updateAllProductDiscounts() {
         });
       }
 
-      await Product.updateOne(
-        { _id: product._id },
-        {
-          $set: {
-            discount: product.discount,
-            isHighest: product.discount === maxDiscount,
-            originalPrice: originalPrice,
-            discountedPrice: highestDiscountVariant?.price || fallbackPrice || 0,
-            webhook,
-            webhookTime,
+      return {
+        updateOne: {
+          filter: { _id: product._id },
+          update: {
+            $set: {
+              discount: product.discount,
+              isHighest: product.discount === maxDiscount,
+              originalPrice: originalPrice,
+              discountedPrice: highestDiscountVariant?.price || fallbackPrice || 0,
+              webhook,
+              webhookTime,
+            },
           },
-        }
-      );
+        },
+      };
+    });
+
+    // MongoDB limits individual bulkWrite payloads; chunk if the batch grows
+    // beyond ~1000 ops to keep each BSON payload well under the 100 MB cap.
+    const CHUNK = 1000;
+    let modifiedTotal = 0;
+    let matchedTotal = 0;
+    for (let i = 0; i < ops.length; i += CHUNK) {
+      const slice = ops.slice(i, i + CHUNK);
+      const res = await Product.bulkWrite(slice, { ordered: false });
+      modifiedTotal += res.modifiedCount || 0;
+      matchedTotal += res.matchedCount || 0;
     }
+
+    console.log(
+      `[updateAllProductDiscounts] bulkWrite: ops=${ops.length} matched=${matchedTotal} modified=${modifiedTotal}`
+    );
   } catch (err) {
     console.error("❌ Error updating discounts:", err);
   }
