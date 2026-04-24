@@ -2,19 +2,20 @@
  * Migration: backfill Notification.status on legacy docs
  *
  * Atlas profiler (2026-04-24 23:57 UTC) showed the scheduled-notification cron
- * scanning all 61,976 notifications per run because the index on
- * {sentAt:1, scheduledDateTime:1} cannot efficiently satisfy a query of the
- * form `{ $or: [status=pending, status null, status missing], sentAt: null }`.
+ * scanning all 61,976 notifications per run because the query had to OR three
+ * status variants and use $ne:null — defeats the existing index.
  *
- * Root cause: old docs were written before the `status` default existed, so
- * the scheduler has to OR three status variants — defeats the index.
+ * Goal: partition legacy docs into concrete statuses so a partial index
+ * { scheduledDateTime: 1 } where status='pending' stays tiny (only truly
+ * active scheduled notifications).
  *
- * Fix: normalize every notification to a concrete status ('pending' | 'sent' |
- * 'failed') so the new partial index { scheduledDateTime: 1 } with
- * partialFilterExpression { status: 'pending' } can cover the cron query in
- * ~50 doc reads instead of ~62K.
+ * Buckets (evaluated against legacy docs with null/missing status):
+ *   - sentAt set                                      -> 'sent'
+ *   - no sentAt, no scheduledDateTime                 -> 'sent'   (legacy immediate push, already delivered)
+ *   - no sentAt, scheduledDateTime < now              -> 'failed' (past due + never sent)
+ *   - no sentAt, scheduledDateTime >= now             -> 'pending' (truly active)
  *
- * IDEMPOTENT — safe to run multiple times.
+ * IDEMPOTENT — only touches docs where status is currently null/missing.
  *
  * Usage:
  *   node src/scripts/migrateNotificationStatus.js          # dry run
@@ -30,25 +31,57 @@ async function migrate() {
   await connectDB();
   const db = mongoose.connection.db;
   const notifications = db.collection("notifications");
+  const now = new Date();
 
   console.log(DRY_RUN ? "=== DRY RUN (pass --apply to execute) ===" : "=== APPLYING MIGRATION ===");
 
+  const missingStatus = { $or: [{ status: null }, { status: { $exists: false } }] };
+
   const total = await notifications.countDocuments({});
+  const legacyTotal = await notifications.countDocuments(missingStatus);
   console.log(`Total notifications: ${total}`);
+  console.log(`Docs with null/missing status (legacy): ${legacyTotal}`);
 
-  // 1. sent notifications: have sentAt AND missing/null status -> status='sent'
-  const sentMissing = await notifications.countDocuments({
+  // 1. sentAt set -> 'sent'
+  const sentQuery = {
+    ...missingStatus,
     sentAt: { $ne: null, $exists: true },
-    $or: [{ status: null }, { status: { $exists: false } }],
-  });
-  console.log(`Docs needing status='sent': ${sentMissing}`);
+  };
+  const sentCount = await notifications.countDocuments(sentQuery);
+  console.log(`-> 'sent' (have sentAt): ${sentCount}`);
 
-  // 2. pending notifications: no sentAt AND missing/null status -> status='pending'
-  const pendingMissing = await notifications.countDocuments({
-    $or: [{ sentAt: null }, { sentAt: { $exists: false } }],
-    $and: [{ $or: [{ status: null }, { status: { $exists: false } }] }],
-  });
-  console.log(`Docs needing status='pending': ${pendingMissing}`);
+  // 2. no sentAt, no scheduledDateTime -> 'sent' (legacy immediate pushes)
+  const legacyImmediateQuery = {
+    $and: [
+      missingStatus,
+      { $or: [{ sentAt: null }, { sentAt: { $exists: false } }] },
+      { $or: [{ scheduledDateTime: null }, { scheduledDateTime: { $exists: false } }] },
+    ],
+  };
+  const legacyImmediateCount = await notifications.countDocuments(legacyImmediateQuery);
+  console.log(`-> 'sent' (legacy immediate, no schedule): ${legacyImmediateCount}`);
+
+  // 3. no sentAt, scheduledDateTime in past -> 'failed'
+  const pastDueQuery = {
+    $and: [
+      missingStatus,
+      { $or: [{ sentAt: null }, { sentAt: { $exists: false } }] },
+      { scheduledDateTime: { $ne: null, $lt: now } },
+    ],
+  };
+  const pastDueCount = await notifications.countDocuments(pastDueQuery);
+  console.log(`-> 'failed' (past due, never sent): ${pastDueCount}`);
+
+  // 4. no sentAt, scheduledDateTime in future -> 'pending'
+  const pendingQuery = {
+    $and: [
+      missingStatus,
+      { $or: [{ sentAt: null }, { sentAt: { $exists: false } }] },
+      { scheduledDateTime: { $ne: null, $gte: now } },
+    ],
+  };
+  const pendingCount = await notifications.countDocuments(pendingQuery);
+  console.log(`-> 'pending' (active scheduled): ${pendingCount}`);
 
   if (DRY_RUN) {
     console.log("Dry run complete. Re-run with --apply to execute.");
@@ -56,33 +89,28 @@ async function migrate() {
     return;
   }
 
-  if (sentMissing > 0) {
-    const r1 = await notifications.updateMany(
-      {
-        sentAt: { $ne: null, $exists: true },
-        $or: [{ status: null }, { status: { $exists: false } }],
-      },
-      { $set: { status: "sent" } }
-    );
-    console.log(`Backfilled status='sent': matched=${r1.matchedCount} modified=${r1.modifiedCount}`);
+  if (sentCount > 0) {
+    const r = await notifications.updateMany(sentQuery, { $set: { status: "sent" } });
+    console.log(`Applied 'sent' (have sentAt): matched=${r.matchedCount} modified=${r.modifiedCount}`);
+  }
+  if (legacyImmediateCount > 0) {
+    const r = await notifications.updateMany(legacyImmediateQuery, { $set: { status: "sent" } });
+    console.log(`Applied 'sent' (legacy immediate): matched=${r.matchedCount} modified=${r.modifiedCount}`);
+  }
+  if (pastDueCount > 0) {
+    const r = await notifications.updateMany(pastDueQuery, { $set: { status: "failed" } });
+    console.log(`Applied 'failed' (past due): matched=${r.matchedCount} modified=${r.modifiedCount}`);
+  }
+  if (pendingCount > 0) {
+    const r = await notifications.updateMany(pendingQuery, { $set: { status: "pending" } });
+    console.log(`Applied 'pending' (active scheduled): matched=${r.matchedCount} modified=${r.modifiedCount}`);
   }
 
-  if (pendingMissing > 0) {
-    const r2 = await notifications.updateMany(
-      {
-        $or: [{ sentAt: null }, { sentAt: { $exists: false } }],
-        $and: [{ $or: [{ status: null }, { status: { $exists: false } }] }],
-      },
-      { $set: { status: "pending" } }
-    );
-    console.log(`Backfilled status='pending': matched=${r2.matchedCount} modified=${r2.modifiedCount}`);
-  }
-
-  // Verification — should be 0
-  const stillMissing = await notifications.countDocuments({
-    $or: [{ status: null }, { status: { $exists: false } }],
-  });
+  // Verification
+  const stillMissing = await notifications.countDocuments(missingStatus);
+  const finalPending = await notifications.countDocuments({ status: "pending" });
   console.log(`Docs still missing status after migration: ${stillMissing}`);
+  console.log(`Total docs with status='pending' (will be in partial index): ${finalPending}`);
 
   await mongoose.disconnect();
 }
