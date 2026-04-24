@@ -46,27 +46,62 @@ const attachSkuToOrderDetails = async (orderDetails) => {
 /**
  * For a list of orders, populate each with its order details + SKU info.
  * Used by getUserOrders, getPaymentHistory, getDashboard.
+ *
+ * Previously: N+1 — one OrderDetail.find() + one Product.find() per order.
+ * Now: two total queries (all OrderDetails + all Products in $in batch).
  */
 const populateOrdersWithDetails = async (orders, { includeSku = true } = {}) => {
-    return Promise.all(
-        orders.map(async (order) => {
-            const orderDetails = await OrderDetail.find({
-                order_id: new mongoose.Types.ObjectId(order._id),
-            }).exec();
+    if (orders.length === 0) return [];
 
-            let finalDetails;
-            if (includeSku) {
-                finalDetails = await attachSkuToOrderDetails(orderDetails);
-            } else {
-                finalDetails = orderDetails;
+    // Batch 1: fetch ALL order details for ALL orders in a single query
+    const orderIds = orders.map((o) => new mongoose.Types.ObjectId(o._id));
+    const allOrderDetails = await OrderDetail.find({
+        order_id: { $in: orderIds },
+    }).lean();
+
+    // Group order details by order_id
+    const detailsByOrderId = {};
+    for (const d of allOrderDetails) {
+        const k = String(d.order_id);
+        if (!detailsByOrderId[k]) detailsByOrderId[k] = [];
+        detailsByOrderId[k].push(d);
+    }
+
+    // Batch 2: fetch ALL products referenced by ALL order details in a single query
+    let productSkuMap = {};
+    if (includeSku) {
+        const productIds = [
+            ...new Set(
+                allOrderDetails
+                    .map((d) => d.product_id)
+                    .filter(Boolean)
+                    .map((id) => String(id))
+            ),
+        ].map((id) => new mongoose.Types.ObjectId(id));
+
+        if (productIds.length > 0) {
+            const products = await Product.find({ _id: { $in: productIds } })
+                .select("product.sku_number")
+                .lean();
+            for (const p of products) {
+                productSkuMap[String(p._id)] = p.product?.sku_number || null;
             }
+        }
+    }
 
-            return {
-                ...order.toObject(),
-                order_details: finalDetails || [],
-            };
-        })
-    );
+    return orders.map((order) => {
+        const details = detailsByOrderId[String(order._id)] || [];
+        const finalDetails = includeSku
+            ? details.map((d) => ({
+                  ...d,
+                  sku: productSkuMap[String(d.product_id)] || null,
+              }))
+            : details;
+        return {
+            ...(typeof order.toObject === "function" ? order.toObject() : order),
+            order_details: finalDetails,
+        };
+    });
 };
 
 // ---------------------------------------------------------------------------

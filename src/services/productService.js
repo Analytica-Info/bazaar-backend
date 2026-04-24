@@ -5,8 +5,12 @@ const Category = require("../models/Category");
 const Brand = require("../models/Brand");
 const Review = require("../models/Review");
 const NodeCache = require("node-cache");
-const cache = new NodeCache({ stdTTL: 1800 });
+// spellingCache keeps 7-day in-memory storage for fuzzy-match suggestions —
+// left on NodeCache: tiny, very hot, fine to re-warm on restart.
 const spellingCache = new NodeCache({ stdTTL: 604800 }); // 7 days
+// Shared Redis-backed cache for everything else (fetchAndCacheCategories, etc.).
+// Graceful-degradation: falls back to direct Lightspeed/DB call on Redis outage.
+const cache = require("../utilities/cache");
 const axios = require("axios");
 const Typo = require("typo-js");
 const dictionary = new Typo("en_US");
@@ -18,6 +22,69 @@ const API_KEY = process.env.API_KEY;
 const CATEGORIES_URL = process.env.CATEGORIES_URL;
 const BRANDS_URL = process.env.BRANDS_URL;
 const PRODUCT_TYPE = process.env.PRODUCT_TYPE;
+
+// -----------------------------------------------------------------------------
+// Bandwidth optimization: list-endpoint projection
+// -----------------------------------------------------------------------------
+// Audit (2026-04-24) confirmed these fields are NEVER read by mobile, web, or
+// admin frontends when rendering product lists. They account for ~60-70% of
+// every product list payload. Detail endpoint (getProductDetails) keeps them.
+//
+// When adding new list endpoints, use one of:
+//   - Aggregate:  pipeline.push({ $project: LIST_EXCLUDE_PROJECTION })
+//   - Mongoose:   Product.find(...).select(LIST_EXCLUDE_SELECT).lean()
+// -----------------------------------------------------------------------------
+const LIST_EXCLUDE_PROJECTION = {
+  // Phase 1a — raw Lightspeed fields never rendered in lists
+  "product.variants": 0,
+  "product.product_codes": 0,
+  "product.suppliers": 0,
+  "product.composite_bom": 0,
+  "product.tag_ids": 0,
+  "product.attributes": 0,
+  "product.account_code_sales": 0,
+  "product.account_code_purchase": 0,
+  "product.price_outlet": 0,
+  "product.brand_id": 0,
+  "product.deleted_at": 0,
+  "product.version": 0,
+  "product.created_at": 0,
+  "product.updated_at": 0,
+  // Phase 2 — wrapper-level backend internals, not used by any frontend
+  webhook: 0,
+  webhookTime: 0,
+  __v: 0,
+  updatedAt: 0, // top-level wrapper updatedAt — keep createdAt (admin gift page uses it)
+  // Phase 3 — HTML description only shown on product DETAIL page, not on cards/lists
+  "product.description": 0,
+};
+
+const LIST_EXCLUDE_SELECT = [
+  // Phase 1a
+  "product.variants",
+  "product.product_codes",
+  "product.suppliers",
+  "product.composite_bom",
+  "product.tag_ids",
+  "product.attributes",
+  "product.account_code_sales",
+  "product.account_code_purchase",
+  "product.price_outlet",
+  "product.brand_id",
+  "product.deleted_at",
+  "product.version",
+  "product.created_at",
+  "product.updated_at",
+  // Phase 2
+  "webhook",
+  "webhookTime",
+  "__v",
+  "updatedAt",
+  // Phase 3
+  "product.description",
+]
+  .map((f) => `-${f}`)
+  .join(" ");
 const PRODUCTS_URL = process.env.PRODUCTS_URL;
 
 // ─── Private Helpers ─────────────────────────────────────────────
@@ -116,10 +183,10 @@ async function trackProductView(productId, userId = null) {
 }
 
 async function fetchAndCacheCategories() {
-  const cacheKey = "lightspeed_categories";
+  const cacheKey = cache.key("lightspeed", "categories", "v1");
 
   try {
-    const cachedCategories = cache.get(cacheKey);
+    const cachedCategories = await cache.get(cacheKey);
     if (cachedCategories) {
       logger.info("Fetching categories from cache");
       return cachedCategories;
@@ -137,7 +204,8 @@ async function fetchAndCacheCategories() {
     const categories =
       categoriesResponse.data.data?.data?.categories || [];
 
-    cache.set(cacheKey, categories);
+    // 30 minutes — matches previous NodeCache stdTTL
+    await cache.set(cacheKey, categories, 1800);
 
     return categories;
   } catch (error) {
@@ -302,6 +370,7 @@ exports.getProducts = async (query) => {
       { $project: { randomSort: 0 } },
       { $skip: (page - 1) * limit },
       { $limit: limit },
+      { $project: LIST_EXCLUDE_PROJECTION },
     ];
 
     const products = await Product.aggregate(productsPipeline);
@@ -337,7 +406,8 @@ exports.getProductDetails = async (productId, userId) => {
 
     await trackProductView(product._id, userId || null);
 
-    const reviews = await Review.find({ product_id: product._id });
+    // .lean() — reviews are read-only, no Mongoose overhead needed
+    const reviews = await Review.find({ product_id: product._id }).lean();
 
     let totalQuality = 0;
     let totalValue = 0;
@@ -402,8 +472,8 @@ exports.getHomeProducts = async () => {
   try {
     logger.info("API - Fetch Home Products");
     const categories = await fetchAndCacheCategories();
-    let products = await Product.find();
-    products = products.filter((product) => product.status === true);
+    // Push the status filter to MongoDB — previously loaded all docs then filtered in JS
+    const products = await Product.find({ status: true }).select(LIST_EXCLUDE_SELECT).lean();
 
     const sortedCategories = {};
     const categoryLookup = Object.fromEntries(
@@ -574,6 +644,7 @@ exports.searchProducts = async (query) => {
       },
       { $sort: { score: -1 } },
       { $limit: 100 },
+      { $project: LIST_EXCLUDE_PROJECTION },
     ];
 
     let filteredProducts = [];
@@ -616,6 +687,7 @@ exports.searchProducts = async (query) => {
         }
 
         const fallbackProducts = await Product.find(fallbackQuery)
+          .select(LIST_EXCLUDE_SELECT)
           .lean()
           .limit(100);
 
@@ -669,6 +741,7 @@ exports.searchProducts = async (query) => {
         }
 
         const fallbackProducts = await Product.find(fallbackQuery)
+          .select(LIST_EXCLUDE_SELECT)
           .lean()
           .limit(100);
         filteredProducts = fallbackProducts.filter(
@@ -737,7 +810,9 @@ exports.searchSingleProduct = async (name) => {
     const productName = name.toLowerCase();
     const products = await Product.find({
       "product.name": { $regex: productName, $options: "i" },
-    });
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
     if (products.length === 0) {
       throw {
         status: 404,
@@ -829,7 +904,9 @@ exports.getCategoriesProduct = async (categoryId, query) => {
       totalQty: { $gt: 0 },
       status: true,
       discountedPrice: { $exists: true, $gt: 0 },
-    }).lean();
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
 
     const categoryIds = [];
 
@@ -921,7 +998,9 @@ exports.getSubCategoriesProduct = async (subCategoryId, query) => {
       totalQty: { $gt: 0 },
       status: true,
       discountedPrice: { $exists: true, $gt: 0 },
-    }).lean();
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
 
     const categoryIds = [];
 
@@ -1011,7 +1090,9 @@ exports.getSubSubCategoriesProduct = async (subSubCategoryId, query) => {
     let products = await Product.find({
       totalQty: { $gt: 0 },
       status: true,
-    }).lean();
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
     const categoriesTypes = await fetchCategoriesType(subSubCategoryId);
 
     const filteredProducts = products.filter(
@@ -1084,8 +1165,11 @@ exports.getAllCategories = async () => {
     logger.info("API - All Categories");
 
     const categories = await Category.find();
-    let allProducts = await Product.find();
-    allProducts = allProducts.filter((product) => product.status === true);
+    // Only need product_type_id, totalQty for category counting — strip everything else.
+    // Status filter pushed to DB (was loading all then filtering in JS).
+    const allProducts = await Product.find({ status: true })
+      .select("product.product_type_id totalQty")
+      .lean();
 
     const productCountMap = {};
     allProducts.forEach((product) => {
@@ -1297,11 +1381,13 @@ exports.getRandomProducts = async (excludeId) => {
       categoryId = categoryDetails.data.id;
     }
 
-    let allProducts = await Product.find();
-    allProducts = allProducts.filter((product) => product.status === true);
-    const subcategoryProducts = allProducts.filter(
-      (p) => p.product.product_type_id === excludeId
-    );
+    // Push status + product_type_id filter to DB (was loading all, filtering in JS)
+    const subcategoryProducts = await Product.find({
+      status: true,
+      "product.product_type_id": excludeId,
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
 
     const filteredProducts = subcategoryProducts.filter((product) => {
       return (
@@ -1350,7 +1436,9 @@ exports.getSimilarProducts = async (productTypeId, productId) => {
       },
       variantsData: { $exists: true, $ne: [] },
       discountedPrice: { $exists: true, $gt: 0 },
-    });
+    })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
 
     const filteredProducts = products.filter((product) => {
       if (
@@ -1465,6 +1553,7 @@ exports.fetchDbProducts = async (query) => {
     }
 
     const products = await Product.find(dbQuery)
+      .select(LIST_EXCLUDE_SELECT)
       .skip(skip)
       .limit(limit)
       .lean()
@@ -1531,6 +1620,7 @@ exports.fetchProductsNoImages = async (query) => {
     }
 
     const products = await Product.find(dbQuery)
+      .select(LIST_EXCLUDE_SELECT)
       .skip(skip)
       .limit(limit)
       .lean()
@@ -1562,8 +1652,10 @@ exports.fetchProductsNoImages = async (query) => {
 exports.getAllProducts = async () => {
   try {
     logger.info("API - Fetch All Products");
-    let allProducts = await Product.find();
-    allProducts = allProducts.filter((product) => product.status === true);
+    // Push status filter to DB (was loading all, filtering in JS)
+    const allProducts = await Product.find({ status: true })
+      .select(LIST_EXCLUDE_SELECT)
+      .lean();
 
     logger.info("Return - API - Fetch All Products");
     return allProducts;

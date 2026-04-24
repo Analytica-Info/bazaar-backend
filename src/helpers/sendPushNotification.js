@@ -162,17 +162,20 @@ exports.sendNotificationToUsers = async (notificationId) => {
             logger.info(`[Notification Send] FAIL — 0 sent. id: ${notificationId}`);
         }
 
-        for (const user of targetUsers) {
+        // Bulk insert per-user notification records — was N inserts, now 1
+        if (targetUsers.length > 0) {
             try {
-                await Notification.create({
-                    userId: user._id,
+                const now = new Date();
+                const docs = targetUsers.map((u) => ({
+                    userId: u._id,
                     title: notification.title,
                     message: notification.message,
                     read: false,
-                    createdAt: new Date()
-                });
+                    createdAt: now,
+                }));
+                await Notification.insertMany(docs, { ordered: false });
             } catch (error) {
-                logger.error({ err: error }, 'Error creating user notification record:');
+                logger.error({ err: error }, 'Error bulk-creating user notification records:');
             }
         }
 

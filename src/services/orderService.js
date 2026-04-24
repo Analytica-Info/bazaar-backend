@@ -190,6 +190,19 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
     const validationResults = [];
     let allValid = true;
 
+    // Batch-fetch all product docs in a single $in query instead of one per item
+    const validProductIds = products
+        .map((p) => p.product_id)
+        .filter(Boolean);
+    const productDocs = validProductIds.length > 0
+        ? await Product.find({ _id: { $in: validProductIds } })
+            .select("product.id product.name variantsData")
+            .lean()
+        : [];
+    const productDocMap = Object.fromEntries(
+        productDocs.map((p) => [String(p._id), p])
+    );
+
     for (const item of products) {
         const productId = item.product_id;
         const requestedQty = item.qty;
@@ -211,7 +224,7 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
         let productDoc = null;
 
         try {
-            productDoc = await Product.findOne({ _id: productId });
+            productDoc = productDocMap[String(productId)] || null;
             if (!productDoc) {
                 validationResults.push({
                     productId,

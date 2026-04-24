@@ -64,6 +64,15 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true, strict: false });
 
 userSchema.index({ lastSeen: -1 });
+// Phone lookup — used on every mobile login/register
+userSchema.index({ phone: 1 }, { sparse: true });
+// Apple Sign-In lookup
+userSchema.index({ appleId: 1 }, { sparse: true });
+// Push notification send — scan was hitting all 6,517 users
+userSchema.index(
+    { fcmToken: 1 },
+    { partialFilterExpression: { fcmToken: { $type: 'string' } } }
+);
 
 const User = mongoose.model('User', userSchema);
 

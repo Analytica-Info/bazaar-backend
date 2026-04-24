@@ -3,6 +3,66 @@ const Review = require("../models/Review");
 const OrderDetail = require("../models/OrderDetail");
 const FlashSale = require("../models/FlashSale");
 const mongoose = require('mongoose');
+const cache = require('../utilities/cache');
+
+// Shared TTL for smart-category reads — 5 minutes.
+// Short enough to feel fresh, long enough to absorb the per-minute request
+// volume (2,400+/day on /api/products/products alone).
+const SMART_CAT_TTL = 300;
+
+// Mirror of productService.js LIST_EXCLUDE_* — keep in sync when adding fields.
+// See productService.js for rationale and audit date.
+const LIST_EXCLUDE_PROJECTION = {
+    // Phase 1a
+    "product.variants": 0,
+    "product.product_codes": 0,
+    "product.suppliers": 0,
+    "product.composite_bom": 0,
+    "product.tag_ids": 0,
+    "product.attributes": 0,
+    "product.account_code_sales": 0,
+    "product.account_code_purchase": 0,
+    "product.price_outlet": 0,
+    "product.brand_id": 0,
+    "product.deleted_at": 0,
+    "product.version": 0,
+    "product.created_at": 0,
+    "product.updated_at": 0,
+    // Phase 2
+    webhook: 0,
+    webhookTime: 0,
+    __v: 0,
+    updatedAt: 0,
+    // Phase 3
+    "product.description": 0,
+};
+
+const LIST_EXCLUDE_SELECT = [
+    // Phase 1a
+    "product.variants",
+    "product.product_codes",
+    "product.suppliers",
+    "product.composite_bom",
+    "product.tag_ids",
+    "product.attributes",
+    "product.account_code_sales",
+    "product.account_code_purchase",
+    "product.price_outlet",
+    "product.brand_id",
+    "product.deleted_at",
+    "product.version",
+    "product.created_at",
+    "product.updated_at",
+    // Phase 2
+    "webhook",
+    "webhookTime",
+    "__v",
+    "updatedAt",
+    // Phase 3
+    "product.description",
+]
+    .map((f) => `-${f}`)
+    .join(" ");
 
 const getDubaiDateUTC = () => {
     return new Date();
@@ -14,6 +74,10 @@ const getDubaiDateUTC = () => {
  * @param {string} config.priceField - "tax_inclusive" or "tax_exclusive"
  */
 exports.getHotOffers = async ({ priceField }) => {
+  return cache.getOrSet(
+    cache.key('catalog', 'hot-offers', priceField, 'v1'),
+    SMART_CAT_TTL,
+    async () => {
     const ranges = [
         { min: 1, max: 49, priceRange: "AED 1 - 49", label: "Budget Finds" },
         { min: 50, max: 99, priceRange: "AED 50 - 99", label: "Hot Mid-Range Deals" },
@@ -111,6 +175,8 @@ exports.getHotOffers = async ({ priceField }) => {
     );
 
     return result;
+    }
+  );
 };
 
 /**
@@ -129,28 +195,26 @@ exports.productsByPrice = async ({ startPrice, endPrice, page, limit }) => {
         throw err;
     }
 
-    let query = {
+    // Push image-existence check to the query so:
+    //  (1) we don't over-fetch docs without images and slice in JS
+    //  (2) countDocuments gives us the real count directly
+    const query = {
         totalQty: { $gt: 0 },
         $or: [
             { status: { $exists: false } },
             { status: true }
         ],
-        discountedPrice: { $gte: startPrice, $lte: endPrice }
+        discountedPrice: { $gte: startPrice, $lte: endPrice },
+        "product.images.0": { $exists: true },
     };
 
-    const allProducts = await Product.find(query).skip((page - 1) * limit).limit(limit * 2);
-    const products = allProducts.filter(product =>
-        product.product?.images &&
-        Array.isArray(product.product.images) &&
-        product.product.images.length > 0
-    ).slice(0, limit);
+    const products = await Product.find(query)
+        .select(LIST_EXCLUDE_SELECT)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
 
-    const allProductsForCount = await Product.find(query);
-    const totalCount = allProductsForCount.filter(product =>
-        product.product?.images &&
-        Array.isArray(product.product.images) &&
-        product.product.images.length > 0
-    ).length;
+    const totalCount = await Product.countDocuments(query);
 
     const totalPages = Math.ceil(totalCount / limit);
 
@@ -171,6 +235,7 @@ exports.productsByPrice = async ({ startPrice, endPrice, page, limit }) => {
  * Get top rated products based on reviews.
  */
 exports.getTopRatedProducts = async () => {
+  return cache.getOrSet(cache.key('catalog', 'top-rated', 'v1'), SMART_CAT_TTL, async () => {
     const topProducts = await Review.aggregate([
         {
             $addFields: {
@@ -209,6 +274,9 @@ exports.getTopRatedProducts = async () => {
         },
         {
             $replaceRoot: { newRoot: "$product" }
+        },
+        {
+            $project: LIST_EXCLUDE_PROJECTION
         }
     ]);
 
@@ -228,6 +296,9 @@ exports.getTopRatedProducts = async () => {
         },
         {
             $sample: { size: 10 }
+        },
+        {
+            $project: LIST_EXCLUDE_PROJECTION
         }
     ]);
 
@@ -246,6 +317,7 @@ exports.getTopRatedProducts = async () => {
         count: finalData.length,
         products: finalData
     };
+  });
 };
 
 /**
@@ -254,6 +326,10 @@ exports.getTopRatedProducts = async () => {
  * @param {number} config.timeWindowHours - 72 for ecommerce, 100 for mobile
  */
 exports.getTrendingProducts = async ({ timeWindowHours }) => {
+  return cache.getOrSet(
+    cache.key('catalog', 'trending', `w${timeWindowHours}`, 'v1'),
+    SMART_CAT_TTL,
+    async () => {
     const nowDubaiUTC = getDubaiDateUTC();
     const cutoff = new Date(nowDubaiUTC.getTime() - timeWindowHours * 60 * 60 * 1000);
 
@@ -279,7 +355,9 @@ exports.getTrendingProducts = async ({ timeWindowHours }) => {
 
     const trendingProducts = await Product.find(
         { 'product.id': { $in: soldProductIds } }
-    );
+    )
+        .select(LIST_EXCLUDE_SELECT)
+        .lean();
 
     const filteredTrendingProducts = trendingProducts.filter(product =>
         product.product?.images &&
@@ -303,6 +381,9 @@ exports.getTrendingProducts = async ({ timeWindowHours }) => {
         },
         {
             $sample: { size: 10 }
+        },
+        {
+            $project: LIST_EXCLUDE_PROJECTION
         }
     ]);
 
@@ -315,12 +396,15 @@ exports.getTrendingProducts = async ({ timeWindowHours }) => {
         count: finalData.length,
         products: finalData
     };
+    }
+  );
 };
 
 /**
  * Get today's deal products.
  */
 exports.todayDeal = async () => {
+  return cache.getOrSet(cache.key('catalog', 'today-deal', 'v1'), SMART_CAT_TTL, async () => {
     const nowDubaiUTC = getDubaiDateUTC();
     const seventyTwoHoursAgoUTC = new Date(nowDubaiUTC.getTime() - 72 * 60 * 60 * 1000);
 
@@ -341,7 +425,9 @@ exports.todayDeal = async () => {
         trendingProducts = await Product.find({
             'product.id': { $in: soldProductIds },
             totalQty: { $gt: 0 }
-        }).lean();
+        })
+            .select(LIST_EXCLUDE_SELECT)
+            .lean();
 
         trendingProducts = trendingProducts.filter(product =>
             product.product?.images &&
@@ -373,7 +459,8 @@ exports.todayDeal = async () => {
                 }
             }
         },
-        { $sample: { size: 10 } }
+        { $sample: { size: 10 } },
+        { $project: LIST_EXCLUDE_PROJECTION }
     ]);
 
     const finalData = [...new Map([...trendingProducts, ...products].map(item => [item._id.toString(), item])).values()]
@@ -385,6 +472,7 @@ exports.todayDeal = async () => {
         count: finalData.length,
         products: finalData
     };
+  });
 };
 
 /**
@@ -396,6 +484,10 @@ exports.todayDeal = async () => {
  * @param {number|null} config.firstPageLimit - if set, first page uses different limit (ecommerce mode)
  */
 exports.getNewArrivals = async ({ page, limit, maxItemsFromDb, firstPageLimit }) => {
+  return cache.getOrSet(
+    cache.key('catalog', 'new-arrivals', `p${page}`, `l${limit}`, `fpl${firstPageLimit || 0}`, 'v1'),
+    SMART_CAT_TTL,
+    async () => {
     let skip, effectiveLimit;
 
     if (firstPageLimit) {
@@ -431,7 +523,8 @@ exports.getNewArrivals = async ({ page, limit, maxItemsFromDb, firstPageLimit })
                 totalCount: [{ $count: "count" }],
                 products: [
                     { $skip: skip },
-                    { $limit: effectiveLimit }
+                    { $limit: effectiveLimit },
+                    { $project: LIST_EXCLUDE_PROJECTION }
                 ]
             }
         }
@@ -467,6 +560,8 @@ exports.getNewArrivals = async ({ page, limit, maxItemsFromDb, firstPageLimit })
     }
 
     return response;
+    }
+  );
 };
 
 /**
@@ -517,7 +612,9 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             sold: { $exists: true, $gt: 0 }
         };
 
-    const allProductsFromDB = await Product.find(productQuery).lean();
+    const allProductsFromDB = await Product.find(productQuery)
+        .select(LIST_EXCLUDE_SELECT)
+        .lean();
 
     const ranges = [
         { label: "0 - 10%", min: 1, max: 10, name: "10%" },
@@ -613,11 +710,18 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
  * @param {number} config.minItems - 20 for ecommerce, 8 for mobile
  */
 exports.getSuperSaverProducts = async ({ minItems }) => {
+  return cache.getOrSet(
+    cache.key('catalog', 'super-saver', `n${minItems}`, 'v1'),
+    SMART_CAT_TTL,
+    async () => {
     const ranges = { min: 1, max: 99 };
     const requiredCount = minItems;
 
     let superSaverProducts = [];
-    const highestDiscountProduct = await Product.findOne({ isHighest: true });
+    // Only need .discount for the return value — strip everything else
+    const highestDiscountProduct = await Product.findOne({ isHighest: true })
+        .select("discount")
+        .lean();
 
     while (superSaverProducts.length < requiredCount) {
         const randomProducts = await Product.aggregate([
@@ -628,7 +732,8 @@ exports.getSuperSaverProducts = async ({ minItems }) => {
                     }
                 }
             },
-            { $sample: { size: 2 } }
+            { $sample: { size: 2 } },
+            { $project: LIST_EXCLUDE_PROJECTION }
         ]);
         for (let product of randomProducts) {
             if (superSaverProducts.length >= requiredCount) break;
@@ -650,12 +755,15 @@ exports.getSuperSaverProducts = async ({ minItems }) => {
         highestDiscount: highestDiscountProduct.discount,
         products: superSaverProducts
     };
+    }
+  );
 };
 
 /**
  * Get favourites of the week based on sales in last 7 days.
  */
 exports.favouritesOfWeek = async () => {
+  return cache.getOrSet(cache.key('catalog', 'favourites-of-week', 'v1'), SMART_CAT_TTL, async () => {
     const nowDubaiUTC = getDubaiDateUTC();
     const sevenDaysAgoUTC = new Date(nowDubaiUTC.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -682,7 +790,9 @@ exports.favouritesOfWeek = async () => {
     let products = await Product.find({
         'product.id': { $in: soldProductIds },
         totalQty: { $gt: 0 }
-    }).lean();
+    })
+        .select(LIST_EXCLUDE_SELECT)
+        .lean();
 
     products = products.filter(product =>
         product.product?.images &&
@@ -717,6 +827,9 @@ exports.favouritesOfWeek = async () => {
         },
         {
             $sample: { size: 10 }
+        },
+        {
+            $project: LIST_EXCLUDE_PROJECTION
         }
     ]);
 
@@ -729,6 +842,7 @@ exports.favouritesOfWeek = async () => {
         count: finalData.length,
         products: finalData
     };
+  });
 };
 
 /**

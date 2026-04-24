@@ -14,5 +14,10 @@ const reviewSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Product detail page fetches all reviews for a product
+reviewSchema.index({ product_id: 1 });
+// Duplicate-review check ("has this user reviewed this product?")
+reviewSchema.index({ user_id: 1, product_id: 1 });
+
 const Review = mongoose.model('Review', reviewSchema);
 module.exports = Review;

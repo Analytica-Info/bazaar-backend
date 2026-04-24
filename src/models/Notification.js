@@ -19,6 +19,13 @@ const notificationSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 }, { strict: false });
 
+// Compound index for scheduled-notification cron query
+// Without this, the cron scanned all 61,976 notifications every minute
+// (~43 GB/day Atlas egress). See reports/2026-04-24-mongodb-traffic-analysis.md.
+notificationSchema.index({ sentAt: 1, scheduledDateTime: 1 });
+// User notifications tab — was scanning all 61,976 notifications
+notificationSchema.index({ userId: 1, createdAt: -1 });
+
 const Notification = mongoose.model('Notification', notificationSchema);
 
 module.exports = Notification;

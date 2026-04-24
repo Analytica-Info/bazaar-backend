@@ -15,7 +15,24 @@ const fs = require("fs");
 const path = require("path");
 
 const logger = require("../utilities/logger");
+const cache = require("../utilities/cache");
 const BACKEND_URL = process.env.BACKEND_URL;
+
+// CMS content changes only via admin edits.
+// Cache for 30 min; every update path below calls invalidateCmsCache().
+const CMS_CACHE_KEY = cache.key("cms", "data", "v1");
+const CMS_CACHE_TTL = 1800; // 30 min
+
+/** Invalidate the cached CMS payload. Called from every update.* function. */
+async function invalidateCmsCache() {
+  try {
+    await cache.del(CMS_CACHE_KEY);
+  } catch (_) {
+    // cache.del already swallows errors; this is belt-and-braces.
+  }
+}
+
+exports.invalidateCmsCache = invalidateCmsCache;
 
 // ─── Exported Functions ──────────────────────────────────────────
 
@@ -23,41 +40,60 @@ const BACKEND_URL = process.env.BACKEND_URL;
  * Fetch all CMS sections
  */
 exports.getCmsData = async () => {
-  try {
-    const couponCms = await CouponCms.findOne();
-    const headerInfoCms = await HeaderInfoCms.findOne();
-    const sliderCms = await SliderCms.findOne();
-    const featuresCms = await FeaturesCms.findOne();
-    const offersCms = await OffersCms.findOne();
-    const categoryImagesCms = await CategoryImagesCms.findOne();
-    const offerFilterCms = await OfferFilterCms.findOne();
-    const footerInfoCms = await FooterInfoCms.findOne();
-    const aboutCms = await AboutCms.findOne();
-    const shopCms = await ShopCms.findOne();
-    const contactCms = await ContactCms.findOne();
-    const brandsLogoCms = await BrandsLogoCms.findOne();
+  return cache.getOrSet(CMS_CACHE_KEY, CMS_CACHE_TTL, async () => {
+    try {
+      // Parallelize the 12 independent findOne() calls instead of sequential await.
+      // Same result, but fetch completes in ~max(query) rather than ~sum(query).
+      const [
+        couponCms,
+        headerInfoCms,
+        sliderCms,
+        featuresCms,
+        offersCms,
+        categoryImagesCms,
+        offerFilterCms,
+        footerInfoCms,
+        aboutCms,
+        shopCms,
+        contactCms,
+        brandsLogoCms,
+      ] = await Promise.all([
+        CouponCms.findOne().lean(),
+        HeaderInfoCms.findOne().lean(),
+        SliderCms.findOne().lean(),
+        FeaturesCms.findOne().lean(),
+        OffersCms.findOne().lean(),
+        CategoryImagesCms.findOne().lean(),
+        OfferFilterCms.findOne().lean(),
+        FooterInfoCms.findOne().lean(),
+        AboutCms.findOne().lean(),
+        ShopCms.findOne().lean(),
+        ContactCms.findOne().lean(),
+        BrandsLogoCms.findOne().lean(),
+      ]);
 
-    return {
-      couponCmsData: couponCms,
-      headerInfoCmsData: headerInfoCms,
-      sliderCmsData: sliderCms,
-      featuresCmsData: featuresCms,
-      offersCmsData: offersCms,
-      categoryImagesCmsData: categoryImagesCms,
-      offerFilterCmsData: offerFilterCms,
-      footerInfoCmsData: footerInfoCms,
-      aboutCmsData: aboutCms,
-      shopCmsData: shopCms,
-      contactCmsData: contactCms,
-      brandsLogoCmsData: brandsLogoCms,
-    };
-  } catch (error) {
-    logger.error(`Error fetching Cms data: ${error.message}`);
-    throw {
-      status: 500,
-      message: "Error fetching Cms data",
-    };
-  }
+      return {
+        couponCmsData: couponCms,
+        headerInfoCmsData: headerInfoCms,
+        sliderCmsData: sliderCms,
+        featuresCmsData: featuresCms,
+        offersCmsData: offersCms,
+        categoryImagesCmsData: categoryImagesCms,
+        offerFilterCmsData: offerFilterCms,
+        footerInfoCmsData: footerInfoCms,
+        aboutCmsData: aboutCms,
+        shopCmsData: shopCms,
+        contactCmsData: contactCms,
+        brandsLogoCmsData: brandsLogoCms,
+      };
+    } catch (error) {
+      logger.error(`Error fetching Cms data: ${error.message}`);
+      throw {
+        status: 500,
+        message: "Error fetching Cms data",
+      };
+    }
+  });
 };
 
 /**
@@ -107,6 +143,7 @@ exports.updateCouponCms = async (data, files) => {
 
     await couponCms.save();
 
+    await invalidateCmsCache();
     return { message: "Coupon CMS data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -161,6 +198,7 @@ exports.updateHeader = async (data, files) => {
     }
 
     await headerInfo.save();
+    await invalidateCmsCache();
     return { message: "Header info saved successfully" };
   } catch (error) {
     console.error(error);
@@ -204,6 +242,7 @@ exports.updateSlider = async (data, files) => {
 
     await sliderCms.save();
 
+    await invalidateCmsCache();
     return { message: "Slider Images CMS data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -239,6 +278,7 @@ exports.updateFeatures = async (data) => {
     featureCms.featureData = featureData;
     await featureCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     if (error.status) throw error;
@@ -285,6 +325,7 @@ exports.updateOffers = async (data, files) => {
     offersCms.offersData = updatedOffersData;
     await offersCms.save();
 
+    await invalidateCmsCache();
     return { message: "Offers updated successfully" };
   } catch (error) {
     console.error(error);
@@ -323,6 +364,7 @@ exports.updateCategoryImages = async (data, files) => {
 
     await categoryImagesCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -379,6 +421,7 @@ exports.updateOfferFilter = async (data, files) => {
 
     await offerFilterCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data updated successfully" };
   } catch (error) {
     if (error.status) throw error;
@@ -429,6 +472,7 @@ exports.updateFooter = async (data, files) => {
 
     await footerInfoCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -472,6 +516,7 @@ exports.updateAbout = async (data, files) => {
 
     await aboutCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     if (error.status) throw error;
@@ -509,6 +554,7 @@ exports.updateShop = async (data, files) => {
 
     await shopCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -540,6 +586,7 @@ exports.updateContact = async (data) => {
 
     await contactCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     console.error(error);
@@ -569,6 +616,7 @@ exports.updateBrandsLogo = async (data, files) => {
     brandsLogoCms.images = updatedImages;
     await brandsLogoCms.save();
 
+    await invalidateCmsCache();
     return { message: "Data uploaded successfully" };
   } catch (error) {
     throw { status: 500, message: "Error uploading data" };
