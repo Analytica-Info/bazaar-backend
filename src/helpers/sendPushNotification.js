@@ -287,18 +287,11 @@ exports.checkAndSendScheduledNotifications = async () => {
                 if (allPending.length > 0) {
                     const next = allPending.sort((a, b) => new Date(a.scheduledDateTime) - new Date(b.scheduledDateTime))[0];
                     console.log('[Scheduled Notifications] No due this attempt. Pending:', allPending.length, '| Next (UTC):', next?.scheduledDateTime ? new Date(next.scheduledDateTime).toISOString() : null);
-                } else if (attempt === maxAttempts - 1) {
-                    const recent = await Notification.findOne(
-                        { scheduledDateTime: { $ne: null } },
-                        { _id: 1, sentAt: 1, scheduledDateTime: 1 }
-                    ).sort({ createdAt: -1 }).read('primary').lean().exec();
-                    if (recent) {
-                        console.log('[Scheduled Notifications] No due (last attempt). Debug: id=', recent._id, 'sentAt=', recent.sentAt);
-                        if (recent.sentAt) {
-                            logger.info('[Scheduled Notifications] ^ That notification was already SENT (likely by another Node process). Run only ONE server (stop PM2/duplicate terminals/IDE run).');
-                        }
-                    }
                 }
+                // Debug findOne (sort by createdAt) was removed — it ran every minute with no
+                // index support on notifications.createdAt and burned ~767 MB/day of egress.
+                // Scheduler is healthy now; if it regresses, restore selectively or add the
+                // matching index first.
             } else {
                 logger.info('[Scheduled Notifications] runId=', runId, '| Found', toSend.length, 'to send');
                 for (const notification of toSend) {
