@@ -539,6 +539,16 @@ exports.getPaymentMethods = async () => {
         enabled: true,
     });
 
+    // Nomod is gated behind NOMOD_ENABLED=true — not yet exposed to clients
+    if (process.env.NOMOD_ENABLED === 'true' && process.env.NOMOD_API_KEY) {
+        methods.push({
+            id: 'nomod',
+            name: 'Nomod',
+            icon: 'assets/icons/nomod-logo.png',
+            enabled: true,
+        });
+    }
+
     return methods;
 };
 
