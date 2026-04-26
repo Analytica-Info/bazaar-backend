@@ -19,6 +19,7 @@ const TABBY_AUTH_KEY = process.env.TABBY_AUTH_KEY;
 const TABBY_SECRET_KEY = process.env.TABBY_SECRET_KEY;
 const { sendPushNotification } = require('../helpers/sendPushNotification');
 const PendingPayment = require('../models/PendingPayment');
+const PaymentProviderFactory = require('./payments/PaymentProviderFactory');
 const WEBURL = process.env.URL;
 const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
 const { logActivity } = require('../utilities/activityLogger');
@@ -537,6 +538,16 @@ exports.getPaymentMethods = async () => {
         icon: 'assets/icons/online-payment.png',
         enabled: true,
     });
+
+    // Nomod is gated behind NOMOD_ENABLED=true — not yet exposed to clients
+    if (process.env.NOMOD_ENABLED === 'true' && process.env.NOMOD_API_KEY) {
+        methods.push({
+            id: 'nomod',
+            name: 'Nomod',
+            icon: 'assets/icons/nomod-logo.png',
+            enabled: true,
+        });
+    }
 
     return methods;
 };
@@ -1298,6 +1309,83 @@ exports.verifyTabbyPayment = async (paymentId) => {
     }
 
     return { message: `Payment status is ${status}`, finalStatus };
+};
+
+/**
+ * Store Nomod order data in PendingPayment (mobile flow)
+ */
+exports.createNomodCheckoutSession = async (userId, bodyData, metadata) => {
+    const {
+        cartData, shippingCost, name, phone, address, state, city, area,
+        floorNo, buildingName, apartmentNo, landmark, currency,
+        discountPercent, discountAmount, couponCode, payment_method,
+        mobileNumber, paymentIntentId, txnId, paymentStatus, user_email,
+        total, sub_total,
+    } = bodyData;
+    const fcmToken = metadata?.fcmToken || null;
+
+    await logBackendActivity({
+        platform: 'Mobile App Backend',
+        activity_name: 'Checkout Session Nomod API Hit',
+        status: 'success',
+        message: `Nomod checkoutSessionNomod API hit - user: ${userId || 'n/a'}, email: ${user_email || 'n/a'}`,
+        execution_path: 'orderController.checkoutSessionNomod (initial)'
+    });
+
+    if (payment_method !== 'nomod') {
+        throw { status: 400, message: 'This endpoint is only for Nomod payments' };
+    }
+
+    if (!paymentIntentId) {
+        throw { status: 400, message: 'paymentIntentId is required' };
+    }
+
+    const formatDate = new Date().toLocaleDateString("en-GB", {
+        day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Dubai",
+    });
+    const formatTime = new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Dubai",
+    });
+    const orderTime = `${formatDate}, ${formatTime}`;
+
+    const pendingPayment = new PendingPayment({
+        user_id: userId,
+        payment_id: paymentIntentId,
+        payment_method: 'nomod',
+        order_data: {
+            cartData, shippingCost, name, phone, address, state, city, area,
+            floorNo, buildingName, apartmentNo, landmark, currency,
+            discountPercent, discountAmount, couponCode, mobileNumber,
+            user_email, total, sub_total, txnId, paymentStatus, fcmToken,
+        },
+        status: 'pending',
+        orderfrom: 'Mobile App',
+        orderTime,
+    });
+
+    await pendingPayment.save();
+    logger.info({ paymentIntentId, userId }, '[Nomod] Order data stored, ready for payment');
+
+    return { message: 'Order data stored successfully', paymentId: paymentIntentId, status: 'ready_for_payment' };
+};
+
+/**
+ * Verify Nomod payment status (mobile flow)
+ */
+exports.verifyNomodPayment = async (paymentId) => {
+    if (!paymentId) {
+        throw { status: 400, message: 'paymentId is required' };
+    }
+
+    const provider = PaymentProviderFactory.create('nomod');
+    const checkout = await provider.getCheckout(paymentId);
+    const status = checkout.status?.toLowerCase();
+
+    if (checkout.paid) {
+        return { message: `Payment status is ${status}` };
+    }
+
+    return { message: `Payment status is ${status}`, finalStatus: status };
 };
 
 exports.handleTabbyWebhook = async (payload) => {

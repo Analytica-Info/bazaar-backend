@@ -14,6 +14,8 @@ router.post('/validate-inventory', authMiddleware, orderController.validateInven
 router.post('/checkout-session', authMiddleware, orderController.checkoutSession);
 router.post('/checkout-session-tabby', authMiddleware, orderController.checkoutSessionTabby);
 router.get('/verify-tabby-status', authMiddleware, orderController.verifyTabbyPayment);
+router.post('/checkout-session-nomod', authMiddleware, orderController.checkoutSessionNomod);
+router.get('/verify-nomod-payment', authMiddleware, orderController.verifyNomodPayment);
 router.get('/address', authMiddleware, orderController.address);
 router.post('/address', authMiddleware, orderController.storeAddress);
 router.post("/order-status/:orderId", authMiddleware, orderUpload.single("file"), orderController.updateOrderStatus);

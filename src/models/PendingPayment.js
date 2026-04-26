@@ -14,7 +14,7 @@ const pendingPaymentSchema = new mongoose.Schema({
     payment_method: { 
         type: String, 
         required: true,
-        enum: ['tabby', 'stripe']
+        enum: ['tabby', 'stripe', 'nomod']
     },
     order_data: {
         type: Object,

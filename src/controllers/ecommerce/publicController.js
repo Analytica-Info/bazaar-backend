@@ -817,6 +817,32 @@ exports.verifyTabbyPayment = async (req, res) => {
   }
 };
 
+exports.createNomodCheckout = async (req, res) => {
+  try {
+    const result = await checkoutService.createNomodCheckout(req);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    logger.error({ err: error }, 'Nomod checkout error:');
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.verifyNomodPayment = async (req, res) => {
+  try {
+    const result = await checkoutService.verifyNomodPayment(req);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    logger.error({ err: error }, 'Nomod payment verification error:');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 exports.checkout = async (req, res) => {
   try {
     const user_id = req.user?._id;

@@ -11,6 +11,7 @@ const BankPromoCodeUsage = require("../models/BankPromoCodeUsage");
 const Notification = require("../models/Notification");
 const stripe = require("stripe")(process.env.STRIPE_SK);
 const axios = require("axios");
+const PaymentProviderFactory = require("./payments/PaymentProviderFactory");
 const crypto = require("crypto");
 const { sendEmail } = require("../mail/emailService");
 const { getAdminEmail, getCcEmails } = require("../utilities/emailHelper");
@@ -1630,5 +1631,214 @@ exports.handleTabbyWebhook = async (payload, userId, clientIP, webhookSecret) =>
     if (error.status) throw error;
     logger.error({ err: error }, "Tabby webhook error:");
     throw { status: 500, message: "Internal server error" };
+  }
+};
+
+/**
+ * Create Nomod checkout session (website flow)
+ */
+exports.createNomodCheckout = async (req) => {
+  try {
+    const userId = req.user?._id;
+    const {
+      cartData, shippingCost = 0, name, phone, address, currency = 'AED',
+      city, area, buildingName, floorNo, apartmentNo, landmark,
+      discountPercent, couponCode, mobileNumber, saved_total,
+      bankPromoId, discountAmount, capAED, successUrl, failureUrl, cancelledUrl,
+    } = req.body;
+
+    if (!cartData || !cartData.length) {
+      throw { status: 400, message: 'cartData is required' };
+    }
+
+    const { discountAED, subtotalBefore: subtotalAmount } = await resolveCheckoutDiscountAED({
+      cartData, bankPromoId, discountPercent, discountAmount, capAED,
+    });
+
+    const totalAmount = Math.round((subtotalAmount - discountAED + Number(shippingCost || 0)) * 100) / 100;
+
+    const cartDataEntry = await CartData.create({ cartData });
+    const cartDataId = cartDataEntry._id;
+
+    const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || process.env.URL || 'https://bazaar-uae.com';
+
+    const provider = PaymentProviderFactory.create('nomod');
+    const checkout = await provider.createCheckout({
+      referenceId: `${userId}-${Date.now()}`,
+      amount: totalAmount,
+      currency,
+      discount: discountAED,
+      items: cartData.map(item => ({
+        name: item.name || 'Product',
+        quantity: item.qty || 1,
+        price: item.price,
+      })),
+      shippingCost: Number(shippingCost || 0),
+      customer: { name, phone },
+      successUrl: successUrl || `${FRONTEND_BASE_URL}/order-success`,
+      failureUrl: failureUrl || `${FRONTEND_BASE_URL}/order-failure`,
+      cancelledUrl: cancelledUrl || `${FRONTEND_BASE_URL}/cart`,
+      metadata: {
+        userId: String(userId), cartDataId: String(cartDataId),
+        name: String(name || ''), phone: String(phone || ''),
+        address: String(address || ''), city: String(city || ''),
+        area: String(area || ''), buildingName: String(buildingName || ''),
+        floorNo: String(floorNo || ''), apartmentNo: String(apartmentNo || ''),
+        landmark: String(landmark || ''), currency: String(currency),
+        shippingCost: String(shippingCost || 0),
+        subtotalAmount: String(subtotalAmount),
+        totalAmount: String(totalAmount),
+        discountAmount: String(discountAED),
+        couponCode: String(couponCode || ''),
+        mobileNumber: String(mobileNumber || ''),
+        saved_total: String(saved_total || 0),
+        bankPromoId: String(bankPromoId || ''),
+      },
+    });
+
+    const formatDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric", timeZone: "Asia/Dubai" });
+    const formatTime = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Dubai" });
+    const orderTime = `${formatDate} - ${formatTime}`;
+
+    await PendingPayment.create({
+      user_id: userId,
+      payment_id: checkout.id,
+      payment_method: 'nomod',
+      order_data: {
+        cartData, shippingCost, name, phone, address, city, area,
+        buildingName, floorNo, apartmentNo, landmark, currency,
+        discountPercent, discountAmount: discountAED, couponCode,
+        mobileNumber, saved_total, bankPromoId,
+        subtotalAmount, totalAmount, cartDataId: String(cartDataId),
+      },
+      status: 'pending',
+      orderfrom: 'Website',
+      orderTime,
+    });
+
+    logger.info({ checkoutId: checkout.id, userId }, 'Nomod checkout created (website)');
+    return { status: 'created', checkout_url: checkout.redirectUrl };
+  } catch (error) {
+    if (error.status) throw error;
+    logger.error({ err: error }, 'Nomod createCheckout error:');
+    throw { status: 500, message: 'Internal server error' };
+  }
+};
+
+/**
+ * Verify Nomod payment + create order (website flow)
+ */
+exports.verifyNomodPayment = async (req) => {
+  try {
+    const { paymentId } = req.body;
+    const userId = req.user?._id;
+
+    if (!paymentId) {
+      throw { status: 400, message: 'paymentId is required' };
+    }
+
+    const provider = PaymentProviderFactory.create('nomod');
+    const checkout = await provider.getCheckout(paymentId);
+
+    if (!checkout.paid) {
+      throw { status: 400, message: `Payment status is ${checkout.status}` };
+    }
+
+    const pendingPayment = await PendingPayment.findOne({ payment_id: paymentId });
+    if (!pendingPayment) {
+      throw { status: 404, message: 'Pending payment record not found' };
+    }
+    if (pendingPayment.status === 'completed') {
+      return { message: 'Order already created' };
+    }
+
+    const {
+      cartData, shippingCost, name, phone, address, city, area,
+      buildingName, floorNo, apartmentNo, landmark, currency,
+      discountAmount, couponCode, mobileNumber, saved_total,
+      bankPromoId, subtotalAmount, totalAmount,
+    } = pendingPayment.order_data;
+
+    pendingPayment.status = 'completed';
+    await pendingPayment.save();
+
+    const formatter = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedShipping = formatter.format(shippingCost || 0);
+
+    if (couponCode && mobileNumber) {
+      const coupon = await Coupon.findOne({ coupon: couponCode, phone: mobileNumber });
+      if (coupon && coupon.status !== 'used') {
+        coupon.status = 'used';
+        await coupon.save();
+      }
+    }
+
+    if (bankPromoId && userId) {
+      try {
+        const promo = await BankPromoCode.findById(bankPromoId);
+        if (promo) {
+          const existing = await BankPromoCodeUsage.findOne({ bankPromoCodeId: promo._id, userId });
+          if (!existing) {
+            await BankPromoCodeUsage.create({ bankPromoCodeId: promo._id, userId });
+            promo.usageCount = (promo.usageCount || 0) + 1;
+            await promo.save();
+            logger.info(`Bank promo ${promo.code} usage recorded for user ${userId} (Nomod).`);
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, 'Error recording bank promo usage (Nomod):');
+      }
+    }
+
+    const formatDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric", timeZone: "Asia/Dubai" });
+    const formatTime = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Dubai" });
+    const orderDateTime = `${formatDate} - ${formatTime}`;
+
+    const lastOrder = await Order.findOne().sort({ createdAt: -1 }).select('order_no');
+    let nextOrderNo = 1;
+    if (lastOrder && lastOrder.order_no) nextOrderNo = lastOrder.order_no + 1;
+
+    const uniquePart = crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3);
+    const nextOrderId = `BZ${year}${String(nextOrderNo).padStart(3, '0')}${uniquePart}`;
+
+    const user = await User.findById(userId);
+    const userEmail = user?.email || '';
+
+    const order = await Order.create({
+      userId, order_id: nextOrderId, order_no: nextOrderNo,
+      order_datetime: orderDateTime, name, email: userEmail, address,
+      state: '-', city: city || '-', area: area || '-',
+      buildingName: buildingName || '-', floorNo: floorNo || '-',
+      apartmentNo: apartmentNo || '-', landmark: landmark || '-',
+      amount_subtotal: subtotalAmount, amount_total: totalAmount,
+      discount_amount: discountAmount, phone, status: 'confirmed',
+      shipping: shippingCost, txn_id: paymentId, payment_status: 'paid',
+      checkout_session_id: paymentId, payment_method: 'nomod',
+      saved_total: saved_total || 0, orderfrom: 'Website',
+    });
+
+    const orderDetails = cartData.map(item => ({
+      order_id: order._id, product_id: item.id, productId: item.product_id,
+      product_name: item.name, product_image: item.image,
+      variant_name: item.variant, amount: item.price, quantity: item.qty,
+    }));
+    await OrderDetail.insertMany(orderDetails);
+
+    await Notification.create({
+      userId,
+      title: `Order No: ${order.order_id} Placed Successfully`,
+      message: `Hi ${name}, your order of AED ${Number(totalAmount).toFixed(2)} is confirmed. Thank you for shopping with Bazaar!`,
+    });
+
+    order.orderTracks = order.orderTracks || [];
+    order.orderTracks.push({ status: 'Confirmed', dateTime: orderDateTime, image: null });
+    await order.save();
+
+    logger.info({ orderId: nextOrderId, userId }, 'Nomod order created successfully');
+    return { message: 'Order created successfully', orderId: order._id };
+  } catch (error) {
+    if (error.status) throw error;
+    logger.error({ err: error }, 'Nomod verifyPayment error:');
+    throw { status: 500, message: 'Internal server error' };
   }
 };
