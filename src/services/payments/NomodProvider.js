@@ -57,12 +57,13 @@ class NomodProvider extends PaymentProvider {
         }
 
         try {
+            logger.info({ body: JSON.stringify(body) }, 'Nomod createCheckout request body');
             const res = await this.client.post('/v1/checkout', body);
             logger.info({ checkoutId: res.data.id, referenceId }, 'Nomod checkout created');
             return { id: res.data.id, redirectUrl: res.data.url, raw: res.data };
         } catch (error) {
             const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to create Nomod checkout';
-            logger.error({ err: error.response?.data, referenceId }, 'Nomod createCheckout failed');
+            logger.error({ err: error.response?.data, referenceId, status: error.response?.status }, 'Nomod createCheckout failed');
             throw { status: error.response?.status || 500, message: msg };
         }
     }
