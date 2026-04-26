@@ -32,5 +32,7 @@ ProductSchema.index({ "variantsData.sku": 1 });
 // variantsData.id — used on every checkout line item, order update, webhook,
 // and cron (checkoutService, orderService, productSyncService, updateProductsNew).
 ProductSchema.index({ "variantsData.id": 1 });
+// webhook + status compound — used by productSyncService when querying by webhook type.
+ProductSchema.index({ webhook: 1, status: 1 });
 
 module.exports = mongoose.model("Product", ProductSchema);

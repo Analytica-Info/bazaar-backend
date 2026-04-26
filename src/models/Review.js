@@ -18,6 +18,8 @@ const reviewSchema = new mongoose.Schema({
 reviewSchema.index({ product_id: 1 });
 // Duplicate-review check ("has this user reviewed this product?")
 reviewSchema.index({ user_id: 1, product_id: 1 });
+// Standalone user_id — used by getUserReviews aggregation which filters only by user.
+reviewSchema.index({ user_id: 1 });
 
 const Review = mongoose.model('Review', reviewSchema);
 module.exports = Review;

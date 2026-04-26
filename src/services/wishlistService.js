@@ -1,7 +1,12 @@
 const Wishlist = require("../models/Wishlist");
 
 async function getWishlist(userId) {
-  const wishlist = await Wishlist.findOne({ user: userId }).populate("items");
+  // Exclude internal sync fields — the client only needs display + commerce data.
+  // Using exclusion projection preserves any future Product fields automatically.
+  const wishlist = await Wishlist.findOne({ user: userId }).populate(
+    "items",
+    "-webhook -webhookTime -sold -isHighest -createdAt -updatedAt -__v"
+  );
   if (!wishlist) {
     return { wishlistCount: 0, wishlist: [] };
   }

@@ -1119,8 +1119,12 @@ exports.getSubSubCategoriesProduct = async (subSubCategoryId, query) => {
       "product.images.0": { $exists: true },
     };
 
-    const [filteredProducts, categoriesTypes] = await Promise.all([
-      Product.find(baseQuery).select(LIST_EXCLUDE_SELECT).lean(),
+    // Push pagination to MongoDB (same pattern as getCategoriesProduct / getSubCategoriesProduct).
+    // countDocuments + paginated find in parallel — avoids loading the full category into memory.
+    const skip = (page - 1) * limit;
+    const [filteredProductsCount, paginatedProducts, categoriesTypes] = await Promise.all([
+      Product.countDocuments(baseQuery),
+      Product.find(baseQuery).select(LIST_EXCLUDE_SELECT).skip(skip).limit(limit).lean(),
       fetchCategoriesType(subSubCategoryId),
     ]);
 
@@ -1139,12 +1143,7 @@ exports.getSubSubCategoriesProduct = async (subSubCategoryId, query) => {
       categories = null;
     }
 
-    const filteredProductsCount = filteredProducts.length;
     const totalPages = Math.ceil(filteredProductsCount / limit);
-    const paginatedProducts = filteredProducts.slice(
-      (page - 1) * limit,
-      page * limit
-    );
 
     const responseData = {
       success: true,

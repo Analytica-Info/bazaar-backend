@@ -440,13 +440,25 @@ async function inventoryProductDetailUpdate(type, updateProductId, timeFormatted
 
     const matchedProductIds = [];
 
+    // Batch fetch all parked products in a single query instead of one per item.
+    const allParkedVariantIds = allParkedProductIds.map(item => item.product);
+    const parkedQtyMap = new Map(allParkedProductIds.map(item => [item.product, item.qty]));
+    const batchedParkedProducts = await Product.find({
+        'variantsData.id': { $in: allParkedVariantIds },
+    }).select('product variantsData').lean();
+
+    const variantToProductMap = new Map();
+    for (const prod of batchedParkedProducts) {
+        for (const v of (prod.variantsData || [])) {
+            variantToProductMap.set(v.id, prod);
+        }
+    }
+
     for (const item of allParkedProductIds) {
-        const matchedParentProduct = await Product.findOne({
-            'variantsData.id': item.product,
-        });
+        const matchedParentProduct = variantToProductMap.get(item.product);
 
         if (matchedParentProduct && matchedParentProduct.product?.id) {
-            const matchedVariant = matchedParentProduct.variantsData.find(
+            const matchedVariant = (matchedParentProduct.variantsData || []).find(
                 variant => variant.id === item.product
             );
 
@@ -733,13 +745,24 @@ async function handleInventoryUpdate(data) {
 
     const matchedProductIds = [];
 
+    // Batch fetch — one query instead of one per parked item.
+    const allParkedVariantIds2 = allParkedProductIds.map(item => item.product);
+    const batchedParkedProducts2 = await Product.find({
+        'variantsData.id': { $in: allParkedVariantIds2 },
+    }).select('product variantsData').lean();
+
+    const variantToProductMap2 = new Map();
+    for (const prod of batchedParkedProducts2) {
+        for (const v of (prod.variantsData || [])) {
+            variantToProductMap2.set(v.id, prod);
+        }
+    }
+
     for (const item of allParkedProductIds) {
-        const matchedParentProduct = await Product.findOne({
-            'variantsData.id': item.product,
-        });
+        const matchedParentProduct = variantToProductMap2.get(item.product);
 
         if (matchedParentProduct && matchedParentProduct.product?.id) {
-            const matchedVariant = matchedParentProduct.variantsData.find(
+            const matchedVariant = (matchedParentProduct.variantsData || []).find(
                 variant => variant.id === item.product
             );
 
@@ -813,7 +836,8 @@ async function handleSaleUpdate(data) {
         logger.info(`Parent Parked Product Id: ${matchedProduct.product.id}`);
         const itemId = matchedProduct.product.id;
         const existingProductId = await ProductId.findOne({ productId: itemId });
-        const productDoc = await Product.findOne({ 'product.id': itemId });
+        // Reuse matchedProduct — it was already fetched above for 'variantsData.id' lookup.
+        const productDoc = matchedProduct;
         if (productDoc) {
             const { inventoryLevel } = await fetchProductInventory(
                 itemId,

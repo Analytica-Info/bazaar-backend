@@ -927,7 +927,10 @@ exports.addReview = async (req, res) => {
       price_rating,
     });
 
-    const reviews = await Review.find();
+    // Project only the fields the client needs — avoids fetching entire collection.
+    const reviews = await Review.find()
+      .select("nickname summary texttext image product_id quality_rating value_rating price_rating user_id userId createdAt updatedAt")
+      .lean();
 
     res.json({
       message: "Review created successfully",
@@ -941,7 +944,10 @@ exports.addReview = async (req, res) => {
 
 exports.review = async (req, res) => {
   try {
-    const reviews = await Review.find().populate('product_id');
+    // Project only product.id from the populated Product — avoids fetching full documents.
+    const reviews = await Review.find()
+      .select("nickname summary texttext image product_id quality_rating value_rating price_rating user_id userId createdAt updatedAt")
+      .populate("product_id", "product.id");
 
     const reviewsWithProductId = reviews.map(review => {
       const reviewObj = review.toObject();
@@ -1442,10 +1448,10 @@ exports.getIdsss = async (req, res) => {
 exports.categories = async (req, res) => {
   try {
     const categories = await fetchCategories();
-    let allProducts = await Product.find()
+    // Push status filter to MongoDB — avoids loading inactive products into Node.js memory.
+    const allProducts = await Product.find({ status: true })
       .select(LIST_EXCLUDE_SELECT)
       .lean();
-    allProducts = allProducts.filter((product) => product.status === true);
 
     const productCountMap = {};
     allProducts.forEach((product) => {
@@ -1777,6 +1783,14 @@ async function filterProductsByInventory(productsResponse) {
     after = inventories.version?.max || "";
   } while (after);
 
+  // Build a lookup map from inventory — O(n) build, O(1) per lookup.
+  // Previous nested loop was O(products × variants × inventories) ≈ 2.5B comparisons.
+  const inventoryMap = new Map();
+  for (const inv of allInventories) {
+    const existing = inventoryMap.get(inv.product_id) || 0;
+    inventoryMap.set(inv.product_id, existing + inv.inventory_level);
+  }
+
   const filteredProducts = [];
 
   for (const product of allProducts) {
@@ -1784,30 +1798,14 @@ async function filterProductsByInventory(productsResponse) {
 
     if (product.variants && product.variants.length > 0) {
       product.variants = product.variants.filter((variant) => {
-        let variantQty = 0;
-        for (const inventory of allInventories) {
-          if (inventory.product_id === variant.id) {
-            variantQty += inventory.inventory_level;
-          }
-        }
-        return variantQty > 0;
+        return (inventoryMap.get(variant.id) || 0) > 0;
       });
 
       product.variants.forEach((variant) => {
-        let variantQty = 0;
-        for (const inventory of allInventories) {
-          if (inventory.product_id === variant.id) {
-            variantQty += inventory.inventory_level;
-          }
-        }
-        totalQty += variantQty;
+        totalQty += inventoryMap.get(variant.id) || 0;
       });
     } else {
-      for (const inventory of allInventories) {
-        if (inventory.product_id === product.id) {
-          totalQty += inventory.inventory_level;
-        }
-      }
+      totalQty = inventoryMap.get(product.id) || 0;
     }
 
     if (totalQty > 0) {
@@ -2030,12 +2028,10 @@ async function fetchAndCacheCategories() {
 async function autoCacheProducts() {
   try {
     logger.info("Running scheduled cache refresh...");
-    let productsResponse = await Product.find()
+    // Push status filter to MongoDB — same fix as the categories endpoint.
+    const productsResponse = await Product.find({ status: true })
       .select(LIST_EXCLUDE_SELECT)
       .lean();
-    productsResponse = productsResponse.filter(
-      (product) => product.status === true
-    );
     await filterAndCacheProductsByInventory(productsResponse);
   } catch (error) {
     logger.error({ err: error }, "Error in scheduled cache refresh:");
@@ -2044,23 +2040,21 @@ async function autoCacheProducts() {
 
 const generateCouponCode = async () => {
   try {
+    // Fetch only the last matching coupon — avoids loading the entire collection.
+    const lastCouponDoc = await Coupon.findOne({ coupon: /^DH\d+YHZXB$/ })
+      .sort({ _id: -1 })
+      .select("coupon")
+      .lean();
+
     let nextNumber = 1;
-    const coupons = await Coupon.find();
-
-    if (coupons && coupons.length > 0) {
-      const lastCoupon = coupons[coupons.length - 1].coupon;
-      console.log("lastCoupon:", lastCoupon);
-
-      const regex = /DH(\d+)YHZXB/;
-      const matches = lastCoupon.match(regex);
-
+    if (lastCouponDoc) {
+      const matches = lastCouponDoc.coupon.match(/DH(\d+)YHZXB/);
       if (matches && matches[1]) {
         nextNumber = parseInt(matches[1], 10) + 1;
       }
     }
 
-    const newCoupon = `DH${nextNumber}YHZXB`;
-    return newCoupon;
+    return `DH${nextNumber}YHZXB`;
   } catch (error) {
     logger.error({ err: error }, "Error generating the coupon code:");
     return "DH1YHZXB";

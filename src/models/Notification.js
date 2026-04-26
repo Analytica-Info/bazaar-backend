@@ -21,6 +21,8 @@ const notificationSchema = new mongoose.Schema({
 
 // Compound index for scheduled-notification cron query
 notificationSchema.index({ sentAt: 1, scheduledDateTime: 1 });
+// Scheduler compound — efficiently finds pending notifications due for delivery.
+notificationSchema.index({ status: 1, scheduledDateTime: 1 });
 // User notifications tab
 notificationSchema.index({ userId: 1, createdAt: -1 });
 // Partial index — scheduler query after simplification only looks at pending docs.

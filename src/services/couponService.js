@@ -15,23 +15,21 @@ const WEBURL = process.env.URL;
 
 const generateCouponCode = async () => {
   try {
+    // Fetch only the last coupon by _id — avoids loading the entire collection.
+    const lastCouponDoc = await Coupon.findOne({ coupon: /^DH\d+YHZXB$/ })
+      .sort({ _id: -1 })
+      .select("coupon")
+      .lean();
+
     let nextNumber = 1;
-    const coupons = await Coupon.find();
-
-    if (coupons && coupons.length > 0) {
-      const lastCoupon = coupons[coupons.length - 1].coupon;
-      console.log("lastCoupon:", lastCoupon);
-
-      const regex = /DH(\d+)YHZXB/;
-      const matches = lastCoupon.match(regex);
-
+    if (lastCouponDoc) {
+      const matches = lastCouponDoc.coupon.match(/DH(\d+)YHZXB/);
       if (matches && matches[1]) {
         nextNumber = parseInt(matches[1], 10) + 1;
       }
     }
 
-    const newCoupon = `DH${nextNumber}YHZXB`;
-    return newCoupon;
+    return `DH${nextNumber}YHZXB`;
   } catch (error) {
     logger.error({ err: error }, "Error generating the coupon code:");
     return "DH1YHZXB";
@@ -366,7 +364,8 @@ exports.createCoupon = async (userId, data) => {
       };
     }
 
-    const lastCoupon = await Coupon.findOne().sort({ id: -1 }).exec();
+    // Sort by _id (always indexed) instead of id (numeric field with no index).
+    const lastCoupon = await Coupon.findOne().sort({ _id: -1 }).select("id").lean();
     const nextId =
       lastCoupon && typeof lastCoupon.id === "number"
         ? lastCoupon.id + 1

@@ -21,6 +21,26 @@ async function getCategoryNameById(id) {
   }
 }
 
+/**
+ * Build an id→name map from the Category singleton in one query.
+ * Returns an empty Map if the collection is empty or on error.
+ */
+async function buildCategoryMap() {
+  try {
+    const categoryDoc = await Category.findOne().select("search_categoriesList").lean();
+    if (!categoryDoc || !Array.isArray(categoryDoc.search_categoriesList)) return new Map();
+    return new Map(
+      categoryDoc.search_categoriesList.map((cat) => [
+        cat.id,
+        cat.name.split(/\s*\/\s*/)[0],
+      ])
+    );
+  } catch (error) {
+    logger.error({ err: error }, "Error building category map:");
+    return new Map();
+  }
+}
+
 async function getGiftProductInfo() {
   const giftProduct = await Product.findOne({
     isGift: true,
@@ -75,29 +95,27 @@ async function getCart(userId, options = {}) {
     return { cartCount: 0, cart: [] };
   }
 
-  const enrichedItems = await Promise.all(
-    cart.items.map(async (item) => {
-      const product = item.product?.product;
-      const category_id = product?.product_type_id || null;
-      let category_name = null;
-      if (category_id) {
-        category_name = await getCategoryNameById(category_id);
-      }
+  // Build category map once (single DB query) instead of one query per cart item.
+  const categoryMap = await buildCategoryMap();
 
-      const unitPrice = Number(item.variantPrice || 0);
-      const itemSubtotal = unitPrice * (item.quantity || 0);
-      const productIdStr = item.product?._id?.toString() || "";
+  const enrichedItems = cart.items.map((item) => {
+    const product = item.product?.product;
+    const category_id = product?.product_type_id || null;
+    const category_name = category_id ? (categoryMap.get(category_id) || null) : null;
 
-      return {
-        ...item.toObject(),
-        category_id,
-        category_name,
-        unitPrice,
-        itemSubtotal,
-        productIdStr,
-      };
-    })
-  );
+    const unitPrice = Number(item.variantPrice || 0);
+    const itemSubtotal = unitPrice * (item.quantity || 0);
+    const productIdStr = item.product?._id?.toString() || "";
+
+    return {
+      ...item.toObject(),
+      category_id,
+      category_name,
+      unitPrice,
+      itemSubtotal,
+      productIdStr,
+    };
+  });
 
   if (!includeGiftLogic) {
     return {

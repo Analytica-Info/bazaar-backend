@@ -52,7 +52,8 @@ const updateParkedDetails = async (productIds, res) => {
       if (matchedProduct) {
         console.log(`Parent Parked Product Id: ${matchedProduct.product.id}`);
         const itemId = matchedProduct.product.id;
-        const productDoc = await Product.findOne({ "product.id": itemId });
+        // Reuse matchedProduct — it already contains product.id and variantsData.
+        const productDoc = matchedProduct;
         if (productDoc) {
           const { inventoryLevel } = await fetchProductInventory(
             itemId,
@@ -381,27 +382,36 @@ async function updateSoldItems() {
       }
     }
 
-    for (const [productId, soldQty] of Object.entries(soldCounts)) {
-      const product = await Product.findOne({
-        "variantsData.id": productId,
-      });
+    // Batch fetch all sold products in one query, then bulk-write all updates.
+    // Previous pattern: 2 DB roundtrips per sold variant (find + updateOne).
+    const soldVariantIds = Object.keys(soldCounts);
+    const soldProducts = await Product.find({
+      "variantsData.id": { $in: soldVariantIds },
+    }).select("_id totalQty variantsData").lean();
 
-      if (!product) {
-        continue;
-      }
+    const bulkOps = [];
+    for (const product of soldProducts) {
+      // Find which variant IDs from soldCounts match this product's variantsData.
+      const matchingVariantId = (product.variantsData || []).find(
+        (v) => soldCounts[v.id] !== undefined
+      )?.id;
 
-      const newTotalQty = Math.max((product.totalQty || 0) - soldQty, 0);
+      if (!matchingVariantId) continue;
+
+      const soldQty = soldCounts[matchingVariantId];
       const safeSoldQty =
         soldQty && typeof soldQty === "number" && soldQty > 0 ? soldQty : 0;
 
-      await Product.updateOne(
-        { _id: product._id },
-        {
-          $set: {
-            sold: safeSoldQty,
-          },
-        }
-      );
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: product._id },
+          update: { $set: { sold: safeSoldQty } },
+        },
+      });
+    }
+
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps, { ordered: false });
     }
 
     console.log("🎉 All sold products updated successfully");

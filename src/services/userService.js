@@ -24,7 +24,8 @@ const attachSkuToOrderDetails = async (orderDetails) => {
         .filter(id => id)
         .map(id => new mongoose.Types.ObjectId(id));
 
-    const products = await Product.find({ _id: { $in: productIds } }).exec();
+    // Only the SKU number is needed from the Product document.
+    const products = await Product.find({ _id: { $in: productIds } }).select("product.sku_number").lean();
 
     const productSkuMap = {};
     products.forEach(product => {
@@ -415,11 +416,12 @@ exports.getCurrentMonthOrderCategories = async () => {
         }
     });
 
-    const categories = await Category.find();
+    // Category is a singleton collection — use findOne() and project only the needed array.
+    const categoryDoc = await Category.findOne().select("search_categoriesList").lean();
     const categoryMap = {};
 
-    if (categories && categories[0] && categories[0].search_categoriesList) {
-        categories[0].search_categoriesList.forEach(category => {
+    if (categoryDoc && Array.isArray(categoryDoc.search_categoriesList)) {
+        categoryDoc.search_categoriesList.forEach(category => {
             categoryMap[category.id] = category.name;
         });
     }
@@ -582,9 +584,12 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
         });
     }
 
-    const reviews = await Review.find();
+    // Select only the fields the client maps — avoids fetching the full document for every review.
+    const reviews = await Review.find()
+        .select("nickname summary texttext image product_id quality_rating value_rating price_rating user_id createdAt updatedAt")
+        .lean();
     const mappedReviews = reviews.map(r => ({
-        ...r._doc,
+        ...r,
         name: r.nickname,
         description: r.summary,
         title: r.texttext,
