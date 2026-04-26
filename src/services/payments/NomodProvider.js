@@ -27,14 +27,14 @@ class NomodProvider extends PaymentProvider {
         if (!this.apiKey) throw { status: 500, message: 'Nomod API key not configured' };
 
         const lineItems = items.map((item, idx) => ({
-            id: String(item.id || item.variantId || `item-${idx + 1}`),
+            item_id: String(item.id || item.variantId || `item-${idx + 1}`),
             name: item.name || 'Product',
             quantity: Number(item.quantity) || 1,
-            amount: String(Number(item.price).toFixed(2)),
+            unit_amount: String(Number(item.price).toFixed(2)),
         }));
 
         if (shippingCost > 0) {
-            lineItems.push({ id: 'shipping', name: 'Shipping', quantity: 1, amount: String(Number(shippingCost).toFixed(2)) });
+            lineItems.push({ item_id: 'shipping', name: 'Shipping', quantity: 1, unit_amount: String(Number(shippingCost).toFixed(2)) });
         }
 
         const body = {
