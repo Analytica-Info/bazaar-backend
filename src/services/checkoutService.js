@@ -1669,6 +1669,7 @@ exports.createNomodCheckout = async (req) => {
       currency,
       discount: discountAED,
       items: cartData.map(item => ({
+        id: item.variantId || item.id || item.product_id,
         name: item.name || 'Product',
         quantity: item.qty || 1,
         price: item.price,
