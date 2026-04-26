@@ -7,6 +7,8 @@ const allowedFileTypes = /jpeg|jpg|png/;
 const orderUpload = createUpload(allowedFileTypes, "uploads/orders");
 
 router.get('/payment-intent', orderController.paymentIntent);
+router.get('/payment-methods', orderController.getPaymentMethods);
+router.post('/stripe/init', authMiddleware, orderController.initStripePayment);
 router.get('/get-orders', authMiddleware, orderController.getOrders);
 router.post('/validate-inventory', authMiddleware, orderController.validateInventoryBeforeCheckout);
 router.post('/checkout-session', authMiddleware, orderController.checkoutSession);

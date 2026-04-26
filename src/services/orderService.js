@@ -482,6 +482,65 @@ exports.getOrders = async (userId) => {
     return ordersWithDetails;
 };
 
+exports.initStripePayment = async (userId, amountAED) => {
+    const user = await User.findById(userId);
+    if (!user) throw { status: 404, message: 'User not found' };
+
+    let customerId = user.customerId;
+
+    if (!customerId) {
+        const customer = await stripe.customers.create({
+            email: user.email,
+            description: 'Bazaar UAE customer',
+        });
+        customerId = customer.id;
+        user.customerId = customerId;
+        await user.save();
+    }
+
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+        { customer: customerId },
+        { apiVersion: '2023-10-16' }
+    );
+
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amountAED * 100),
+        currency: 'aed',
+        customer: customerId,
+        setup_future_usage: 'off_session',
+        payment_method_types: ['card'],
+    });
+
+    return {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        customerId,
+        ephemeralKey: ephemeralKey.secret,
+    };
+};
+
+exports.getPaymentMethods = async () => {
+    const methods = [];
+
+    if (process.env.TABBY_AUTH_KEY) {
+        methods.push({
+            id: 'tabby',
+            name: 'Tabby',
+            icon: 'assets/icons/tabby-logo.png',
+            enabled: true,
+        });
+    }
+
+    methods.push({
+        id: 'stripe',
+        name: 'Card',
+        icon: 'assets/icons/online-payment.png',
+        enabled: true,
+    });
+
+    return methods;
+};
+
 exports.getPaymentIntent = async () => {
     const paymentIntentId = 'pi_3RVUm3Ga9aBXxV9x0vKrp7qq';
     const response = await axios.get(

@@ -113,6 +113,33 @@ exports.getOrders = async (req, res) => {
     }
 };
 
+exports.initStripePayment = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { amountAED } = req.body;
+
+        if (!amountAED || isNaN(amountAED) || Number(amountAED) <= 0) {
+            return res.status(400).json({ error: 'amountAED is required and must be a positive number' });
+        }
+
+        const result = await orderService.initStripePayment(userId, Number(amountAED));
+        return res.status(200).json(result);
+    } catch (error) {
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        console.error('initStripePayment error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getPaymentMethods = async (req, res) => {
+    try {
+        const methods = await orderService.getPaymentMethods();
+        return res.status(200).json({ methods });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 exports.paymentIntent = async (req, res) => {
     try {
         const data = await orderService.getPaymentIntent();
