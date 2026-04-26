@@ -1718,7 +1718,7 @@ exports.createNomodCheckout = async (req) => {
     });
 
     logger.info({ checkoutId: checkout.id, userId }, 'Nomod checkout created (website)');
-    return { status: 'created', checkout_url: checkout.redirectUrl };
+    return { status: 'created', checkout_url: checkout.redirectUrl, checkout_id: checkout.id };
   } catch (error) {
     if (error.status) throw error;
     logger.error({ err: error }, 'Nomod createCheckout error:');
