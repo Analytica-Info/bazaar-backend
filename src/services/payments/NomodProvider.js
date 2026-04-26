@@ -49,16 +49,8 @@ class NomodProvider extends PaymentProvider {
             metadata,
         };
 
-        if (customer) {
-            body.customer = {};
-            if (customer.name) {
-                const parts = String(customer.name).trim().split(/\s+/);
-                body.customer.first_name = parts[0];
-                body.customer.last_name = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
-            }
-            if (customer.email) body.customer.email = customer.email;
-            if (customer.phone) body.customer.phone = customer.phone;
-        }
+        // Nomod collects customer details on their hosted checkout page.
+        // Sending partial customer data causes validation errors, so we omit it.
 
         try {
             logger.info({ body: JSON.stringify(body) }, 'Nomod createCheckout request body');
