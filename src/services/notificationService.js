@@ -7,6 +7,7 @@ const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
 const logger = require("../utilities/logger");
+const { escapeRegex } = require("../utilities/stringUtils");
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -293,10 +294,11 @@ async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
 
     let query = {};
     if (search) {
+        const safeSearch = escapeRegex(search);
         query.$or = [
-            { name: { $regex: search, $options: 'i' } },
-            { email: { $regex: search, $options: 'i' } },
-            { phone: { $regex: search, $options: 'i' } },
+            { name: { $regex: safeSearch, $options: 'i' } },
+            { email: { $regex: safeSearch, $options: 'i' } },
+            { phone: { $regex: safeSearch, $options: 'i' } },
         ];
     }
 

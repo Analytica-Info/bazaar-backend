@@ -11,6 +11,7 @@ const spellingCache = new NodeCache({ stdTTL: 604800 }); // 7 days
 // Shared Redis-backed cache for everything else (fetchAndCacheCategories, etc.).
 // Graceful-degradation: falls back to direct Lightspeed/DB call on Redis outage.
 const cache = require("../utilities/cache");
+const { escapeRegex } = require("../utilities/stringUtils");
 const axios = require("axios");
 const Typo = require("typo-js");
 const dictionary = new Typo("en_US");
@@ -657,8 +658,6 @@ exports.searchProducts = async (query) => {
       filteredProducts = await Product.aggregate(pipeline);
 
       if (filteredProducts.length === 0) {
-        const escapeRegex = (str) =>
-          str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const searchTerms = item_name
           .trim()
           .split(/\s+/)
@@ -711,8 +710,6 @@ exports.searchProducts = async (query) => {
         aggError.message.includes("$search") ||
         aggError.message.includes("index")
       ) {
-        const escapeRegex = (str) =>
-          str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const searchTerms = item_name
           .trim()
           .split(/\s+/)
@@ -812,7 +809,7 @@ exports.searchProducts = async (query) => {
  */
 exports.searchSingleProduct = async (name) => {
   try {
-    const productName = name.toLowerCase();
+    const productName = escapeRegex(name.toLowerCase());
     const products = await Product.find({
       "product.name": { $regex: productName, $options: "i" },
     })
@@ -1520,8 +1517,6 @@ exports.fetchDbProducts = async (query) => {
     const status = query.status;
     const qty = query.qty;
 
-    const escapeRegex = (string) =>
-      string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
     const safeSearchQuery = escapeRegex(searchQuery);
 
     let dbQuery = {};
@@ -1608,8 +1603,6 @@ exports.fetchProductsNoImages = async (query) => {
     const skip = (page - 1) * limit;
     const searchQuery = query.search || "";
 
-    const escapeRegex = (string) =>
-      string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
     const safeSearchQuery = escapeRegex(searchQuery);
 
     let dbQuery = {

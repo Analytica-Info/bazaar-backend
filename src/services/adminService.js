@@ -17,6 +17,7 @@ const mongoose = require('mongoose');
 const { sendEmail } = require("../mail/emailService");
 
 const logger = require("../utilities/logger");
+const { escapeRegex } = require("../utilities/stringUtils");
 function getUaeDateTime() {
   const now = new Date();
 
@@ -490,10 +491,11 @@ exports.getAllUsers = async ({ page, limit, search, status, platform, authProvid
     let query = {};
 
     if (searchQuery) {
+        const safeQuery = escapeRegex(searchQuery);
         query.$or = [
-            { name: { $regex: searchQuery, $options: 'i' } },
-            { email: { $regex: searchQuery, $options: 'i' } },
-            { phone: { $regex: searchQuery, $options: 'i' } }
+            { name: { $regex: safeQuery, $options: 'i' } },
+            { email: { $regex: safeQuery, $options: 'i' } },
+            { phone: { $regex: safeQuery, $options: 'i' } }
         ];
     }
 
@@ -626,10 +628,11 @@ exports.exportUsers = async (filters) => {
     let query = {};
 
     if (searchQuery) {
+        const safeQuery = escapeRegex(searchQuery);
         query.$or = [
-            { name: { $regex: searchQuery, $options: 'i' } },
-            { email: { $regex: searchQuery, $options: 'i' } },
-            { phone: { $regex: searchQuery, $options: 'i' } }
+            { name: { $regex: safeQuery, $options: 'i' } },
+            { email: { $regex: safeQuery, $options: 'i' } },
+            { phone: { $regex: safeQuery, $options: 'i' } }
         ];
     }
 
@@ -1263,12 +1266,13 @@ exports.getActivityLogs = async ({ page, limit, search, platform, status }) => {
     }
 
     if (search) {
+        const safeSearch = escapeRegex(search);
         query.$or = [
-            { message: { $regex: search, $options: 'i' } },
-            { user_name: { $regex: search, $options: 'i' } },
-            { user_email: { $regex: search, $options: 'i' } },
-            { order_id: { $regex: search, $options: 'i' } },
-            { issue_message: { $regex: search, $options: 'i' } }
+            { message: { $regex: safeSearch, $options: 'i' } },
+            { user_name: { $regex: safeSearch, $options: 'i' } },
+            { user_email: { $regex: safeSearch, $options: 'i' } },
+            { order_id: { $regex: safeSearch, $options: 'i' } },
+            { issue_message: { $regex: safeSearch, $options: 'i' } }
         ];
     }
 
@@ -1396,12 +1400,13 @@ exports.downloadActivityLogs = async (filters) => {
     if (log_type) query.log_type = log_type;
     if (status) query.status = status;
     if (search) {
+        const safeSearch = escapeRegex(search);
         query.$or = [
-            { message: { $regex: search, $options: 'i' } },
-            { user_name: { $regex: search, $options: 'i' } },
-            { user_email: { $regex: search, $options: 'i' } },
-            { order_id: { $regex: search, $options: 'i' } },
-            { issue_message: { $regex: search, $options: 'i' } }
+            { message: { $regex: safeSearch, $options: 'i' } },
+            { user_name: { $regex: safeSearch, $options: 'i' } },
+            { user_email: { $regex: safeSearch, $options: 'i' } },
+            { order_id: { $regex: safeSearch, $options: 'i' } },
+            { issue_message: { $regex: safeSearch, $options: 'i' } }
         ];
     }
 

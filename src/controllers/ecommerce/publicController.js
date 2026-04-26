@@ -13,6 +13,7 @@ const { getAdminEmail, getCcEmails } = require("../../utilities/emailHelper");
 
 const Product = require("../../models/Product");
 const ProductId = require("../../models/ProductId");
+const { escapeRegex } = require("../../utilities/stringUtils");
 const ProductView = require("../../models/ProductView");
 const User = require("../../models/User");
 const Cronjoblog = require("../../models/Cronjoblog");
@@ -482,15 +483,15 @@ exports.deleteFileByUrl = async (req, res) => {
 exports.search = async (req, res) => {
   try {
     const { search } = req.body;
-    console.log("Seacrh term", search);
     if (!search) {
       return res.status(400).json({ error: "Search term is required" });
     }
+    const safeSearch = escapeRegex(search);
 
     let products = await Product.find({
       $or: [
-        { "product.name": { $regex: search, $options: "i" } },
-        { "product.description": { $regex: search, $options: "i" } },
+        { "product.name": { $regex: safeSearch, $options: "i" } },
+        { "product.description": { $regex: safeSearch, $options: "i" } },
       ],
     })
       .select(LIST_EXCLUDE_SELECT_KEEP_DESCRIPTION)
