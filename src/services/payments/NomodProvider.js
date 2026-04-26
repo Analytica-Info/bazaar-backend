@@ -51,7 +51,11 @@ class NomodProvider extends PaymentProvider {
 
         if (customer) {
             body.customer = {};
-            if (customer.name) body.customer.name = customer.name;
+            if (customer.name) {
+                const parts = String(customer.name).trim().split(/\s+/);
+                body.customer.first_name = parts[0];
+                body.customer.last_name = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+            }
             if (customer.email) body.customer.email = customer.email;
             if (customer.phone) body.customer.phone = customer.phone;
         }
