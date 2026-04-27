@@ -171,7 +171,7 @@ exports.adminLogin = async (email, password) => {
 };
 
 exports.forgotPassword = async (email) => {
-    console.log(email)
+    logger.info({ email }, 'forgotPassword called');
     const admin = await Admin.findOne({ email });
     if (!admin) {
         throw { status: 404, message: 'Admin not found' };

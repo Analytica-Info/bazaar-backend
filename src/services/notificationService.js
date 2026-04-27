@@ -130,14 +130,14 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
     // Determine whether to send now
     const shouldSendNow = !scheduledDateTime || new Date(scheduledDateTime) <= getUaeDateTime();
     if (shouldSendNow) {
-        console.log('[Notification Create]', sendInstantly ? 'Send Instantly' : 'Past schedule', '— sending now. id:', notification._id.toString());
+        logger.info({ notificationId: notification._id.toString(), trigger: sendInstantly ? 'Send Instantly' : 'Past schedule' }, '[Notification Create] Sending now');
         await sendNotificationToUsers(notification._id);
     } else {
         const s = notification.scheduledDateTime ? new Date(notification.scheduledDateTime).toISOString() : null;
         const dubai = notification.scheduledDateTime
             ? new Date(notification.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })
             : null;
-        console.log('[Notification Create] Scheduled for later. id:', notification._id.toString(), '| UTC:', s, '| Dubai:', dubai);
+        logger.info({ notificationId: notification._id.toString(), utc: s, dubai }, '[Notification Create] Scheduled for later');
     }
 
     // Return fresh doc so caller gets correct status/sentAt

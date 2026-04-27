@@ -148,9 +148,7 @@ const logStatusFalseItems = (endpoint, requestData, responseData) => {
             `# Status False Items Log\n\n${logContent}`
           );
         }
-        console.log(
-          `ALERT: ${falseStatusItems.length} items with status: false found in ${endpoint}`
-        );
+        logger.warn({ count: falseStatusItems.length, endpoint }, `ALERT: items with status: false found`);
       } catch (fileError) {
         logger.error({ err: fileError }, "Error writing to status log file:");
       }
@@ -210,10 +208,7 @@ async function fetchAndCacheCategories() {
 
     return categories;
   } catch (error) {
-    console.warn(
-      "Error fetching categories from Lightspeed:",
-      error.message
-    );
+    logger.warn({ err: error.message }, "Error fetching categories from Lightspeed");
 
     if (error.response && error.response.status >= 500) {
       throw new Error("Server error while fetching categories");
@@ -237,10 +232,7 @@ async function fetchCategoriesType(id) {
       });
       return categoriesResponse.data || [];
     } catch (error) {
-      console.warn(
-        "Error fetching products from Lightspeed:",
-        error.message
-      );
+      logger.warn({ err: error.message }, "Error fetching products from Lightspeed");
       return [];
     }
   });
@@ -285,7 +277,7 @@ async function fetchBrands() {
     });
     return brandsResponse.data || [];
   } catch (error) {
-    console.warn("Error fetching brands from Lightspeed:", error.message);
+    logger.warn({ err: error.message }, "Error fetching brands from Lightspeed");
     return [];
   }
 }
@@ -300,10 +292,7 @@ async function fetchCategories() {
     });
     return categoriesResponse.data.data.data.categories || [];
   } catch (error) {
-    console.warn(
-      "Error fetching categories from Lightspeed:",
-      error.message
-    );
+    logger.warn({ err: error.message }, "Error fetching categories from Lightspeed");
     return [];
   }
 }

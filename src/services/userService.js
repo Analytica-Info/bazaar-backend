@@ -7,6 +7,7 @@ const Review = require('../models/Review');
 const Wishlist = require('../models/Wishlist');
 const Category = require('../models/Category');
 const backendLogger = require('../utilities/backendLogger');
+const cache = require('../utilities/cache');
 
 const BACKEND_URL = process.env.BACKEND_URL;
 
@@ -583,6 +584,9 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
             price_rating: priceRating,
         });
     }
+
+    // Invalidate top-rated cache — new/updated review changes product ratings
+    await cache.del(cache.key('catalog', 'top-rated', 'v1')).catch(() => {});
 
     // Select only the fields the client maps — avoids fetching the full document for every review.
     const reviews = await Review.find()

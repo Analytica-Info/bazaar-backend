@@ -549,6 +549,10 @@ exports.getNewArrivals = async ({ page, limit, maxItemsFromDb, firstPageLimit })
  * @param {number} [config.limit] - items per page (only used when paginated)
  */
 exports.getFlashSales = async ({ paginated, page, limit }) => {
+    const cacheKey = cache.key('catalog', 'flash-sale', paginated ? `mobile:${page}:${limit}` : 'ecom');
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const flashSale = await FlashSale.findOne().sort({ createdAt: -1 }).lean();
     if (!flashSale) {
         return { status: false, message: "No flash sale configured" };
@@ -656,7 +660,7 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             }))
         ];
 
-        return {
+        const result = {
             status: true,
             flashSale: flashSale,
             pagination: {
@@ -667,6 +671,8 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             },
             data: formatted
         };
+        await cache.set(cacheKey, result, SMART_CAT_TTL);
+        return result;
     } else {
         // Ecommerce: flat (no pagination on "all")
         const formatted = [
@@ -682,11 +688,13 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             }))
         ];
 
-        return {
+        const result = {
             status: true,
             flashSale: flashSale,
             data: formatted
         };
+        await cache.set(cacheKey, result, SMART_CAT_TTL);
+        return result;
     }
 };
 
@@ -853,6 +861,8 @@ exports.storeFlashSales = async ({ startDay, startTime, endDay, endTime, isEnabl
             isEnabled: isEnabled !== undefined ? isEnabled : true
         });
     }
+
+    await cache.delPattern('catalog:flash-sale:*');
 
     return { success: true, flashSale };
 };
