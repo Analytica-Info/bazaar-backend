@@ -75,3 +75,33 @@ exports.getErrors = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch errors' });
     }
 };
+
+/**
+ * GET /admin/monitoring/requests?window=120
+ * Returns per-minute API request counts broken down by source (user-api, admin-api, webhook).
+ */
+exports.getRequestTimeline = async (req, res) => {
+    try {
+        const window = Math.min(parseInt(req.query.window || '120', 10), 1440);
+        const data = await metrics.getRequestTimeline(window);
+        res.json({ success: true, data });
+    } catch (err) {
+        logger.error({ err }, 'monitoringController.getRequestTimeline failed');
+        res.status(500).json({ success: false, message: 'Failed to fetch request timeline' });
+    }
+};
+
+/**
+ * GET /admin/monitoring/discount-sync?window=120
+ * Returns per-minute discount sync invocation counts and documents processed.
+ */
+exports.getDiscountSyncTimeline = async (req, res) => {
+    try {
+        const window = Math.min(parseInt(req.query.window || '120', 10), 1440);
+        const data = await metrics.getDiscountSyncTimeline(window);
+        res.json({ success: true, data });
+    } catch (err) {
+        logger.error({ err }, 'monitoringController.getDiscountSyncTimeline failed');
+        res.status(500).json({ success: false, message: 'Failed to fetch discount sync timeline' });
+    }
+};

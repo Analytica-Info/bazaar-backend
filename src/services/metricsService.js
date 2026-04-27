@@ -8,10 +8,13 @@
  * Every method degrades gracefully when Redis is unavailable.
  *
  * Key schema (all prefixed with bazaar: by the cache utility):
- *   metrics:webhook:<type>:<YYYY-MM-DDTHH:MM>   → INCR  (TTL 3h)
- *   metrics:dedup:<type>:<YYYY-MM-DDTHH:MM>      → INCR  (TTL 3h)
- *   metrics:errors:<YYYY-MM-DDTHH:MM>            → INCR  (TTL 3h)
- *   metrics:error-log                            → Redis LIST, capped at 200 entries
+ *   metrics:webhook:<type>:<YYYY-MM-DDTHH:MM>        → INCR  (TTL 3h)
+ *   metrics:dedup:<type>:<YYYY-MM-DDTHH:MM>           → INCR  (TTL 3h)
+ *   metrics:errors:<YYYY-MM-DDTHH:MM>                 → INCR  (TTL 3h)
+ *   metrics:error-log                                 → Redis LIST, capped at 200 entries
+ *   metrics:req:<source>:<YYYY-MM-DDTHH:MM>           → INCR  (TTL 3h)  sources: user-api|admin-api|webhook
+ *   metrics:discount-sync:<YYYY-MM-DDTHH:MM>          → INCR  (TTL 3h)  count of syncs triggered
+ *   metrics:discount-sync-docs:<YYYY-MM-DDTHH:MM>     → INCRBY productCount (TTL 3h)
  */
 
 const { getClient, isEnabled } = require('../config/redis');
@@ -186,12 +189,102 @@ async function getLastHourTotals() {
     return { totalWebhooks, totalDedup, totalErrors, peak, peakMinute, dedupRate };
 }
 
+// ---------------------------------------------------------------------------
+// Request source tracking (user-api, admin-api, webhook)
+// ---------------------------------------------------------------------------
+
+async function recordRequest(source) {
+    await incr(`metrics:req:${source}:${currentMinute()}`);
+}
+
+async function getRequestTimeline(windowMinutes = 120) {
+    const client = getClient();
+    if (!client || !isEnabled()) return { minutes: [], series: {} };
+
+    try {
+        const now = new Date();
+        const minutes = [];
+        for (let i = windowMinutes - 1; i >= 0; i--) {
+            const d = new Date(now - i * 60 * 1000);
+            minutes.push(d.toISOString().slice(0, 16));
+        }
+
+        const sources = ['user-api', 'admin-api', 'webhook'];
+        const series = {};
+
+        for (const src of sources) {
+            const keys = minutes.map(m => `${NAMESPACE}metrics:req:${src}:${m}`);
+            const vals = await client.mget(...keys);
+            series[src] = vals.map(v => parseInt(v || '0', 10));
+        }
+
+        return { minutes, series };
+    } catch (err) {
+        logger.warn({ module: 'metrics', err }, 'getRequestTimeline failed');
+        return { minutes: [], series: {} };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Discount sync impact tracking
+// ---------------------------------------------------------------------------
+
+async function recordDiscountSync(productCount) {
+    const min = currentMinute();
+    await incr(`metrics:discount-sync:${min}`);
+    if (!isEnabled()) return;
+    const client = getClient();
+    if (!client) return;
+    try {
+        const docsKey = `${NAMESPACE}metrics:discount-sync-docs:${min}`;
+        const val = await client.incrby(docsKey, productCount);
+        if (val === productCount) await client.expire(docsKey, COUNTER_TTL);
+    } catch (err) {
+        logger.warn({ module: 'metrics', err }, 'recordDiscountSync docs failed');
+    }
+}
+
+async function getDiscountSyncTimeline(windowMinutes = 120) {
+    const client = getClient();
+    if (!client || !isEnabled()) return { minutes: [], syncs: [], docs: [] };
+
+    try {
+        const now = new Date();
+        const minutes = [];
+        for (let i = windowMinutes - 1; i >= 0; i--) {
+            const d = new Date(now - i * 60 * 1000);
+            minutes.push(d.toISOString().slice(0, 16));
+        }
+
+        const syncKeys = minutes.map(m => `${NAMESPACE}metrics:discount-sync:${m}`);
+        const docsKeys = minutes.map(m => `${NAMESPACE}metrics:discount-sync-docs:${m}`);
+
+        const [syncVals, docsVals] = await Promise.all([
+            client.mget(...syncKeys),
+            client.mget(...docsKeys),
+        ]);
+
+        return {
+            minutes,
+            syncs: syncVals.map(v => parseInt(v || '0', 10)),
+            docs: docsVals.map(v => parseInt(v || '0', 10)),
+        };
+    } catch (err) {
+        logger.warn({ module: 'metrics', err }, 'getDiscountSyncTimeline failed');
+        return { minutes: [], syncs: [], docs: [] };
+    }
+}
+
 module.exports = {
     recordWebhook,
     recordDedup,
     recordError,
+    recordRequest,
+    recordDiscountSync,
     getWebhookTimeline,
     getErrorTimeline,
     getRecentErrors,
     getLastHourTotals,
+    getRequestTimeline,
+    getDiscountSyncTimeline,
 };

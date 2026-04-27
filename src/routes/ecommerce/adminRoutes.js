@@ -60,6 +60,8 @@ router.get("/analytics/products/:productId", adminMiddleware, getProductViewDeta
 router.get("/monitoring/overview", adminMiddleware, monitoringCtrl.getOverview);
 router.get("/monitoring/webhooks", adminMiddleware, monitoringCtrl.getWebhookTimeline);
 router.get("/monitoring/errors", adminMiddleware, monitoringCtrl.getErrors);
+router.get("/monitoring/requests", adminMiddleware, monitoringCtrl.getRequestTimeline);
+router.get("/monitoring/discount-sync", adminMiddleware, monitoringCtrl.getDiscountSyncTimeline);
 
 router.get("/logs/activity/download", adminMiddleware, downloadActivityLogs);
 router.get("/logs/backend/download", adminMiddleware, downloadBackendLogs);

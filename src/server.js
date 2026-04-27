@@ -42,6 +42,7 @@ const { tabbyWebhook: ecommerceTabbyWebhook } = require("./controllers/ecommerce
 // ==========================================
 // ECOMMERCE ROUTES (consumed by: Storefront, User Dashboard, Admin Dashboard)
 // ==========================================
+const requestMetrics = require("./middleware/requestMetricsMiddleware");
 const ecommerceAdminRoutes = require("./routes/ecommerce/adminRoutes.js");
 const ecommerceUserRoutes = require("./routes/ecommerce/userRoutes.js");
 const ecommercePublicRoutes = require("./routes/ecommerce/publicRoutes.js");
@@ -240,30 +241,30 @@ const connectAndRun = async () => {
   await connectDB();
 
   // --- Ecommerce routes (original paths from port 5050) ---
-  app.use("/admin", ecommerceAdminRoutes);
-  app.use("/admin/roles", ecommerceRoleRoutes);
-  app.use("/admin/permissions", ecommercePermissionRoutes);
-  app.use("/admin", ecommerceEmailRoutes);
-  app.use("/user", ecommerceUserRoutes);
-  app.use("/user", ecommerceOrderRoutes);
-  app.use("/webhook", ecommerceWebhooksRoutes);
+  app.use("/admin", requestMetrics("admin-api"), ecommerceAdminRoutes);
+  app.use("/admin/roles", requestMetrics("admin-api"), ecommerceRoleRoutes);
+  app.use("/admin/permissions", requestMetrics("admin-api"), ecommercePermissionRoutes);
+  app.use("/admin", requestMetrics("admin-api"), ecommerceEmailRoutes);
+  app.use("/user", requestMetrics("user-api"), ecommerceUserRoutes);
+  app.use("/user", requestMetrics("user-api"), ecommerceOrderRoutes);
+  app.use("/webhook", requestMetrics("webhook"), ecommerceWebhooksRoutes);
   app.use("/", ecommercePublicRoutes);
   app.use("/", ecommerceWishlistRoutes);
-  app.use("/cart", ecommerceCartRoutes);
+  app.use("/cart", requestMetrics("user-api"), ecommerceCartRoutes);
   app.use("/", ecommerceBannerImages);
   app.use("/", ecommerceSeedRoutes);
 
   // --- Mobile API routes (original paths from port 5000) ---
-  app.use("/api/auth", mobileAuthRoutes);
-  app.use("/api/products", mobileProductRoutes);
-  app.use("/api/wishlist", mobileWishlistRoutes);
-  app.use("/api/cart", mobileCartRoutes);
-  app.use("/api/order", mobileOrderRoutes);
-  app.use("/api/notification", mobileNotificationRoutes);
-  app.use("/api", mobileCouponsRoutes);
-  app.use("/api", mobilePublicRoutes);
-  app.use("/api", mobileBannerImages);
-  app.use("/api/mobile", mobileConfigRoutes);
+  app.use("/api/auth", requestMetrics("user-api"), mobileAuthRoutes);
+  app.use("/api/products", requestMetrics("user-api"), mobileProductRoutes);
+  app.use("/api/wishlist", requestMetrics("user-api"), mobileWishlistRoutes);
+  app.use("/api/cart", requestMetrics("user-api"), mobileCartRoutes);
+  app.use("/api/order", requestMetrics("user-api"), mobileOrderRoutes);
+  app.use("/api/notification", requestMetrics("user-api"), mobileNotificationRoutes);
+  app.use("/api", requestMetrics("user-api"), mobileCouponsRoutes);
+  app.use("/api", requestMetrics("user-api"), mobilePublicRoutes);
+  app.use("/api", requestMetrics("user-api"), mobileBannerImages);
+  app.use("/api/mobile", requestMetrics("user-api"), mobileConfigRoutes);
 
   // ==========================================
   // GLOBAL ERROR HANDLER (must be after all routes)

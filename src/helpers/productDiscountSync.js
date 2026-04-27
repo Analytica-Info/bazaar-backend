@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const metrics = require("../services/metricsService");
 
 const eligibleDiscountProductFilter = {
   $or: [{ status: { $exists: false } }, { status: true }],
@@ -92,6 +93,7 @@ async function syncDiscountFieldsForParentIds(
 
   if (bulkOps.length) {
     await Product.bulkWrite(bulkOps);
+    metrics.recordDiscountSync(bulkOps.length).catch(() => {});
   }
   return {
     bulkWriteCount: bulkOps.length,
