@@ -44,6 +44,53 @@ function getUaeDateTime() {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}+04:00`;
 }
 
+// ==================== Query Helpers ====================
+
+/**
+ * Batch-fetch order details and product SKUs for a list of orders.
+ * Replaces the N+1 pattern (1 OrderDetail + 1 Product query per order)
+ * with 2 queries total regardless of order count.
+ *
+ * @param {Array} orders - Mongoose order documents (or plain objects with _id)
+ * @returns {Array} Orders as plain objects with order_details array attached
+ */
+async function enrichOrdersWithDetails(orders) {
+    if (!orders.length) return [];
+
+    const orderIds = orders.map(o => new mongoose.Types.ObjectId(o._id));
+
+    // Single query for all order details across all orders
+    const allDetails = await OrderDetail.find({ order_id: { $in: orderIds } }).lean().exec();
+
+    // Collect unique product IDs across all details
+    const allProductIds = [...new Set(
+        allDetails
+            .map(d => d.product_id)
+            .filter(Boolean)
+    )].map(id => new mongoose.Types.ObjectId(id));
+
+    // Single query for product SKUs — only the one field we need
+    const products = await Product.find({ _id: { $in: allProductIds } })
+        .select('product.sku_number')
+        .lean()
+        .exec();
+
+    const skuMap = Object.fromEntries(products.map(p => [p._id.toString(), p.product?.sku_number || null]));
+
+    // Group details by order_id
+    const detailsByOrderId = {};
+    for (const detail of allDetails) {
+        const key = detail.order_id.toString();
+        if (!detailsByOrderId[key]) detailsByOrderId[key] = [];
+        detailsByOrderId[key].push({ ...detail, sku: skuMap[detail.product_id?.toString()] || null });
+    }
+
+    return orders.map(order => {
+        const orderObj = typeof order.toObject === 'function' ? order.toObject() : order;
+        return { ...orderObj, order_details: detailsByOrderId[order._id.toString()] || [] };
+    });
+}
+
 // ==================== Admin Auth ====================
 
 exports.adminRegister = async (data) => {
@@ -548,63 +595,35 @@ exports.getAllUsers = async ({ page, limit, search, status, platform, authProvid
     const totalCount = await User.countDocuments(query);
     const totalPages = Math.ceil(totalCount / limit);
 
-    const usersWithOrders = await Promise.all(
-        users.map(async (user) => {
-            const userId = new mongoose.Types.ObjectId(user._id);
+    // Fetch all orders for this page of users in one query, then batch-enrich details
+    const userIds = users.map(u => new mongoose.Types.ObjectId(u._id));
+    const allOrders = await Order.find({ $or: [{ userId: { $in: userIds } }, { user_id: { $in: userIds } }] })
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
 
-            const orders = await Order.find({ userId: userId })
-                .sort({ createdAt: -1 })
-                .exec();
+    const enrichedOrders = await enrichOrdersWithDetails(allOrders);
 
-            const ordersWithDetails = await Promise.all(
-                orders.map(async (order) => {
-                    const orderDetails = await OrderDetail.find({
-                        order_id: new mongoose.Types.ObjectId(order._id)
-                    }).exec();
+    // Group enriched orders by userId
+    const ordersByUserId = {};
+    for (const order of enrichedOrders) {
+        const key = (order.userId || order.user_id)?.toString();
+        if (!key) continue;
+        if (!ordersByUserId[key]) ordersByUserId[key] = [];
+        ordersByUserId[key].push(order);
+    }
 
-                    const productIds = orderDetails
-                        .map(detail => detail.product_id)
-                        .filter(id => id)
-                        .map(id => new mongoose.Types.ObjectId(id));
-
-                    const products = await Product.find({
-                        _id: { $in: productIds }
-                    }).exec();
-
-                    const productSkuMap = {};
-                    products.forEach(product => {
-                        const productId = product._id.toString();
-                        const sku = product.product?.sku_number || null;
-                        productSkuMap[productId] = sku;
-                    });
-
-                    const orderDetailsWithSku = orderDetails.map(detail => {
-                        const productId = detail.product_id?.toString();
-                        const sku = productSkuMap[productId] || null;
-                        return {
-                            ...detail.toObject(),
-                            sku: sku
-                        };
-                    });
-
-                    return {
-                        ...order.toObject(),
-                        order_details: orderDetailsWithSku || []
-                    };
-                })
-            );
-
-            const userObj = user.toObject();
-            const platformFromOrder = ordersWithDetails?.[0]?.orderfrom;
-            const displayPlatform = userObj.platform || platformFromOrder || null;
-            return {
-                ...userObj,
-                platform: displayPlatform,
-                orders: ordersWithDetails,
-                totalOrders: ordersWithDetails.length
-            };
-        })
-    );
+    const usersWithOrders = users.map(user => {
+        const userObj = user.toObject();
+        const ordersWithDetails = ordersByUserId[user._id.toString()] || [];
+        const platformFromOrder = ordersWithDetails[0]?.orderfrom;
+        return {
+            ...userObj,
+            platform: userObj.platform || platformFromOrder || null,
+            orders: ordersWithDetails,
+            totalOrders: ordersWithDetails.length,
+        };
+    });
 
     return {
         users: usersWithOrders,
@@ -699,55 +718,17 @@ exports.getUserById = async (userId) => {
 
     const userIdObj = new mongoose.Types.ObjectId(user._id);
 
-    const orders = await Order.find({
-        $or: [
-            { user_id: userIdObj },
-            { userId: userIdObj }
-        ]
+    const rawOrders = await Order.find({
+        $or: [{ user_id: userIdObj }, { userId: userIdObj }]
     })
         .sort({ createdAt: -1 })
+        .lean()
         .exec();
 
-    const ordersWithDetails = await Promise.all(
-        orders.map(async (order) => {
-            const orderDetails = await OrderDetail.find({
-                order_id: new mongoose.Types.ObjectId(order._id)
-            }).exec();
-
-            const productIds = orderDetails
-                .map(detail => detail.product_id)
-                .filter(id => id)
-                .map(id => new mongoose.Types.ObjectId(id));
-
-            const products = await Product.find({
-                _id: { $in: productIds }
-            }).exec();
-
-            const productSkuMap = {};
-            products.forEach(product => {
-                const productId = product._id.toString();
-                const sku = product.product?.sku_number || null;
-                productSkuMap[productId] = sku;
-            });
-
-            const orderDetailsWithSku = orderDetails.map(detail => {
-                const productId = detail.product_id?.toString();
-                const sku = productSkuMap[productId] || null;
-                return {
-                    ...detail.toObject(),
-                    sku: sku
-                };
-            });
-
-            return {
-                ...order.toObject(),
-                order_details: orderDetailsWithSku || []
-            };
-        })
-    );
+    const ordersWithDetails = await enrichOrdersWithDetails(rawOrders);
 
     const cart = await Cart.findOne({ user: userId })
-        .populate('items.product')
+        .populate('items.product', 'product.name product.images discountedPrice originalPrice discount')
         .lean();
 
     const wishlist = await Wishlist.findOne({ user: userId })
@@ -981,44 +962,12 @@ exports.getOrders = async ({ page, limit, search, status, paymentStatus, payment
         }
     }
 
-    const orders = await Order.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }).exec();
-    const totalCount = await Order.countDocuments(query);
+    const [rawOrders, totalCount] = await Promise.all([
+        Order.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }).lean().exec(),
+        Order.countDocuments(query),
+    ]);
     const totalPages = Math.ceil(totalCount / limit);
-    const updatedOrders = await Promise.all(orders.map(async (order) => {
-        const orderDetails = await OrderDetail.find({
-            order_id: new mongoose.Types.ObjectId(order._id)
-        }).exec();
-
-        const productIds = orderDetails
-            .map(detail => detail.product_id)
-            .filter(id => id)
-            .map(id => new mongoose.Types.ObjectId(id));
-
-        const products = await Product.find({
-            _id: { $in: productIds }
-        }).exec();
-
-        const productSkuMap = {};
-        products.forEach(product => {
-            const productId = product._id.toString();
-            const sku = product.product?.sku_number || null;
-            productSkuMap[productId] = sku;
-        });
-
-        const orderDetailsWithSku = orderDetails.map(detail => {
-            const productId = detail.product_id?.toString();
-            const sku = productSkuMap[productId] || null;
-            return {
-                ...detail.toObject(),
-                sku: sku
-            };
-        });
-
-        return {
-            ...order.toObject(),
-            order_details: orderDetailsWithSku || []
-        };
-    }));
+    const updatedOrders = await enrichOrdersWithDetails(rawOrders);
 
     return {
         orders: updatedOrders,
@@ -1133,29 +1082,20 @@ exports.getProductAnalytics = async ({ page, limit, search, startDate, endDate }
     const totalCount = totalProducts.length;
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Get product details for each product
     const productIds = productViews.map(pv => new mongoose.Types.ObjectId(pv.product_id));
-    const products = await Product.find({ _id: { $in: productIds } });
+    const products = await Product.find({ _id: { $in: productIds } })
+        .select('product.name product.images discountedPrice originalPrice')
+        .lean();
 
-    const productsMap = {};
-    products.forEach(product => {
-        productsMap[product._id.toString()] = product;
-    });
+    const productsMap = Object.fromEntries(products.map(p => [p._id.toString(), p]));
 
     const analyticsData = productViews.map(pv => {
         const product = productsMap[pv.product_id.toString()];
-        // Get product image - check if images array exists and has items
         let productImage = null;
-        if (product?.product?.images && Array.isArray(product.product.images) && product.product.images.length > 0) {
-            const firstImage = product.product.images[0];
-            // Check if image has sizes.original (object structure) or is a direct URL (string)
-            if (typeof firstImage === 'string') {
-                productImage = firstImage;
-            } else if (firstImage?.sizes?.original) {
-                productImage = firstImage.sizes.original;
-            } else if (firstImage?.original) {
-                productImage = firstImage.original;
-            }
+        const images = product?.product?.images;
+        if (Array.isArray(images) && images.length > 0) {
+            const first = images[0];
+            productImage = typeof first === 'string' ? first : (first?.sizes?.original || first?.original || null);
         }
         return {
             product_id: pv.product_id,
@@ -1199,14 +1139,13 @@ exports.exportProductAnalytics = async (filters) => {
     ]);
 
     const productIds = productViews.map(pv => new mongoose.Types.ObjectId(pv.product_id));
-    const products = await Product.find({ _id: { $in: productIds } });
+    const products = await Product.find({ _id: { $in: productIds } })
+        .select('product.name discountedPrice originalPrice')
+        .lean();
 
-    const productsMap = {};
-    products.forEach(product => {
-        productsMap[product._id.toString()] = product;
-    });
+    const productsMap = Object.fromEntries(products.map(p => [p._id.toString(), p]));
 
-    const analyticsData = productViews.map(pv => {
+    return productViews.map(pv => {
         const product = productsMap[pv.product_id.toString()];
         return {
             product_name: product?.product?.name || 'Unknown Product',
@@ -1215,8 +1154,6 @@ exports.exportProductAnalytics = async (filters) => {
             unique_users: pv.uniqueUsers
         };
     });
-
-    return analyticsData;
 };
 
 exports.getProductViewDetails = async (productId) => {
@@ -1226,7 +1163,7 @@ exports.getProductViewDetails = async (productId) => {
     .populate('user_id', 'name email')
     .sort({ lastViewedAt: -1 });
 
-    const product = await Product.findById(productId);
+    const product = await Product.findById(productId).select('product.name discountedPrice originalPrice').lean();
 
     const viewDetails = productViews.map(pv => ({
         user_id: pv.user_id?._id || null,

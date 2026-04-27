@@ -196,27 +196,48 @@ async function getNotificationDetails(notificationId) {
         throw { status: 404, message: 'Notification not found' };
     }
 
-    let allTargetUsers = [];
+    // For sendToAll notifications avoid loading the entire user collection.
+    // Return counts and a capped sample — the UI shows summaries, not full lists.
+    const MAX_USER_SAMPLE = 500;
+
+    const clickedUserIds = new Set(notification.clickedUsers.map(u => u._id.toString()));
+
+    let totalTargetUsers;
+    let clickedUsers;
+    let notClickedUsers;
+
     if (notification.sendToAll) {
-        allTargetUsers = await User.find()
-            .select('name email phone fcmToken')
+        totalTargetUsers = await User.countDocuments();
+
+        // Clicked users come from the notification document (already populated)
+        clickedUsers = notification.clickedUsers;
+
+        // For not-clicked, return a capped sample to avoid loading the full collection
+        const notClickedSample = await User.find({
+            _id: { $nin: [...clickedUserIds].map(id => new mongoose.Types.ObjectId(id)) }
+        })
+            .select('name email phone')
+            .limit(MAX_USER_SAMPLE)
             .lean()
             .exec();
-    } else {
-        allTargetUsers = notification.targetUsers || [];
-    }
 
-    const clickedUserIds = notification.clickedUsers.map(u => u._id.toString());
-    const clickedUsers = allTargetUsers.filter(u => clickedUserIds.includes(u._id.toString()));
-    const notClickedUsers = allTargetUsers.filter(u => !clickedUserIds.includes(u._id.toString()));
+        notClickedUsers = notClickedSample;
+    } else {
+        const allTargetUsers = notification.targetUsers || [];
+        clickedUsers = allTargetUsers.filter(u => clickedUserIds.has(u._id.toString()));
+        notClickedUsers = allTargetUsers.filter(u => !clickedUserIds.has(u._id.toString()));
+        totalTargetUsers = allTargetUsers.length;
+    }
 
     return {
         ...notification.toObject(),
         clickedUsers,
         notClickedUsers,
-        totalTargetUsers: notification.sendToAll ? allTargetUsers.length : notification.targetUsers.length,
+        totalTargetUsers,
         totalClickedUsers: clickedUsers.length,
-        totalNotClickedUsers: notClickedUsers.length,
+        totalNotClickedUsers: notification.sendToAll
+            ? totalTargetUsers - clickedUsers.length
+            : notClickedUsers.length,
     };
 }
 
@@ -328,9 +349,13 @@ async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
  * @returns {Array} Users array.
  */
 async function getAllUsersForNotification() {
+    // Hard cap to prevent a full collection scan on large user bases.
+    // Admin UI should use searchUsers() for targeted selection beyond this cap.
     const users = await User.find()
         .select('name email phone fcmToken')
         .sort({ name: 1 })
+        .limit(1000)
+        .lean()
         .exec();
 
     return users;

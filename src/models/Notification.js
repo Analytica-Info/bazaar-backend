@@ -25,6 +25,10 @@ notificationSchema.index({ sentAt: 1, scheduledDateTime: 1 });
 notificationSchema.index({ status: 1, scheduledDateTime: 1 });
 // User notifications tab
 notificationSchema.index({ userId: 1, createdAt: -1 });
+// Admin notification list — getNotifications() filters on createdBy existence, sorted by createdAt
+notificationSchema.index({ createdBy: 1, createdAt: -1 });
+// Targeting queries — sendToAll flag used in delivery and detail lookups
+notificationSchema.index({ sendToAll: 1 });
 // Partial index — scheduler query after simplification only looks at pending docs.
 // With 62K total but <100 pending at any time, this collapses the scan to ~O(pending).
 notificationSchema.index(
