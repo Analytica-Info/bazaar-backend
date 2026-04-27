@@ -11,7 +11,6 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
-const NodeCache = require("node-cache");
 const mongoose = require("mongoose");
 require("dotenv").config();
 
@@ -74,7 +73,6 @@ const mobileConfigRoutes = require("./routes/mobile/configRoutes.js");
 // APP SETUP
 // ==========================================
 const app = express();
-const cache = new NodeCache({ stdTTL: 1800 });
 
 const PORT = process.env.PORT || 5000;
 const BACKEND_URL = process.env.BACKEND_URL;
