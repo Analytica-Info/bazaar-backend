@@ -248,8 +248,19 @@ async function getNotificationDetails(notificationId) {
         ]);
     }
 
+    // targetUsers in toObject() are raw ObjectIds (no populate) — fetch a capped
+    // sample so the admin UI still gets named objects for the targeted-users list.
+    const targetUsersSample = notification.sendToAll
+        ? []
+        : await User.find({ _id: { $in: targetUserIds } })
+            .select('name email phone')
+            .limit(MAX_USER_SAMPLE)
+            .lean()
+            .exec();
+
     return {
         ...notification.toObject(),
+        targetUsers: targetUsersSample,
         clickedUsers,
         notClickedUsers,
         totalTargetUsers,
