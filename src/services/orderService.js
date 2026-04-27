@@ -807,10 +807,8 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
     }
 
     const cartDataEntryValue = await CartData.create({ cartData: cartDataToUse });
-    const cartDataId = cartDataEntryValue._id;
-
-    const cartDataEntry = await CartData.findById(cartDataId);
-    const cartDataValue = cartDataEntry.cartData;
+    // Use the create() return value directly — avoids a redundant replica read.
+    const cartDataValue = cartDataEntryValue.cartData;
 
     const formatter = new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
@@ -1597,10 +1595,8 @@ async function processPendingPayment(paymentId, payment) {
 
         // Create cart data entry
         const cartDataEntryValue = await CartData.create({ cartData: orderData.cartData });
-        const cartDataId = cartDataEntryValue._id;
-
-        const cartDataEntry = await CartData.findById(cartDataId);
-        const cartDataValue = cartDataEntry.cartData;
+        // Use the create() return value directly — avoids a redundant replica read.
+        const cartDataValue = cartDataEntryValue.cartData;
 
         const formatter = new Intl.NumberFormat("en-US", {
             minimumFractionDigits: 2,

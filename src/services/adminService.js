@@ -452,9 +452,11 @@ exports.createSubAdmin = async (data) => {
 
     await admin.save();
 
+    // Must read from primary — populate immediately after save must see the write.
     const populatedAdmin = await Admin.findById(admin._id)
         .populate('role', 'name description')
-        .select('-password -resetPasswordToken -resetPasswordExpires');
+        .select('-password -resetPasswordToken -resetPasswordExpires')
+        .read('primary');
 
     return populatedAdmin;
 };
@@ -498,9 +500,11 @@ exports.updateSubAdmin = async (adminId, data) => {
     admin.updatedAt = Date.now();
     await admin.save();
 
+    // Must read from primary — populate immediately after save must see the write.
     const populatedAdmin = await Admin.findById(admin._id)
         .populate('role', 'name description')
-        .select('-password -resetPasswordToken -resetPasswordExpires');
+        .select('-password -resetPasswordToken -resetPasswordExpires')
+        .read('primary');
 
     return populatedAdmin;
 };

@@ -559,7 +559,8 @@ async function refreshSingleProductById(productId) {
         }
     );
     logger.info({ productId: product.id }, '[Refresh Product] updated in MongoDB');
-    const updated = await Product.findOne({ 'product.id': product.id }).lean();
+    // Must read from primary — must see the updateOne just issued above.
+    const updated = await Product.findOne({ 'product.id': product.id }).read('primary').lean();
 
     return {
         created: false,
