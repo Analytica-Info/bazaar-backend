@@ -1,12 +1,20 @@
 const Wishlist = require("../models/Wishlist");
 
 async function getWishlist(userId) {
-  // Exclude internal sync fields — the client only needs display + commerce data.
-  // Using exclusion projection preserves any future Product fields automatically.
-  const wishlist = await Wishlist.findOne({ user: userId }).populate(
-    "items",
-    "-webhook -webhookTime -sold -isHighest -createdAt -updatedAt -__v"
-  );
+  // Exclude large internal Lightspeed sync fields — same set as LIST_EXCLUDE_SELECT
+  // used across product list endpoints. Exclusion projection stays forward-compatible.
+  const WISHLIST_PRODUCT_EXCLUDE = [
+    "product.variants", "product.product_codes", "product.suppliers",
+    "product.composite_bom", "product.tag_ids", "product.attributes",
+    "product.account_code_sales", "product.account_code_purchase",
+    "product.price_outlet", "product.brand_id", "product.deleted_at",
+    "product.version", "product.created_at", "product.updated_at",
+    "product.description", "webhook", "webhookTime", "__v", "updatedAt",
+  ].map(f => `-${f}`).join(" ");
+
+  const wishlist = await Wishlist.findOne({ user: userId })
+    .populate("items", WISHLIST_PRODUCT_EXCLUDE)
+    .lean();
   if (!wishlist) {
     return { wishlistCount: 0, wishlist: [] };
   }

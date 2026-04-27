@@ -1,11 +1,7 @@
 const BankPromoCode = require("../models/BankPromoCode");
 const BankPromoCodeUsage = require("../models/BankPromoCodeUsage");
 
-async function enrichPromo(promo) {
-  const doc = promo.toObject ? promo.toObject() : promo;
-  const uniqueCustomers = await BankPromoCodeUsage.countDocuments({
-    bankPromoCodeId: doc._id,
-  });
+function formatPromo(doc, uniqueCustomers = 0) {
   return {
     ...doc,
     id: doc._id.toString(),
@@ -16,9 +12,23 @@ async function enrichPromo(promo) {
   };
 }
 
+async function enrichPromo(promo) {
+  const doc = promo.toObject ? promo.toObject() : promo;
+  const uniqueCustomers = await BankPromoCodeUsage.countDocuments({ bankPromoCodeId: doc._id });
+  return formatPromo(doc, uniqueCustomers);
+}
+
 async function list() {
-  const promos = await BankPromoCode.find().sort({ createdAt: -1 });
-  return Promise.all(promos.map(enrichPromo));
+  const promos = await BankPromoCode.find().sort({ createdAt: -1 }).lean();
+
+  // Single aggregation replaces N countDocuments() calls (one per promo)
+  const usageCounts = await BankPromoCodeUsage.aggregate([
+    { $match: { bankPromoCodeId: { $in: promos.map(p => p._id) } } },
+    { $group: { _id: "$bankPromoCodeId", count: { $sum: 1 } } },
+  ]);
+  const countMap = Object.fromEntries(usageCounts.map(u => [u._id.toString(), u.count]));
+
+  return promos.map(p => formatPromo(p, countMap[p._id.toString()] || 0));
 }
 
 async function create(data) {

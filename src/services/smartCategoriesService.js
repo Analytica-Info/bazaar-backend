@@ -589,9 +589,17 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             sold: { $exists: true, $gt: 0 }
         };
 
-    const allProductsFromDB = await Product.find(productQuery)
-        .select(LIST_EXCLUDE_SELECT)
-        .lean();
+    // For ecommerce: we return at most 100 for "all" + 10 per range (10 ranges) = 200 max.
+    // For mobile (paginated): we need totalCount for pagination metadata, then fetch a page.
+    // Use countDocuments in parallel with the product fetch to avoid loading all docs.
+    const FLASH_SALE_MAX_DOCS = paginated ? 2000 : 200;
+    const [allProductsFromDB, flashSaleTotalCount] = await Promise.all([
+        Product.find(productQuery)
+            .select(LIST_EXCLUDE_SELECT)
+            .limit(FLASH_SALE_MAX_DOCS)
+            .lean(),
+        paginated ? Product.countDocuments({ ...productQuery, "product.images.0": { $exists: true } }) : Promise.resolve(0),
+    ]);
 
     const ranges = [
         { label: "0 - 10%", min: 1, max: 10, name: "10%" },
@@ -630,7 +638,8 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
 
     if (paginated) {
         const allProducts = discountBuckets["all"];
-        const totalCount = allProducts.length;
+        // Use the parallel countDocuments result for true total (not limited by FLASH_SALE_MAX_DOCS)
+        const totalCount = flashSaleTotalCount || allProducts.length;
         const totalPages = Math.ceil(totalCount / limit);
         const paginatedAllProducts = allProducts.slice((page - 1) * limit, page * limit);
 
