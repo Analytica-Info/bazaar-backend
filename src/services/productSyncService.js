@@ -3,6 +3,7 @@ const Product = require('../models/Product');
 const ProductId = require('../models/ProductId');
 const logger = require("../utilities/logger");
 const cache = require('../utilities/cache');
+const metrics = require('./metricsService');
 const {
     applyDiscountFieldsForParentProductId,
     syncDiscountFieldsForParentIds,
@@ -652,9 +653,11 @@ async function handleProductUpdate(data) {
     const alreadyProcessing = await cache.get(dedupKey);
     if (alreadyProcessing) {
         logger.info({ updateProductId }, 'Skipping duplicate product.update (dedup lock held)');
+        metrics.recordDedup('product-update').catch(() => {});
         return { success: true, skipped: true };
     }
     await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
+    metrics.recordWebhook('product-update').catch(() => {});
 
     if (!productId) {
         throw { status: 400, message: 'Missing product ID' };
@@ -747,9 +750,11 @@ async function handleInventoryUpdate(data) {
     const alreadyProcessing = await cache.get(dedupKey);
     if (alreadyProcessing) {
         logger.info({ updateProductId }, 'Skipping duplicate inventory.update (dedup lock held)');
+        metrics.recordDedup('inventory-update').catch(() => {});
         return { success: true, skipped: true };
     }
     await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
+    metrics.recordWebhook('inventory-update').catch(() => {});
 
     const timeFormatted = await currentTime();
     logger.info(`${timeFormatted} ${type} - Received Inventory Update for ID : ${updateProductId}`);
@@ -857,9 +862,11 @@ async function handleSaleUpdate(data) {
     const alreadyProcessing = await cache.get(dedupKey);
     if (alreadyProcessing) {
         logger.info({ productId, updateProductId }, 'Skipping duplicate sale.update (dedup lock held)');
+        metrics.recordDedup('sale-update').catch(() => {});
         return { success: true, skipped: true };
     }
     await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
+    metrics.recordWebhook('sale-update').catch(() => {});
 
     const timeFormatted = await currentTime();
     logger.info({ type, productId: updateProductId, qty: updateProductQty, status: updateProductStatus }, 'Received Parked Product');

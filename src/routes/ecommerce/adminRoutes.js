@@ -9,6 +9,7 @@ const {
 const { setGiftProduct, getGiftProduct } = require('../../controllers/ecommerce/giftProductController');
 const { list: listBankPromoCodes, create: createBankPromoCode, getById: getBankPromoCodeById, update: updateBankPromoCode, toggleActive: toggleBankPromoCodeActive, delete: deleteBankPromoCode } = require('../../controllers/ecommerce/bankPromoCodeController');
 const shippingCtrl = require('../../controllers/ecommerce/shippingCountryController');
+const monitoringCtrl = require('../../controllers/ecommerce/monitoringController');
 const adminMiddleware = require('../../middleware/adminMiddleware');
 const { checkPermission } = require('../../middleware/permissionMiddleware');
 const createUpload = require("../../utilities/fileUpload");
@@ -55,6 +56,10 @@ router.get("/notifications/users/all", adminMiddleware, getAllUsersForNotificati
 router.get("/analytics/products", adminMiddleware, checkPermission('analytics'), getProductAnalytics);
 router.get("/analytics/products/export", adminMiddleware, checkPermission('analytics-export'), exportProductAnalytics);
 router.get("/analytics/products/:productId", adminMiddleware, getProductViewDetails);
+
+router.get("/monitoring/overview", adminMiddleware, monitoringCtrl.getOverview);
+router.get("/monitoring/webhooks", adminMiddleware, monitoringCtrl.getWebhookTimeline);
+router.get("/monitoring/errors", adminMiddleware, monitoringCtrl.getErrors);
 
 router.get("/logs/activity/download", adminMiddleware, downloadActivityLogs);
 router.get("/logs/backend/download", adminMiddleware, downloadBackendLogs);

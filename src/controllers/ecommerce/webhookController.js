@@ -1,4 +1,5 @@
 const productSyncService = require("../../services/productSyncService");
+const metrics = require("../../services/metricsService");
 const logger = require("../../utilities/logger");
 
 // Respond 200 immediately so Lightspeed stops retrying, then process async.
@@ -12,6 +13,7 @@ exports.productUpdate = async (req, res) => {
 
     productSyncService.handleProductUpdate({ payload, type }).catch((err) => {
         logger.error({ err }, 'productUpdate background processing failed');
+        metrics.recordError('productUpdate', err?.message || String(err)).catch(() => {});
     });
 };
 
@@ -21,6 +23,7 @@ exports.inventoryUpdate = async (req, res) => {
 
     productSyncService.handleInventoryUpdate({ payload, type }).catch((err) => {
         logger.error({ err }, 'inventoryUpdate background processing failed');
+        metrics.recordError('inventoryUpdate', err?.message || String(err)).catch(() => {});
     });
 };
 
@@ -30,5 +33,6 @@ exports.saleUpdate = async (req, res) => {
 
     productSyncService.handleSaleUpdate({ payload, type }).catch((err) => {
         logger.error({ err }, 'saleUpdate background processing failed');
+        metrics.recordError('saleUpdate', err?.message || String(err)).catch(() => {});
     });
 };
