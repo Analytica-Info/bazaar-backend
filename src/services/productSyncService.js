@@ -796,7 +796,10 @@ async function handleInventoryUpdate(data) {
     }
 
     // Invalidate catalog caches — inventory/totalQty affects product listings and variants
-    await cache.delPattern('catalog:*');
+    await Promise.all([
+        cache.delPattern('catalog:*'),
+        cache.del(cache.key('lightspeed', 'products-inventory', 'v1')),
+    ]);
     logger.info({ productId: itemId, type }, 'cache invalidated after inventory.update');
 
     return { success: true };
