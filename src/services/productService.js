@@ -148,9 +148,7 @@ const logStatusFalseItems = (endpoint, requestData, responseData) => {
             `# Status False Items Log\n\n${logContent}`
           );
         }
-        console.log(
-          `ALERT: ${falseStatusItems.length} items with status: false found in ${endpoint}`
-        );
+        logger.warn({ count: falseStatusItems.length, endpoint }, `ALERT: items with status: false found`);
       } catch (fileError) {
         logger.error({ err: fileError }, "Error writing to status log file:");
       }
@@ -210,10 +208,7 @@ async function fetchAndCacheCategories() {
 
     return categories;
   } catch (error) {
-    console.warn(
-      "Error fetching categories from Lightspeed:",
-      error.message
-    );
+    logger.warn({ err: error.message }, "Error fetching categories from Lightspeed");
 
     if (error.response && error.response.status >= 500) {
       throw new Error("Server error while fetching categories");
@@ -237,10 +232,7 @@ async function fetchCategoriesType(id) {
       });
       return categoriesResponse.data || [];
     } catch (error) {
-      console.warn(
-        "Error fetching products from Lightspeed:",
-        error.message
-      );
+      logger.warn({ err: error.message }, "Error fetching products from Lightspeed");
       return [];
     }
   });
@@ -285,7 +277,7 @@ async function fetchBrands() {
     });
     return brandsResponse.data || [];
   } catch (error) {
-    console.warn("Error fetching brands from Lightspeed:", error.message);
+    logger.warn({ err: error.message }, "Error fetching brands from Lightspeed");
     return [];
   }
 }
@@ -300,10 +292,7 @@ async function fetchCategories() {
     });
     return categoriesResponse.data.data.data.categories || [];
   } catch (error) {
-    console.warn(
-      "Error fetching categories from Lightspeed:",
-      error.message
-    );
+    logger.warn({ err: error.message }, "Error fetching categories from Lightspeed");
     return [];
   }
 }
@@ -477,8 +466,16 @@ exports.getProductDetails = async (productId, userId) => {
 exports.getHomeProducts = async () => {
   try {
     logger.info("API - Fetch Home Products");
+
+    return await cache.getOrSet(
+      cache.key('catalog', 'home-products', 'v1'),
+      300, // 5-minute TTL — same as other smart-category endpoints
+      async () => {
+
     const categories = await fetchAndCacheCategories();
-    // Push the status filter to MongoDB — previously loaded all docs then filtered in JS
+    // Full product load is required here because the grouping is done in JS
+    // (products are bucketed by product_type_id across arbitrary subcategories).
+    // The cache wrapper above ensures this only hits MongoDB once per 5 minutes.
     const products = await Product.find({ status: true }).select(LIST_EXCLUDE_SELECT).lean();
 
     const sortedCategories = {};
@@ -562,6 +559,8 @@ exports.getHomeProducts = async () => {
 
     logger.info("Return - API - Fetch Home Products");
     return { result };
+
+      }); // end cache.getOrSet
   } catch (error) {
     logger.error({ err: error }, "Error fetching products:");
     throw { status: 500, message: "Failed to fetch home products" };

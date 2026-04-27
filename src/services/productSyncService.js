@@ -2,6 +2,7 @@ const axios = require('axios');
 const Product = require('../models/Product');
 const ProductId = require('../models/ProductId');
 const logger = require("../utilities/logger");
+const cache = require('../utilities/cache');
 const {
     applyDiscountFieldsForParentProductId,
     syncDiscountFieldsForParentIds,
@@ -98,7 +99,7 @@ async function filterParkProducts() {
 
         return allParkedProductIds;
     } catch (error) {
-        console.warn('Error fetching park products from Lightspeed:', error.message);
+        logger.warn({ err: error.message }, 'Error fetching park products from Lightspeed');
         return [];
     }
 }
@@ -237,8 +238,7 @@ async function fetchProductInventory(id, inventoryId, qty, status) {
     if (is_active !== true) return { inventoryLevel: 0 };
 
     let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
-    console.log('Inventory Id', inventoryId);
-    console.log('Status', status);
+    logger.debug({ inventoryId, status }, 'fetchProductInventory');
     if (status === 'SAVED') {
         inventoryLevel = Math.max(inventoryLevel - qty, 0);
     }
@@ -344,7 +344,7 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
  * Uses tax_inclusive ?? tax_exclusive pricing (refresh-specific behavior).
  */
 async function fetchProductDetailsForRefresh(id) {
-    console.log('[Refresh Product] Hitting Lightspeed API: GET /api/3.0/products/' + id);
+    logger.info({ id }, '[Refresh Product] Hitting Lightspeed API: GET /api/3.0/products/:id');
     const response = await axios.get(
         `https://bazaargeneraltrading.retail.lightspeed.app/api/3.0/products/${id}`,
         {
@@ -377,7 +377,7 @@ async function fetchProductDetailsForRefresh(id) {
         const inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
         const ps = product.price_standard || {};
         const price = ps.tax_inclusive ?? ps.tax_exclusive;
-        console.log('[Refresh Product] Price from API (product, no variants) — tax_exclusive:', ps.tax_exclusive, '| tax_inclusive:', ps.tax_inclusive, '| storing price:', price);
+        logger.debug({ taxExclusive: ps.tax_exclusive, taxInclusive: ps.tax_inclusive, storingPrice: price }, '[Refresh Product] price (no variants)');
         if (inventoryLevel > 0 && parseFloat(price) !== 0) {
             variantsData.push({
                 qty: inventoryLevel,
@@ -410,7 +410,7 @@ async function fetchProductDetailsForRefresh(id) {
                 }
             );
             const inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
-            console.log('[Refresh Product] Price from API (variant)', variantId, '— tax_exclusive:', pv.tax_exclusive, '| tax_inclusive:', pv.tax_inclusive, '| storing price:', variantPrice);
+            logger.debug({ variantId, taxExclusive: pv.tax_exclusive, taxInclusive: pv.tax_inclusive, storingPrice: variantPrice }, '[Refresh Product] price (variant)');
             if (inventoryLevel > 0 && parseFloat(variantPrice) !== 0) {
                 variantsData.push({
                     qty: inventoryLevel,
@@ -424,7 +424,7 @@ async function fetchProductDetailsForRefresh(id) {
         }
     }
 
-    console.log('[Refresh Product] variantsData we are storing:', JSON.stringify(variantsData.map(v => ({ id: v.id, sku: v.sku, price: v.price, qty: v.qty }))));
+    logger.debug({ variantsData: variantsData.map(v => ({ id: v.id, sku: v.sku, price: v.price, qty: v.qty })) }, '[Refresh Product] variantsData to store');
     return { product, variantsData, totalQty };
 }
 
@@ -479,7 +479,7 @@ async function inventoryProductDetailUpdate(type, updateProductId, timeFormatted
         { 'product.id': itemId, status: true },
         { $set: { variantsData, totalQty, status, webhook, webhookTime } }
     );
-    console.log(`Inventory Updated (Product Update) Product with ID : ${itemId} : `, type);
+    logger.info({ itemId, type }, 'Inventory Updated (Product Update)');
     return itemId;
 }
 
@@ -502,7 +502,7 @@ async function refreshSingleProductById(productId) {
     }
 
     const id = productId;
-    console.log('[Refresh Product] Requested productId:', id);
+    logger.info({ id }, '[Refresh Product] requested');
 
     const existingProductId = await ProductId.findOne({ productId: id });
     if (!existingProductId) {
@@ -535,7 +535,7 @@ async function refreshSingleProductById(productId) {
             status: productStatus,
         });
         await newProductDetails.save();
-        console.log('[Refresh Product] Created in MongoDB. product.id:', product.id);
+        logger.info({ productId: product.id }, '[Refresh Product] created in MongoDB');
         const doc = newProductDetails.toObject ? newProductDetails.toObject() : newProductDetails;
         return {
             created: true,
@@ -558,8 +558,9 @@ async function refreshSingleProductById(productId) {
             },
         }
     );
-    console.log('[Refresh Product] Updated in MongoDB. product.id:', product.id);
-    const updated = await Product.findOne({ 'product.id': product.id }).lean();
+    logger.info({ productId: product.id }, '[Refresh Product] updated in MongoDB');
+    // Must read from primary — must see the updateOne just issued above.
+    const updated = await Product.findOne({ 'product.id': product.id }).read('primary').lean();
 
     return {
         created: false,
@@ -603,9 +604,7 @@ async function syncWebhookDiscounts() {
         hour12: true,
     });
 
-    for (const pid of parentIds) {
-        console.log('product id next updated:', pid);
-    }
+    logger.info({ parentIds }, 'syncWebhookDiscounts: parent IDs to sync');
 
     const result = await syncDiscountFieldsForParentIds(parentIds, WEBHOOK_AFTER_SYNC, webhookTime);
 
@@ -687,7 +686,7 @@ async function handleProductUpdate(data) {
                 },
             }
         );
-        console.log(`Product Details Updated Product with ID: ${product.id} : `, type);
+        logger.info({ productId: product.id, type }, 'Product Details Updated');
     }
 
     const parentProductId = await inventoryProductDetailUpdate(type, updateProductId, timeFormatted);
@@ -696,6 +695,11 @@ async function handleProductUpdate(data) {
     } catch (discountErr) {
         logger.error({ err: discountErr }, 'product.update discount sync failed:');
     }
+
+    // Invalidate all catalog caches — product data (price, discount, status) has changed
+    await cache.delPattern('catalog:*');
+    await cache.del(cache.key('lightspeed', 'categories', 'v1'));
+    logger.info({ productId: updateProductId, type }, 'cache invalidated after product.update');
 
     return { success: true };
 }
@@ -733,9 +737,9 @@ async function handleInventoryUpdate(data) {
     logger.info(`${timeFormatted} ${type} - Received Inventory Update for ID : ${updateProductId}`);
 
     const allParkedProductIds = await filterParkProducts();
-    console.log('All Parked ProductIds : ', allParkedProductIds.length);
+    logger.debug({ count: allParkedProductIds.length }, 'All Parked ProductIds');
     const result = getMatchingProductIds(updateProductId, allParkedProductIds);
-    console.log('Matched Product IDs:', result);
+    logger.debug({ result }, 'Matched Product IDs');
     let itemId;
     if (result.length > 0) {
         itemId = result[0].product;
@@ -775,7 +779,7 @@ async function handleInventoryUpdate(data) {
         }
     }
 
-    console.log('Matched Parent Product IDs:', matchedProductIds);
+    logger.debug({ matchedProductIds }, 'Matched Parent Product IDs');
 
     const { variantsData, totalQty } = await fetchProductInventoryDetails(itemId, matchedProductIds);
     const webhook = type;
@@ -784,13 +788,20 @@ async function handleInventoryUpdate(data) {
         { 'product.id': itemId },
         { $set: { variantsData, totalQty, webhook, webhookTime } }
     );
-    console.log(`Inventory Updated Product with ID : ${itemId} : `, type);
+    logger.info({ itemId, type }, 'Inventory Updated Product');
 
     try {
         await applyDiscountFieldsForParentProductId(itemId, type, timeFormatted);
     } catch (discountErr) {
         logger.error({ err: discountErr }, 'inventoryUpdate discount sync failed:');
     }
+
+    // Invalidate catalog caches — inventory/totalQty affects product listings and variants
+    await Promise.all([
+        cache.delPattern('catalog:*'),
+        cache.del(cache.key('lightspeed', 'products-inventory', 'v1')),
+    ]);
+    logger.info({ productId: itemId, type }, 'cache invalidated after inventory.update');
 
     return { success: true };
 }
@@ -824,9 +835,7 @@ async function handleSaleUpdate(data) {
     }
 
     const timeFormatted = await currentTime();
-    console.log(
-        `${timeFormatted} ${type} - Received Parked Product ID : ${updateProductId} | Quantity : ${updateProductQty} | Status : ${updateProductStatus}`
-    );
+    logger.info({ type, productId: updateProductId, qty: updateProductQty, status: updateProductStatus }, 'Received Parked Product');
 
     const matchedProduct = await Product.findOne({
         'variantsData.id': updateProductId,
@@ -868,7 +877,7 @@ async function handleSaleUpdate(data) {
                 }
             );
 
-            console.log(`Parked Sale Inventory Updated Product with ID : ${updateProductId} : `, type);
+            logger.info({ productId: updateProductId, type }, 'Parked Sale Inventory Updated');
 
             try {
                 await applyDiscountFieldsForParentProductId(itemId, type, timeFormatted);
@@ -877,10 +886,19 @@ async function handleSaleUpdate(data) {
             }
         }
     } else {
-        console.log(
-            `No Parked Product found for Variant ID : ${updateProductId} | Quantity : ${updateProductQty} | Status : ${updateProductStatus}`
+        logger.info(
+            { variantId: updateProductId, qty: updateProductQty, status: updateProductStatus },
+            'No parked product found for variant'
         );
     }
+
+    // Invalidate trending/today-deal/favourites — sold quantities have changed
+    await Promise.all([
+        cache.delPattern('catalog:trending:*'),
+        cache.del(cache.key('catalog', 'today-deal', 'v1')),
+        cache.del(cache.key('catalog', 'favourites-of-week', 'v1')),
+    ]);
+    logger.info({ type }, 'cache invalidated after register_sale.update');
 
     return { success: true };
 }

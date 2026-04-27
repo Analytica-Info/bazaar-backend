@@ -75,7 +75,18 @@ async function getGiftProductInfo() {
 async function getCart(userId, options = {}) {
   const { includeGiftLogic = false } = options;
 
-  const cart = await Cart.findOne({ user: userId }).populate("items.product");
+  // Exclude large internal Lightspeed sync fields — aligns with LIST_EXCLUDE_SELECT
+  // used across all other product list endpoints. variantsData kept for variant display.
+  const CART_PRODUCT_EXCLUDE = [
+    "product.variants", "product.product_codes", "product.suppliers",
+    "product.composite_bom", "product.tag_ids", "product.attributes",
+    "product.account_code_sales", "product.account_code_purchase",
+    "product.price_outlet", "product.brand_id", "product.deleted_at",
+    "product.version", "product.created_at", "product.updated_at",
+    "product.description", "webhook", "webhookTime", "__v", "updatedAt",
+  ].map(f => `-${f}`).join(" ");
+
+  const cart = await Cart.findOne({ user: userId }).populate("items.product", CART_PRODUCT_EXCLUDE);
 
   if (!cart) {
     if (includeGiftLogic) {

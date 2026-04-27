@@ -549,6 +549,10 @@ exports.getNewArrivals = async ({ page, limit, maxItemsFromDb, firstPageLimit })
  * @param {number} [config.limit] - items per page (only used when paginated)
  */
 exports.getFlashSales = async ({ paginated, page, limit }) => {
+    const cacheKey = cache.key('catalog', 'flash-sale', paginated ? `mobile:${page}:${limit}` : 'ecom');
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const flashSale = await FlashSale.findOne().sort({ createdAt: -1 }).lean();
     if (!flashSale) {
         return { status: false, message: "No flash sale configured" };
@@ -589,9 +593,17 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             sold: { $exists: true, $gt: 0 }
         };
 
-    const allProductsFromDB = await Product.find(productQuery)
-        .select(LIST_EXCLUDE_SELECT)
-        .lean();
+    // For ecommerce: we return at most 100 for "all" + 10 per range (10 ranges) = 200 max.
+    // For mobile (paginated): we need totalCount for pagination metadata, then fetch a page.
+    // Use countDocuments in parallel with the product fetch to avoid loading all docs.
+    const FLASH_SALE_MAX_DOCS = paginated ? 2000 : 200;
+    const [allProductsFromDB, flashSaleTotalCount] = await Promise.all([
+        Product.find(productQuery)
+            .select(LIST_EXCLUDE_SELECT)
+            .limit(FLASH_SALE_MAX_DOCS)
+            .lean(),
+        paginated ? Product.countDocuments({ ...productQuery, "product.images.0": { $exists: true } }) : Promise.resolve(0),
+    ]);
 
     const ranges = [
         { label: "0 - 10%", min: 1, max: 10, name: "10%" },
@@ -630,7 +642,8 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
 
     if (paginated) {
         const allProducts = discountBuckets["all"];
-        const totalCount = allProducts.length;
+        // Use the parallel countDocuments result for true total (not limited by FLASH_SALE_MAX_DOCS)
+        const totalCount = flashSaleTotalCount || allProducts.length;
         const totalPages = Math.ceil(totalCount / limit);
         const paginatedAllProducts = allProducts.slice((page - 1) * limit, page * limit);
 
@@ -647,7 +660,7 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             }))
         ];
 
-        return {
+        const result = {
             status: true,
             flashSale: flashSale,
             pagination: {
@@ -658,6 +671,8 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             },
             data: formatted
         };
+        await cache.set(cacheKey, result, SMART_CAT_TTL);
+        return result;
     } else {
         // Ecommerce: flat (no pagination on "all")
         const formatted = [
@@ -673,11 +688,13 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
             }))
         ];
 
-        return {
+        const result = {
             status: true,
             flashSale: flashSale,
             data: formatted
         };
+        await cache.set(cacheKey, result, SMART_CAT_TTL);
+        return result;
     }
 };
 
@@ -694,37 +711,23 @@ exports.getSuperSaverProducts = async ({ minItems }) => {
     const ranges = { min: 1, max: 99 };
     const requiredCount = minItems;
 
-    let superSaverProducts = [];
     // Only need .discount for the return value — strip everything else
     const highestDiscountProduct = await Product.findOne({ isHighest: true })
         .select("discount")
         .lean();
 
-    while (superSaverProducts.length < requiredCount) {
-        const randomProducts = await Product.aggregate([
-            {
-                $match: {
-                    $expr: {
-                        $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0]
-                    }
-                }
-            },
-            { $sample: { size: 2 } },
-            { $project: LIST_EXCLUDE_PROJECTION }
-        ]);
-        for (let product of randomProducts) {
-            if (superSaverProducts.length >= requiredCount) break;
-
-            const productWithDiscount = product;
-
-            if (
-                productWithDiscount.discount >= ranges.min &&
-                productWithDiscount.discount <= ranges.max
-            ) {
-                superSaverProducts.push(productWithDiscount);
+    // Single bounded aggregation replaces the while loop that could spin indefinitely.
+    // $match on discount range first, then $sample from that filtered set.
+    const superSaverProducts = await Product.aggregate([
+        {
+            $match: {
+                discount: { $gte: ranges.min, $lte: ranges.max },
+                $expr: { $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0] }
             }
-        }
-    }
+        },
+        { $sample: { size: requiredCount } },
+        { $project: LIST_EXCLUDE_PROJECTION }
+    ]);
 
     return {
         status: superSaverProducts.length > 0,
@@ -858,6 +861,8 @@ exports.storeFlashSales = async ({ startDay, startTime, endDay, endTime, isEnabl
             isEnabled: isEnabled !== undefined ? isEnabled : true
         });
     }
+
+    await cache.delPattern('catalog:flash-sale:*');
 
     return { success: true, flashSale };
 };

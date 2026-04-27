@@ -130,14 +130,14 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
     // Determine whether to send now
     const shouldSendNow = !scheduledDateTime || new Date(scheduledDateTime) <= getUaeDateTime();
     if (shouldSendNow) {
-        console.log('[Notification Create]', sendInstantly ? 'Send Instantly' : 'Past schedule', '— sending now. id:', notification._id.toString());
+        logger.info({ notificationId: notification._id.toString(), trigger: sendInstantly ? 'Send Instantly' : 'Past schedule' }, '[Notification Create] Sending now');
         await sendNotificationToUsers(notification._id);
     } else {
         const s = notification.scheduledDateTime ? new Date(notification.scheduledDateTime).toISOString() : null;
         const dubai = notification.scheduledDateTime
             ? new Date(notification.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })
             : null;
-        console.log('[Notification Create] Scheduled for later. id:', notification._id.toString(), '| UTC:', s, '| Dubai:', dubai);
+        logger.info({ notificationId: notification._id.toString(), utc: s, dubai }, '[Notification Create] Scheduled for later');
     }
 
     // Return fresh doc so caller gets correct status/sentAt
@@ -186,37 +186,88 @@ async function getNotifications({ page = 1, limit = 10 } = {}) {
  * @returns {Object} Enriched notification object.
  */
 async function getNotificationDetails(notificationId) {
+    // Fetch without populating large user arrays — we query them separately with caps.
     const notification = await Notification.findById(notificationId)
         .populate('createdBy', 'firstName lastName email')
-        .populate('targetUsers', 'name email phone')
-        .populate('clickedUsers', 'name email phone')
         .exec();
 
     if (!notification) {
         throw { status: 404, message: 'Notification not found' };
     }
 
-    let allTargetUsers = [];
+    // For sendToAll notifications avoid loading the entire user collection.
+    // Return counts and a capped sample — the UI shows summaries, not full lists.
+    const MAX_USER_SAMPLE = 500;
+
+    // Raw ObjectId arrays from the document (no populate)
+    const targetUserIds = notification.targetUsers || [];
+    const clickedUserIdRefs = notification.clickedUsers || [];
+
+    const clickedUserIdSet = new Set(clickedUserIdRefs.map(id => id.toString()));
+    const notClickedIds = targetUserIds.filter(id => !clickedUserIdSet.has(id.toString()));
+
+    let totalTargetUsers;
+    let clickedUsers;
+    let notClickedUsers;
+
     if (notification.sendToAll) {
-        allTargetUsers = await User.find()
-            .select('name email phone fcmToken')
-            .lean()
-            .exec();
+        totalTargetUsers = await User.countDocuments();
+
+        // Fetch both buckets with a cap — avoid loading the entire user collection
+        [clickedUsers, notClickedUsers] = await Promise.all([
+            User.find({ _id: { $in: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
+                .select('name email phone')
+                .limit(MAX_USER_SAMPLE)
+                .lean()
+                .exec(),
+            User.find({ _id: { $nin: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
+                .select('name email phone')
+                .limit(MAX_USER_SAMPLE)
+                .lean()
+                .exec(),
+        ]);
     } else {
-        allTargetUsers = notification.targetUsers || [];
+        totalTargetUsers = targetUserIds.length;
+
+        // Fetch actual user docs for both buckets with a cap
+        [clickedUsers, notClickedUsers] = await Promise.all([
+            clickedUserIdRefs.length
+                ? User.find({ _id: { $in: clickedUserIdRefs } })
+                    .select('name email phone')
+                    .limit(MAX_USER_SAMPLE)
+                    .lean()
+                    .exec()
+                : Promise.resolve([]),
+            notClickedIds.length
+                ? User.find({ _id: { $in: notClickedIds } })
+                    .select('name email phone')
+                    .limit(MAX_USER_SAMPLE)
+                    .lean()
+                    .exec()
+                : Promise.resolve([]),
+        ]);
     }
 
-    const clickedUserIds = notification.clickedUsers.map(u => u._id.toString());
-    const clickedUsers = allTargetUsers.filter(u => clickedUserIds.includes(u._id.toString()));
-    const notClickedUsers = allTargetUsers.filter(u => !clickedUserIds.includes(u._id.toString()));
+    // targetUsers in toObject() are raw ObjectIds (no populate) — fetch a capped
+    // sample so the admin UI still gets named objects for the targeted-users list.
+    const targetUsersSample = notification.sendToAll
+        ? []
+        : await User.find({ _id: { $in: targetUserIds } })
+            .select('name email phone')
+            .limit(MAX_USER_SAMPLE)
+            .lean()
+            .exec();
 
     return {
         ...notification.toObject(),
+        targetUsers: targetUsersSample,
         clickedUsers,
         notClickedUsers,
-        totalTargetUsers: notification.sendToAll ? allTargetUsers.length : notification.targetUsers.length,
-        totalClickedUsers: clickedUsers.length,
-        totalNotClickedUsers: notClickedUsers.length,
+        totalTargetUsers,
+        totalClickedUsers: clickedUserIdRefs.length,
+        totalNotClickedUsers: notification.sendToAll
+            ? totalTargetUsers - clickedUserIdRefs.length
+            : notClickedIds.length,
     };
 }
 
@@ -328,9 +379,13 @@ async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
  * @returns {Array} Users array.
  */
 async function getAllUsersForNotification() {
+    // Hard cap to prevent a full collection scan on large user bases.
+    // Admin UI should use searchUsers() for targeted selection beyond this cap.
     const users = await User.find()
         .select('name email phone fcmToken')
         .sort({ name: 1 })
+        .limit(1000)
+        .lean()
         .exec();
 
     return users;

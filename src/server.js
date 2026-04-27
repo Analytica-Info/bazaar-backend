@@ -11,7 +11,6 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
-const NodeCache = require("node-cache");
 const mongoose = require("mongoose");
 require("dotenv").config();
 
@@ -74,7 +73,6 @@ const mobileConfigRoutes = require("./routes/mobile/configRoutes.js");
 // APP SETUP
 // ==========================================
 const app = express();
-const cache = new NodeCache({ stdTTL: 1800 });
 
 const PORT = process.env.PORT || 5000;
 const BACKEND_URL = process.env.BACKEND_URL;
@@ -143,15 +141,36 @@ app.use(compression());
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Request logging
+// Request logging — duration + response size
 app.use((req, res, next) => {
   const start = Date.now();
-  res.on("finish", () => {
+  const originalJson = res.json.bind(res);
+
+  res.json = function (body) {
     const duration = Date.now() - start;
-    if (duration > 5000) {
-      logger.warn({ method: req.method, url: req.originalUrl, status: res.statusCode, duration: `${duration}ms` }, "Slow request");
+    const sizeBytes = body ? Buffer.byteLength(JSON.stringify(body), "utf8") : 0;
+    const sizeKb = (sizeBytes / 1024).toFixed(1);
+
+    const logData = {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: `${duration}ms`,
+      responseKb: `${sizeKb} KB`,
+    };
+
+    if (duration > 3000) {
+      logger.warn(logData, "Slow request");
+    } else if (sizeBytes > 512 * 1024) {
+      // Log any response > 512 KB so large payloads are visible in logs
+      logger.warn(logData, "Large response payload");
+    } else {
+      logger.debug(logData, "Request");
     }
-  });
+
+    return originalJson(body);
+  };
+
   next();
 });
 

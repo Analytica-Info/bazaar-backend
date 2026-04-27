@@ -29,9 +29,7 @@ require("dotenv").config();
 const { sendEmail } = require("../../mail/emailService");
 const crypto = require("crypto");
 const year = new Date().getFullYear();
-const NodeCache = require("node-cache");
-const cache = new NodeCache({ stdTTL: 1800 });
-const spellingCache = new NodeCache({ stdTTL: 604800 });
+const cache = require('../../utilities/cache');
 const { Readable } = require("stream");
 const fs = require("fs");
 const path = require("path");
@@ -1843,19 +1841,21 @@ async function filterProductsByInventory(productsResponse) {
   return filteredProducts;
 }
 
-async function filterAndCacheProductsByInventory(productsResponse) {
-  try {
-    const cacheKey = "filtered_products_inventory";
-    const cachedProducts = cache.get(cacheKey);
-
-    if (cachedProducts) {
-      logger.info("Fetching filtered products from cache");
-      return cachedProducts;
-    }
-
+async function filterAndCacheProductsByInventory() {
+  const cacheKey = cache.key('lightspeed', 'products-inventory', 'v1');
+  return cache.getOrSet(cacheKey, 300, async () => {
     logger.info("Fetching filtered products from Lightspeed API");
 
-    const allProducts = productsResponse || [];
+    const productsResponse = await axios.get(PRODUCTS_URL, {
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        Accept: "application/json",
+      },
+    });
+    const allProducts = (productsResponse.data.data || []).filter(
+      (product) => product.is_active === true
+    );
+
     const allInventories = [];
     let after = "";
 
@@ -1917,13 +1917,8 @@ async function filterAndCacheProductsByInventory(productsResponse) {
       }
     }
 
-    cache.set(cacheKey, filteredProducts);
-
     return filteredProducts;
-  } catch (error) {
-    logger.error({ err: error }, "Error filtering products by inventory:");
-    throw new Error("Failed to filter products by inventory");
-  }
+  });
 }
 
 async function fetchProducts() {
@@ -1948,15 +1943,8 @@ async function fetchProducts() {
 }
 
 async function fetchAndCacheProducts() {
-  try {
-    const cacheKey = "lightspeed_products";
-    const cachedProducts = cache.get(cacheKey);
-
-    if (cachedProducts) {
-      logger.info("Fetching products from cache");
-      return cachedProducts;
-    }
-
+  const cacheKey = cache.key('lightspeed', 'products', 'v1');
+  return cache.getOrSet(cacheKey, 600, async () => {
     logger.info("Fetching products from Lightspeed API");
 
     const response = await axios.get(PRODUCTS_URL, {
@@ -1968,22 +1956,8 @@ async function fetchAndCacheProducts() {
 
     const products = response.data.data || [];
 
-    const activeProducts = products.filter(
-      (product) => product.is_active === true
-    );
-
-    cache.set(cacheKey, activeProducts);
-
-    return activeProducts;
-  } catch (error) {
-    logger.error({ err: error }, "Error fetching products:");
-
-    if (error.response && error.response.status >= 500) {
-      throw new Error("Server error while fetching product");
-    }
-
-    throw new Error("Failed to fetch product");
-  }
+    return products.filter((product) => product.is_active === true);
+  });
 }
 
 async function fetchBrands() {
@@ -1996,7 +1970,7 @@ async function fetchBrands() {
     });
     return brandsResponse.data || [];
   } catch (error) {
-    console.warn("Error fetching products from Lightspeed:", error.message);
+    logger.warn({ err: error.message }, "Error fetching brands from Lightspeed");
     return [];
   }
 }
@@ -2011,21 +1985,14 @@ async function fetchCategories() {
     });
     return categoriesResponse.data.data.data.categories || [];
   } catch (error) {
-    console.warn("Error fetching products from Lightspeed:", error.message);
+    logger.warn({ err: error.message }, "Error fetching categories from Lightspeed");
     return [];
   }
 }
 
 async function fetchAndCacheCategories() {
-  const cacheKey = "lightspeed_categories";
-
-  try {
-    const cachedCategories = cache.get(cacheKey);
-    if (cachedCategories) {
-      logger.info("Fetching categories from cache");
-      return cachedCategories;
-    }
-
+  const cacheKey = cache.key('lightspeed', 'categories', 'v1');
+  return cache.getOrSet(cacheKey, 3600, async () => {
     logger.info("Fetching categories from Lightspeed API");
 
     const categoriesResponse = await axios.get(CATEGORIES_URL, {
@@ -2035,30 +2002,14 @@ async function fetchAndCacheCategories() {
       },
     });
 
-    const categories = categoriesResponse.data.data?.data?.categories || [];
-
-    cache.set(cacheKey, categories);
-
-    return categories;
-  } catch (error) {
-    console.warn("Error fetching categories from Lightspeed:", error.message);
-
-    if (error.response && error.response.status >= 500) {
-      throw new Error("Server error while fetching categories");
-    }
-
-    throw new Error("Failed to fetch categories");
-  }
+    return categoriesResponse.data.data?.data?.categories || [];
+  });
 }
 
 async function autoCacheProducts() {
   try {
     logger.info("Running scheduled cache refresh...");
-    // Push status filter to MongoDB — same fix as the categories endpoint.
-    const productsResponse = await Product.find({ status: true })
-      .select(LIST_EXCLUDE_SELECT)
-      .lean();
-    await filterAndCacheProductsByInventory(productsResponse);
+    await filterAndCacheProductsByInventory();
   } catch (error) {
     logger.error({ err: error }, "Error in scheduled cache refresh:");
   }

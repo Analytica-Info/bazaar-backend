@@ -7,6 +7,7 @@ const Review = require('../models/Review');
 const Wishlist = require('../models/Wishlist');
 const Category = require('../models/Category');
 const backendLogger = require('../utilities/backendLogger');
+const cache = require('../utilities/cache');
 
 const BACKEND_URL = process.env.BACKEND_URL;
 
@@ -480,7 +481,7 @@ exports.getUserReviews = async (userId) => {
 
     const products = await Product.find({
         _id: { $in: productObjectIds },
-    });
+    }).select("-product.variants -product.product_codes -product.suppliers -product.composite_bom -product.tag_ids -product.attributes -product.account_code_sales -product.account_code_purchase -product.price_outlet -product.brand_id -product.deleted_at -product.version -product.created_at -product.updated_at -webhook -webhookTime -__v").lean();
 
     const userReviews = await Review.find({
         user_id: userObjectId,
@@ -535,7 +536,7 @@ exports.getUserReviews = async (userId) => {
         } : null;
 
         return {
-            ...product.toObject(),
+            ...product,
             user_review: userReview,
             order_details: orderData,
         };
@@ -583,6 +584,9 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
             price_rating: priceRating,
         });
     }
+
+    // Invalidate top-rated cache — new/updated review changes product ratings
+    await cache.del(cache.key('catalog', 'top-rated', 'v1')).catch(() => {});
 
     // Select only the fields the client maps — avoids fetching the full document for every review.
     const reviews = await Review.find()
