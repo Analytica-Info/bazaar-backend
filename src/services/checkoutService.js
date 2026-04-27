@@ -1669,15 +1669,16 @@ exports.createNomodCheckout = async (req) => {
       currency,
       discount: discountAED,
       items: cartData.map(item => ({
+        id: item.variantId || item.id || item.product_id,
         name: item.name || 'Product',
         quantity: item.qty || 1,
         price: item.price,
       })),
       shippingCost: Number(shippingCost || 0),
       customer: { name, phone },
-      successUrl: successUrl || `${FRONTEND_BASE_URL}/order-success`,
-      failureUrl: failureUrl || `${FRONTEND_BASE_URL}/order-failure`,
-      cancelledUrl: cancelledUrl || `${FRONTEND_BASE_URL}/cart`,
+      successUrl: successUrl || `${FRONTEND_BASE_URL}/success`,
+      failureUrl: failureUrl || `${FRONTEND_BASE_URL}/failed`,
+      cancelledUrl: cancelledUrl || `${FRONTEND_BASE_URL}/cancelled`,
       metadata: {
         userId: String(userId), cartDataId: String(cartDataId),
         name: String(name || ''), phone: String(phone || ''),
@@ -1717,7 +1718,7 @@ exports.createNomodCheckout = async (req) => {
     });
 
     logger.info({ checkoutId: checkout.id, userId }, 'Nomod checkout created (website)');
-    return { status: 'created', checkout_url: checkout.redirectUrl };
+    return { status: 'created', checkout_url: checkout.redirectUrl, checkout_id: checkout.id };
   } catch (error) {
     if (error.status) throw error;
     logger.error({ err: error }, 'Nomod createCheckout error:');

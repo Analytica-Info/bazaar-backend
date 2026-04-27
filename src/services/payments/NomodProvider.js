@@ -26,14 +26,15 @@ class NomodProvider extends PaymentProvider {
     }) {
         if (!this.apiKey) throw { status: 500, message: 'Nomod API key not configured' };
 
-        const lineItems = items.map(item => ({
+        const lineItems = items.map((item, idx) => ({
+            item_id: String(item.id || item.variantId || `item-${idx + 1}`),
             name: item.name || 'Product',
             quantity: Number(item.quantity) || 1,
-            amount: String(Number(item.price).toFixed(2)),
+            unit_amount: String(Number(item.price).toFixed(2)),
         }));
 
         if (shippingCost > 0) {
-            lineItems.push({ name: 'Shipping', quantity: 1, amount: String(Number(shippingCost).toFixed(2)) });
+            lineItems.push({ item_id: 'shipping', name: 'Shipping', quantity: 1, unit_amount: String(Number(shippingCost).toFixed(2)) });
         }
 
         const body = {
@@ -48,20 +49,17 @@ class NomodProvider extends PaymentProvider {
             metadata,
         };
 
-        if (customer) {
-            body.customer = {};
-            if (customer.name) body.customer.name = customer.name;
-            if (customer.email) body.customer.email = customer.email;
-            if (customer.phone) body.customer.phone = customer.phone;
-        }
+        // Nomod collects customer details on their hosted checkout page.
+        // Sending partial customer data causes validation errors, so we omit it.
 
         try {
+            logger.info({ body: JSON.stringify(body) }, 'Nomod createCheckout request body');
             const res = await this.client.post('/v1/checkout', body);
             logger.info({ checkoutId: res.data.id, referenceId }, 'Nomod checkout created');
             return { id: res.data.id, redirectUrl: res.data.url, raw: res.data };
         } catch (error) {
             const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to create Nomod checkout';
-            logger.error({ err: error.response?.data, referenceId }, 'Nomod createCheckout failed');
+            logger.error({ err: error.response?.data, referenceId, status: error.response?.status }, 'Nomod createCheckout failed');
             throw { status: error.response?.status || 500, message: msg };
         }
     }

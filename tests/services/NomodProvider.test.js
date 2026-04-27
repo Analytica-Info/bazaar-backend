@@ -72,7 +72,7 @@ describe('NomodProvider', () => {
             const body = mockClient.post.mock.calls[0][1];
             const shippingItem = body.items.find(i => i.name === 'Shipping');
             expect(shippingItem).toBeDefined();
-            expect(shippingItem.amount).toBe('20.00');
+            expect(shippingItem.unit_amount).toBe('20.00');
         });
 
         it('throws structured error on API failure', async () => {
