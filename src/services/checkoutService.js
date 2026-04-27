@@ -85,7 +85,7 @@ async function resolveCheckoutDiscountAED({
 
 async function clearUserCart(user_id) {
   try {
-    const cart = await Cart.findOne({ user: user_id });
+    const cart = await Cart.findOne({ user: user_id }).read('primary');
     if (cart) {
       cart.items = [];
       await cart.save();

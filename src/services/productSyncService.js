@@ -12,8 +12,13 @@ const API_KEY = process.env.API_KEY;
 const WEBHOOK_PRODUCT_UPDATE = 'product.update';
 const WEBHOOK_AFTER_SYNC = 'updateProductDiscounts';
 
-// In-memory dedup set for product updates (same as original controller)
-const processedProductIds = new Set();
+// Redis-backed dedup lock TTL (seconds).
+// Catches true duplicate retries fired in the same burst (Lightspeed occasionally
+// fires the same event 2-3× in rapid succession). Kept intentionally short so
+// that a genuine second sale/update on the same product a few seconds later is
+// still processed. The primary protection against retry storms is the immediate
+// 200 ACK in webhookController — Lightspeed won't retry if we respond instantly.
+const WEBHOOK_DEDUP_TTL = 3;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -641,13 +646,15 @@ async function handleProductUpdate(data) {
         ? updateProduct.variant_parent_id
         : updateProduct.id;
 
-    if (processedProductIds.has(updateProductId)) {
-        logger.info(`Skipping Duplicate Update Product Id : ${updateProductId}`);
+    // Redis dedup — drop duplicate product.update for the same ID within TTL window.
+    // Replaces the old in-memory Set which reset on every container restart.
+    const dedupKey = cache.key('webhook', 'product-update', updateProductId);
+    const alreadyProcessing = await cache.get(dedupKey);
+    if (alreadyProcessing) {
+        logger.info({ updateProductId }, 'Skipping duplicate product.update (dedup lock held)');
         return { success: true, skipped: true };
     }
-
-    processedProductIds.add(updateProductId);
-    setTimeout(() => processedProductIds.delete(updateProductId), 5000);
+    await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
 
     if (!productId) {
         throw { status: 400, message: 'Missing product ID' };
@@ -732,6 +739,17 @@ async function handleInventoryUpdate(data) {
     if (!productId) {
         throw { status: 400, message: 'Missing product ID' };
     }
+
+    // Redis dedup — drop duplicate inventory.update for the same productId within TTL.
+    // Previously had NO dedup at all, causing 233 duplicate calls per product during
+    // busy periods when Lightspeed retried slow-responding webhooks.
+    const dedupKey = cache.key('webhook', 'inventory-update', updateProductId);
+    const alreadyProcessing = await cache.get(dedupKey);
+    if (alreadyProcessing) {
+        logger.info({ updateProductId }, 'Skipping duplicate inventory.update (dedup lock held)');
+        return { success: true, skipped: true };
+    }
+    await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
 
     const timeFormatted = await currentTime();
     logger.info(`${timeFormatted} ${type} - Received Inventory Update for ID : ${updateProductId}`);
@@ -833,6 +851,15 @@ async function handleSaleUpdate(data) {
     if (!productId) {
         throw { status: 400, message: 'Missing product ID' };
     }
+
+    // Dedup on sale ID + product ID — same sale firing multiple times is safe to drop.
+    const dedupKey = cache.key('webhook', 'sale-update', String(productId), String(updateProductId));
+    const alreadyProcessing = await cache.get(dedupKey);
+    if (alreadyProcessing) {
+        logger.info({ productId, updateProductId }, 'Skipping duplicate sale.update (dedup lock held)');
+        return { success: true, skipped: true };
+    }
+    await cache.set(dedupKey, '1', WEBHOOK_DEDUP_TTL);
 
     const timeFormatted = await currentTime();
     logger.info({ type, productId: updateProductId, qty: updateProductQty, status: updateProductStatus }, 'Received Parked Product');

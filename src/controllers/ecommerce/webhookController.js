@@ -1,57 +1,34 @@
 const productSyncService = require("../../services/productSyncService");
-
 const logger = require("../../utilities/logger");
+
+// Respond 200 immediately so Lightspeed stops retrying, then process async.
+// Previously we awaited the full handler (4–40 s), causing Lightspeed to
+// treat the request as timed-out and fire it again — producing 233 duplicate
+// calls per product during busy periods.
+
 exports.productUpdate = async (req, res) => {
-    try {
-        const { payload, type } = req.body;
+    const { payload, type } = req.body;
+    res.status(200).send({ success: true });
 
-        const result = await productSyncService.handleProductUpdate({ payload, type });
-
-        if (result.skipped) {
-            return res.status(200).send({ message: 'Duplicate update skipped' });
-        }
-
-        return res.status(200).send({ success: true });
-    } catch (error) {
-        if (error.status) {
-            console.log(error.message);
-            return res.status(error.status).send({ error: error.message });
-        }
-        console.log("Server error:", error);
-        return res.status(500).send({ error: "Internal Server Error" });
-    }
+    productSyncService.handleProductUpdate({ payload, type }).catch((err) => {
+        logger.error({ err }, 'productUpdate background processing failed');
+    });
 };
 
 exports.inventoryUpdate = async (req, res) => {
-    try {
-        const { payload, type } = req.body;
+    const { payload, type } = req.body;
+    res.status(200).send({ success: true });
 
-        await productSyncService.handleInventoryUpdate({ payload, type });
-
-        return res.status(200).send({ success: true });
-    } catch (error) {
-        if (error.status) {
-            console.log(error.message);
-            return res.status(error.status).send({ error: error.message });
-        }
-        console.log("Server error:", error);
-        return res.status(500).send({ error: "Internal Server Error" });
-    }
+    productSyncService.handleInventoryUpdate({ payload, type }).catch((err) => {
+        logger.error({ err }, 'inventoryUpdate background processing failed');
+    });
 };
 
 exports.saleUpdate = async (req, res) => {
-    try {
-        const { payload, type } = req.body;
+    const { payload, type } = req.body;
+    res.status(200).send({ success: true });
 
-        await productSyncService.handleSaleUpdate({ payload, type });
-
-        return res.status(200).send({ success: true });
-    } catch (error) {
-        if (error.status) {
-            console.log(error.message);
-            return res.status(error.status).send({ error: error.message });
-        }
-        console.log("Server error:", error);
-        return res.status(500).send({ error: "Internal Server Error" });
-    }
+    productSyncService.handleSaleUpdate({ payload, type }).catch((err) => {
+        logger.error({ err }, 'saleUpdate background processing failed');
+    });
 };

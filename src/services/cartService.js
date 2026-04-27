@@ -75,18 +75,15 @@ async function getGiftProductInfo() {
 async function getCart(userId, options = {}) {
   const { includeGiftLogic = false } = options;
 
-  // Exclude large internal Lightspeed sync fields — aligns with LIST_EXCLUDE_SELECT
-  // used across all other product list endpoints. variantsData kept for variant display.
-  const CART_PRODUCT_EXCLUDE = [
-    "product.variants", "product.product_codes", "product.suppliers",
-    "product.composite_bom", "product.tag_ids", "product.attributes",
-    "product.account_code_sales", "product.account_code_purchase",
-    "product.price_outlet", "product.brand_id", "product.deleted_at",
-    "product.version", "product.created_at", "product.updated_at",
-    "product.description", "webhook", "webhookTime", "__v", "updatedAt",
-  ].map(f => `-${f}`).join(" ");
+  // Inclusion projection: only the fields the Flutter app actually reads.
+  // Cart/checkout use: product.id, product.productDetails.{name,images,description},
+  // variantsData, totalQty. Everything else (variants, suppliers, composite_bom,
+  // product_codes, attributes, webhook, etc.) is Lightspeed-internal and unused.
+  const CART_PRODUCT_SELECT = "_id product.id product.name product.images product.description product.product_type_id variantsData totalQty";
 
-  const cart = await Cart.findOne({ user: userId }).populate("items.product", CART_PRODUCT_EXCLUDE);
+  // Pin to primary — cart is always read immediately after a write (add/remove/qty change).
+  // Reading from a secondary risks replication lag making the cart appear stale or empty.
+  const cart = await Cart.findOne({ user: userId }).read('primary').populate("items.product", CART_PRODUCT_SELECT);
 
   if (!cart) {
     if (includeGiftLogic) {
@@ -277,7 +274,7 @@ async function addToCart(userId, itemData, options = {}) {
     };
   }
 
-  let cart = await Cart.findOne({ user: userId });
+  let cart = await Cart.findOne({ user: userId }).read('primary');
 
   const newItem = {
     product: product_id,
@@ -342,7 +339,7 @@ async function addToCart(userId, itemData, options = {}) {
 async function removeFromCart(userId, productId) {
   if (!productId) throw { status: 400, message: "product_id is required" };
 
-  const cart = await Cart.findOne({ user: userId });
+  const cart = await Cart.findOne({ user: userId }).read('primary');
   if (!cart) throw { status: 404, message: "Cart not found" };
 
   const originalLength = cart.items.length;
@@ -365,7 +362,7 @@ async function increaseQty(userId, productId, qty, options = {}) {
   if (!productId || !qty || qty < 1)
     throw { status: 400, message: "product_id and valid qty are required" };
 
-  const cart = await Cart.findOne({ user: userId });
+  const cart = await Cart.findOne({ user: userId }).read('primary');
   const item = cart?.items.find((i) => i.product.toString() === productId);
   if (!item) throw { status: 404, message: "Product not found in cart" };
 
@@ -391,7 +388,7 @@ async function decreaseQty(userId, productId, qty) {
   if (!productId || !qty || qty < 1)
     throw { status: 400, message: "product_id and valid qty are required" };
 
-  const cart = await Cart.findOne({ user: userId });
+  const cart = await Cart.findOne({ user: userId }).read('primary');
   const item = cart?.items.find((i) => i.product.toString() === productId);
   if (!item) throw { status: 404, message: "Product not found in cart" };
 
