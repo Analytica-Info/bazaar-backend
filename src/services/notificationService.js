@@ -186,10 +186,9 @@ async function getNotifications({ page = 1, limit = 10 } = {}) {
  * @returns {Object} Enriched notification object.
  */
 async function getNotificationDetails(notificationId) {
+    // Fetch without populating large user arrays — we query them separately with caps.
     const notification = await Notification.findById(notificationId)
         .populate('createdBy', 'firstName lastName email')
-        .populate('targetUsers', 'name email phone')
-        .populate('clickedUsers', 'name email phone')
         .exec();
 
     if (!notification) {
@@ -200,7 +199,12 @@ async function getNotificationDetails(notificationId) {
     // Return counts and a capped sample — the UI shows summaries, not full lists.
     const MAX_USER_SAMPLE = 500;
 
-    const clickedUserIds = new Set(notification.clickedUsers.map(u => u._id.toString()));
+    // Raw ObjectId arrays from the document (no populate)
+    const targetUserIds = notification.targetUsers || [];
+    const clickedUserIdRefs = notification.clickedUsers || [];
+
+    const clickedUserIdSet = new Set(clickedUserIdRefs.map(id => id.toString()));
+    const notClickedIds = targetUserIds.filter(id => !clickedUserIdSet.has(id.toString()));
 
     let totalTargetUsers;
     let clickedUsers;
@@ -209,24 +213,39 @@ async function getNotificationDetails(notificationId) {
     if (notification.sendToAll) {
         totalTargetUsers = await User.countDocuments();
 
-        // Clicked users come from the notification document (already populated)
-        clickedUsers = notification.clickedUsers;
-
-        // For not-clicked, return a capped sample to avoid loading the full collection
-        const notClickedSample = await User.find({
-            _id: { $nin: [...clickedUserIds].map(id => new mongoose.Types.ObjectId(id)) }
-        })
-            .select('name email phone')
-            .limit(MAX_USER_SAMPLE)
-            .lean()
-            .exec();
-
-        notClickedUsers = notClickedSample;
+        // Fetch both buckets with a cap — avoid loading the entire user collection
+        [clickedUsers, notClickedUsers] = await Promise.all([
+            User.find({ _id: { $in: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
+                .select('name email phone')
+                .limit(MAX_USER_SAMPLE)
+                .lean()
+                .exec(),
+            User.find({ _id: { $nin: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
+                .select('name email phone')
+                .limit(MAX_USER_SAMPLE)
+                .lean()
+                .exec(),
+        ]);
     } else {
-        const allTargetUsers = notification.targetUsers || [];
-        clickedUsers = allTargetUsers.filter(u => clickedUserIds.has(u._id.toString()));
-        notClickedUsers = allTargetUsers.filter(u => !clickedUserIds.has(u._id.toString()));
-        totalTargetUsers = allTargetUsers.length;
+        totalTargetUsers = targetUserIds.length;
+
+        // Fetch actual user docs for both buckets with a cap
+        [clickedUsers, notClickedUsers] = await Promise.all([
+            clickedUserIdRefs.length
+                ? User.find({ _id: { $in: clickedUserIdRefs } })
+                    .select('name email phone')
+                    .limit(MAX_USER_SAMPLE)
+                    .lean()
+                    .exec()
+                : Promise.resolve([]),
+            notClickedIds.length
+                ? User.find({ _id: { $in: notClickedIds } })
+                    .select('name email phone')
+                    .limit(MAX_USER_SAMPLE)
+                    .lean()
+                    .exec()
+                : Promise.resolve([]),
+        ]);
     }
 
     return {
@@ -234,10 +253,10 @@ async function getNotificationDetails(notificationId) {
         clickedUsers,
         notClickedUsers,
         totalTargetUsers,
-        totalClickedUsers: clickedUsers.length,
+        totalClickedUsers: clickedUserIdRefs.length,
         totalNotClickedUsers: notification.sendToAll
-            ? totalTargetUsers - clickedUsers.length
-            : notClickedUsers.length,
+            ? totalTargetUsers - clickedUserIdRefs.length
+            : notClickedIds.length,
     };
 }
 

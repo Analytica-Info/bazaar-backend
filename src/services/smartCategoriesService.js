@@ -694,37 +694,23 @@ exports.getSuperSaverProducts = async ({ minItems }) => {
     const ranges = { min: 1, max: 99 };
     const requiredCount = minItems;
 
-    let superSaverProducts = [];
     // Only need .discount for the return value — strip everything else
     const highestDiscountProduct = await Product.findOne({ isHighest: true })
         .select("discount")
         .lean();
 
-    while (superSaverProducts.length < requiredCount) {
-        const randomProducts = await Product.aggregate([
-            {
-                $match: {
-                    $expr: {
-                        $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0]
-                    }
-                }
-            },
-            { $sample: { size: 2 } },
-            { $project: LIST_EXCLUDE_PROJECTION }
-        ]);
-        for (let product of randomProducts) {
-            if (superSaverProducts.length >= requiredCount) break;
-
-            const productWithDiscount = product;
-
-            if (
-                productWithDiscount.discount >= ranges.min &&
-                productWithDiscount.discount <= ranges.max
-            ) {
-                superSaverProducts.push(productWithDiscount);
+    // Single bounded aggregation replaces the while loop that could spin indefinitely.
+    // $match on discount range first, then $sample from that filtered set.
+    const superSaverProducts = await Product.aggregate([
+        {
+            $match: {
+                discount: { $gte: ranges.min, $lte: ranges.max },
+                $expr: { $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0] }
             }
-        }
-    }
+        },
+        { $sample: { size: requiredCount } },
+        { $project: LIST_EXCLUDE_PROJECTION }
+    ]);
 
     return {
         status: superSaverProducts.length > 0,

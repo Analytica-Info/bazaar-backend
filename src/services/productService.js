@@ -477,8 +477,16 @@ exports.getProductDetails = async (productId, userId) => {
 exports.getHomeProducts = async () => {
   try {
     logger.info("API - Fetch Home Products");
+
+    return await cache.getOrSet(
+      cache.key('catalog', 'home-products', 'v1'),
+      300, // 5-minute TTL — same as other smart-category endpoints
+      async () => {
+
     const categories = await fetchAndCacheCategories();
-    // Push the status filter to MongoDB — previously loaded all docs then filtered in JS
+    // Full product load is required here because the grouping is done in JS
+    // (products are bucketed by product_type_id across arbitrary subcategories).
+    // The cache wrapper above ensures this only hits MongoDB once per 5 minutes.
     const products = await Product.find({ status: true }).select(LIST_EXCLUDE_SELECT).lean();
 
     const sortedCategories = {};
@@ -562,6 +570,8 @@ exports.getHomeProducts = async () => {
 
     logger.info("Return - API - Fetch Home Products");
     return { result };
+
+      }); // end cache.getOrSet
   } catch (error) {
     logger.error({ err: error }, "Error fetching products:");
     throw { status: 500, message: "Failed to fetch home products" };
