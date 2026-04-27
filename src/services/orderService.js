@@ -27,7 +27,6 @@ const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
-const logger = require("../utilities/logger");
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.gif', '.webp'];
 const ALLOWED_IMAGE_MIMETYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
 
