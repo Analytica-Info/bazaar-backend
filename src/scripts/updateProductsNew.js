@@ -3,8 +3,13 @@ require("dotenv").config();
 const Product = require("../models/Product");
 const ProductId = require("../models/ProductId");
 const SyncState = require("../models/SyncState");
+const cache = require("../utilities/cache");
 const fs = require("fs");
 const API_KEY = process.env.API_KEY;
+
+// Must match the key in productDiscountSync.js
+const MAX_DISCOUNT_CACHE_KEY = "metrics:discount:max-discount";
+const MAX_DISCOUNT_TTL = 60 * 60 * 6;
 
 const LOG_FILE = "cron.log";
 const SYNC_KEY_PRODUCTS_V2 = "lightspeed_products_v2";
@@ -292,6 +297,9 @@ async function updateAllProductDiscounts() {
     const maxDiscount = Math.max(
       ...productsWithDiscounts.map((p) => p.discount || 0)
     );
+
+    // Refresh the cached global max so post-cron webhooks can skip full scans.
+    cache.set(MAX_DISCOUNT_CACHE_KEY, String(maxDiscount), MAX_DISCOUNT_TTL).catch(() => {});
 
     // Single snapshot of the timestamp for the entire batch — avoids
     // N async calls to currentTime() inside the hot loop and means every
