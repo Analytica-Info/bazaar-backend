@@ -149,7 +149,10 @@ exports.getOrders = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Orders retrieved successfully",
-            data: result,
+            data: result.orders,
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
         });
     } catch (error) {
         logger.error({ err: error }, "Error fetching orders:");
