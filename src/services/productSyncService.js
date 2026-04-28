@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { mapLimit } = require('async');
 const Product = require('../models/Product');
 const ProductId = require('../models/ProductId');
 const logger = require("../utilities/logger");
@@ -12,6 +13,11 @@ const {
 const API_KEY = process.env.API_KEY;
 const WEBHOOK_PRODUCT_UPDATE = 'product.update';
 const WEBHOOK_AFTER_SYNC = 'updateProductDiscounts';
+
+// Max concurrent Lightspeed inventory calls per product fetch.
+// Lightspeed does not publish a hard rate limit; 5 keeps us well clear of
+// triggering 429s while still collapsing N sequential calls into ~1 RTT batch.
+const INVENTORY_CONCURRENCY = 5;
 
 // Redis-backed dedup lock TTL (seconds).
 // Catches true duplicate retries fired in the same burst (Lightspeed occasionally
@@ -132,6 +138,7 @@ function getMatchingProductIds(updateProductId, allParkedProductIds) {
 }
 
 async function fetchProductDetails(id, qty) {
+    logger.debug({ productId: id, qty }, 'fetchProductDetails: start');
     const response = await axios.get(
         `https://bazaargeneraltrading.retail.lightspeed.app/api/3.0/products/${id}`,
         {
@@ -149,6 +156,7 @@ async function fetchProductDetails(id, qty) {
     let totalQty = 0;
 
     if (product.variants.length === 0) {
+        logger.debug({ productId: id }, 'fetchProductDetails: no variants, fetching single inventory');
         const inventoryResponse = await axios.get(
             `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${id}/inventory`,
             {
@@ -160,10 +168,14 @@ async function fetchProductDetails(id, qty) {
         );
 
         const is_active = product.is_active;
-        if (is_active !== true) return { product, variantsData, totalQty };
+        if (is_active !== true) {
+            logger.debug({ productId: id }, 'fetchProductDetails: product inactive, skipping');
+            return { product, variantsData, totalQty };
+        }
 
         let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
         inventoryLevel = Math.max(inventoryLevel - qty, 0);
+        logger.debug({ productId: id, inventoryLevel, deducted: qty }, 'fetchProductDetails: inventory (no variants)');
 
         if (inventoryLevel > 0 && parseFloat(product.price_standard.tax_inclusive) !== 0) {
             variantsData.push({
@@ -176,30 +188,42 @@ async function fetchProductDetails(id, qty) {
             totalQty += inventoryLevel;
         }
     } else {
-        for (const variant of product.variants) {
-            const is_active = variant.is_active;
-            if (is_active !== true) continue;
+        const activeVariants = product.variants.filter(v => v.is_active === true);
+        logger.debug({ productId: id, totalVariants: product.variants.length, activeVariants: activeVariants.length }, 'fetchProductDetails: fetching variant inventories in parallel');
+
+        await mapLimit(activeVariants, INVENTORY_CONCURRENCY, async (variant) => {
             const variantId = variant.id;
             const variantPrice = variant.price_standard.tax_inclusive;
             const variantDefinitions = variant.variant_definitions;
-            let sku = '';
-            if (variantDefinitions && variantDefinitions.length > 0) {
-                sku = variantDefinitions.map(def => def.value).join(' - ');
-            }
-            const inventoryResponse = await axios.get(
-                `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${API_KEY}`,
-                        Accept: 'application/json',
-                    },
-                }
-            );
+            const sku = variantDefinitions?.length
+                ? variantDefinitions.map(def => def.value).join(' - ')
+                : '';
 
-            let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
+            let inventoryLevel;
+            try {
+                const inventoryResponse = await axios.get(
+                    `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${API_KEY}`,
+                            Accept: 'application/json',
+                        },
+                    }
+                );
+                inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
+            } catch (err) {
+                logger.warn({ productId: id, variantId, err: err.message }, 'fetchProductDetails: inventory fetch failed for variant, skipping');
+                return;
+            }
+
+            // The specific variant that triggered this update has qty units already
+            // reserved/sold — subtract them from the live count so the UI reflects
+            // the correct available stock.
             if (variantId === id) {
                 inventoryLevel = Math.max(inventoryLevel - qty, 0);
             }
+
+            logger.debug({ productId: id, variantId, inventoryLevel, price: variantPrice }, 'fetchProductDetails: variant inventory');
 
             if (inventoryLevel > 0 && parseFloat(variantPrice) !== 0) {
                 variantsData.push({
@@ -211,8 +235,10 @@ async function fetchProductDetails(id, qty) {
                 });
                 totalQty += inventoryLevel;
             }
-        }
+        });
     }
+
+    logger.debug({ productId: id, variantCount: variantsData.length, totalQty }, 'fetchProductDetails: done');
     return { product, variantsData, totalQty };
 }
 
@@ -253,6 +279,7 @@ async function fetchProductInventory(id, inventoryId, qty, status) {
 }
 
 async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
+    logger.debug({ itemId, parkedMatchCount: matchedProductIds.length }, 'fetchProductInventoryDetails: start');
     const response = await axios.get(
         `https://bazaargeneraltrading.retail.lightspeed.app/api/3.0/products/${itemId}`,
         {
@@ -269,12 +296,12 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
     const variantsData = [];
     let totalQty = 0;
 
-    const getMatchedQty = (variantId) => {
-        const match = matchedProductIds.find(v => v.product === variantId);
-        return match ? Math.floor(match.qty) : 0;
-    };
+    // Build a Map for O(1) parked-qty lookup instead of O(n) Array.find per variant.
+    const parkedQtyMap = new Map(matchedProductIds.map(v => [v.product, Math.floor(v.qty)]));
+    const getMatchedQty = (variantId) => parkedQtyMap.get(variantId) ?? 0;
 
     if (product.variants.length === 0) {
+        logger.debug({ itemId }, 'fetchProductInventoryDetails: no variants, fetching single inventory');
         const inventoryResponse = await axios.get(
             `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${itemId}/inventory`,
             {
@@ -286,11 +313,15 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
         );
 
         const is_active = product.is_active;
-        if (is_active !== true) return { product, variantsData, totalQty };
+        if (is_active !== true) {
+            logger.debug({ itemId }, 'fetchProductInventoryDetails: product inactive, skipping');
+            return { product, variantsData, totalQty };
+        }
 
         const matchedQty = getMatchedQty(product.id);
         let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
         inventoryLevel = Math.max(inventoryLevel - matchedQty, 0);
+        logger.debug({ itemId, inventoryLevel, parkedDeduction: matchedQty }, 'fetchProductInventoryDetails: inventory (no variants)');
 
         if (inventoryLevel > 0 && parseFloat(product.price_standard.tax_inclusive) !== 0) {
             variantsData.push({
@@ -303,31 +334,36 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
             totalQty += inventoryLevel;
         }
     } else {
-        for (const variant of product.variants) {
-            if (!variant.is_active) continue;
+        const activeVariants = product.variants.filter(v => v.is_active);
+        logger.debug({ itemId, totalVariants: product.variants.length, activeVariants: activeVariants.length }, 'fetchProductInventoryDetails: fetching variant inventories in parallel');
 
+        await mapLimit(activeVariants, INVENTORY_CONCURRENCY, async (variant) => {
             const variantId = variant.id;
             const matchedQty = getMatchedQty(variantId);
             const variantPrice = variant.price_standard.tax_inclusive;
+            const sku = variant.variant_definitions?.length
+                ? variant.variant_definitions.map(def => def.value).join(' - ')
+                : '';
 
-            const variantDefinitions = variant.variant_definitions;
-            let sku = '';
-            if (variantDefinitions?.length) {
-                sku = variantDefinitions.map(def => def.value).join(' - ');
+            let inventoryLevel;
+            try {
+                const inventoryResponse = await axios.get(
+                    `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${API_KEY}`,
+                            Accept: 'application/json',
+                        },
+                    }
+                );
+                inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
+            } catch (err) {
+                logger.warn({ itemId, variantId, err: err.message }, 'fetchProductInventoryDetails: inventory fetch failed for variant, skipping');
+                return;
             }
 
-            const inventoryResponse = await axios.get(
-                `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${API_KEY}`,
-                        Accept: 'application/json',
-                    },
-                }
-            );
-
-            let inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
             inventoryLevel = Math.max(inventoryLevel - matchedQty, 0);
+            logger.debug({ itemId, variantId, inventoryLevel, parkedDeduction: matchedQty, price: variantPrice }, 'fetchProductInventoryDetails: variant inventory');
 
             if (inventoryLevel > 0 && parseFloat(variantPrice) !== 0) {
                 variantsData.push({
@@ -339,9 +375,10 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
                 });
                 totalQty += inventoryLevel;
             }
-        }
+        });
     }
 
+    logger.debug({ itemId, variantCount: variantsData.length, totalQty }, 'fetchProductInventoryDetails: done');
     return { product, variantsData, totalQty };
 }
 
@@ -395,28 +432,37 @@ async function fetchProductDetailsForRefresh(id) {
             totalQty += inventoryLevel;
         }
     } else {
-        for (const variant of product.variants) {
-            if (variant.is_active !== true) continue;
+        const activeVariants = product.variants.filter(v => v.is_active === true);
+        logger.info({ id, totalVariants: product.variants.length, activeVariants: activeVariants.length }, '[Refresh Product] fetching variant inventories in parallel');
+
+        await mapLimit(activeVariants, INVENTORY_CONCURRENCY, async (variant) => {
             const variantId = variant.id;
             const pv = variant.price_standard || {};
             const variantPrice = pv.tax_inclusive ?? pv.tax_exclusive;
-            const variantDefinitions = variant.variant_definitions;
-            let sku = '';
-            if (variantDefinitions && variantDefinitions.length > 0) {
-                sku = variantDefinitions.map(d => d.value).join(' - ');
+            const sku = variant.variant_definitions?.length
+                ? variant.variant_definitions.map(d => d.value).join(' - ')
+                : '';
+
+            logger.info({ variantId }, '[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/:variantId/inventory');
+            let inventoryLevel;
+            try {
+                const inventoryResponse = await axios.get(
+                    `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${API_KEY}`,
+                            Accept: 'application/json',
+                        },
+                    }
+                );
+                inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
+            } catch (err) {
+                logger.warn({ id, variantId, err: err.message }, '[Refresh Product] inventory fetch failed for variant, skipping');
+                return;
             }
-            logger.info('[Refresh Product] Hitting Lightspeed API: GET /api/2.0/products/' + variantId + '/inventory');
-            const inventoryResponse = await axios.get(
-                `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${API_KEY}`,
-                        Accept: 'application/json',
-                    },
-                }
-            );
-            const inventoryLevel = inventoryResponse.data.data?.[0]?.inventory_level || 0;
-            logger.debug({ variantId, taxExclusive: pv.tax_exclusive, taxInclusive: pv.tax_inclusive, storingPrice: variantPrice }, '[Refresh Product] price (variant)');
+
+            logger.debug({ variantId, taxExclusive: pv.tax_exclusive, taxInclusive: pv.tax_inclusive, storingPrice: variantPrice, inventoryLevel }, '[Refresh Product] price (variant)');
+
             if (inventoryLevel > 0 && parseFloat(variantPrice) !== 0) {
                 variantsData.push({
                     qty: inventoryLevel,
@@ -427,7 +473,7 @@ async function fetchProductDetailsForRefresh(id) {
                 });
                 totalQty += inventoryLevel;
             }
-        }
+        });
     }
 
     logger.debug({ variantsData: variantsData.map(v => ({ id: v.id, sku: v.sku, price: v.price, qty: v.qty })) }, '[Refresh Product] variantsData to store');

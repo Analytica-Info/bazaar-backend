@@ -517,3 +517,232 @@ describe("handleSaleUpdate", () => {
         expect(cache.del).toHaveBeenCalledWith("catalog:favourites-of-week:v1");
     });
 });
+
+// ---------------------------------------------------------------------------
+// Parallel inventory fetch — handleProductUpdate with multi-variant product
+// ---------------------------------------------------------------------------
+
+const makeMultiVariantProductResponse = (parentId, variants) => ({
+    data: {
+        data: {
+            id: parentId,
+            name: `Parent ${parentId}`,
+            sku_number: `SKU-${parentId}`,
+            is_active: true,
+            ecwid_enabled_webstore: true,
+            variants: variants.map(v => ({
+                id: v.id,
+                name: v.name || `Variant ${v.id}`,
+                is_active: v.is_active !== false,
+                price_standard: { tax_inclusive: v.price || "100.00" },
+                variant_definitions: v.definitions || [{ value: v.id }],
+            })),
+            price_standard: { tax_inclusive: "100.00", tax_exclusive: "95.24" },
+        },
+    },
+});
+
+describe("parallel inventory fetch (multi-variant products)", () => {
+    it("fetches all active variant inventories and builds variantsData correctly", async () => {
+        cache.get.mockResolvedValue(null);
+
+        // Product with 3 variants — all active
+        const variants = [
+            { id: "v1", price: "80.00", definitions: [{ value: "Red" }] },
+            { id: "v2", price: "90.00", definitions: [{ value: "Blue" }] },
+            { id: "v3", price: "70.00", definitions: [{ value: "Green" }] },
+        ];
+
+        await Product.create({
+            product: { id: "parent_multi", name: "Multi" },
+            variantsData: [{ id: "v1", qty: 5, price: "80.00" }],
+            totalQty: 5,
+            status: true,
+        });
+
+        axios.get
+            .mockResolvedValueOnce(makeProductResponse("parent_multi"))      // 2.0 product detail (onlineStatus)
+            // fetchProductDetails (existingProductId not in DB, so this path is skipped)
+            .mockResolvedValueOnce(makeParkedSalesResponse([]))               // filterParkProducts
+            // fetchProductInventoryDetails: 3.0 product
+            .mockResolvedValueOnce(makeMultiVariantProductResponse("parent_multi", variants))
+            // 3 concurrent inventory calls — order not guaranteed but each resolves
+            .mockResolvedValueOnce(makeInventoryResponse(5))  // v1
+            .mockResolvedValueOnce(makeInventoryResponse(3))  // v2
+            .mockResolvedValueOnce(makeInventoryResponse(8)); // v3
+
+        const payload = JSON.stringify({ id: "parent_multi", variant_parent_id: null });
+        const result = await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        expect(result).toEqual({ success: true });
+
+        const updated = await Product.findOne({ "product.id": "parent_multi" }).lean();
+        expect(updated.variantsData).toHaveLength(3);
+        expect(updated.totalQty).toBe(16); // 5+3+8
+    });
+
+    it("skips inactive variants and does not fetch their inventory", async () => {
+        cache.get.mockResolvedValue(null);
+
+        const variants = [
+            { id: "vA", price: "50.00", is_active: true },
+            { id: "vB", price: "60.00", is_active: false }, // inactive — should be skipped
+        ];
+
+        await Product.create({
+            product: { id: "parent_inactive", name: "Inactive Variant" },
+            variantsData: [{ id: "vA", qty: 4, price: "50.00" }],
+            totalQty: 4,
+            status: true,
+        });
+
+        axios.get
+            .mockResolvedValueOnce(makeProductResponse("parent_inactive"))
+            .mockResolvedValueOnce(makeParkedSalesResponse([]))
+            .mockResolvedValueOnce(makeMultiVariantProductResponse("parent_inactive", variants))
+            .mockResolvedValueOnce(makeInventoryResponse(4)); // only vA fetched
+
+        const payload = JSON.stringify({ id: "parent_inactive", variant_parent_id: null });
+        await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        // vB is inactive → only 1 inventory call (for vA)
+        const inventoryCalls = axios.get.mock.calls.filter(([url]) =>
+            url.includes('/inventory')
+        );
+        expect(inventoryCalls).toHaveLength(1);
+        expect(inventoryCalls[0][0]).toContain('vA');
+    });
+
+    it("excludes variants with zero inventory from variantsData", async () => {
+        cache.get.mockResolvedValue(null);
+
+        const variants = [
+            { id: "vX", price: "100.00", is_active: true },
+            { id: "vY", price: "100.00", is_active: true },
+        ];
+
+        await Product.create({
+            product: { id: "parent_zero", name: "Zero Stock" },
+            variantsData: [{ id: "vX", qty: 2, price: "100.00" }],
+            totalQty: 2,
+            status: true,
+        });
+
+        axios.get
+            .mockResolvedValueOnce(makeProductResponse("parent_zero"))
+            .mockResolvedValueOnce(makeParkedSalesResponse([]))
+            .mockResolvedValueOnce(makeMultiVariantProductResponse("parent_zero", variants))
+            .mockResolvedValueOnce(makeInventoryResponse(2))  // vX: 2 in stock
+            .mockResolvedValueOnce(makeInventoryResponse(0)); // vY: out of stock
+
+        const payload = JSON.stringify({ id: "parent_zero", variant_parent_id: null });
+        await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        const updated = await Product.findOne({ "product.id": "parent_zero" }).lean();
+        // vY has 0 inventory → excluded
+        expect(updated.variantsData).toHaveLength(1);
+        expect(updated.variantsData[0].id).toBe("vX");
+    });
+
+    it("continues processing other variants when one inventory call fails (partial failure)", async () => {
+        cache.get.mockResolvedValue(null);
+
+        const variants = [
+            { id: "vGood", price: "100.00", is_active: true },
+            { id: "vBad",  price: "100.00", is_active: true },
+        ];
+
+        await Product.create({
+            product: { id: "parent_partial", name: "Partial Fail" },
+            variantsData: [{ id: "vGood", qty: 5, price: "100.00" }],
+            totalQty: 5,
+            status: true,
+        });
+
+        axios.get
+            .mockResolvedValueOnce(makeProductResponse("parent_partial"))
+            .mockResolvedValueOnce(makeParkedSalesResponse([]))
+            .mockResolvedValueOnce(makeMultiVariantProductResponse("parent_partial", variants))
+            // One succeeds, one throws (network error / 429)
+            .mockResolvedValueOnce(makeInventoryResponse(5))                 // vGood
+            .mockRejectedValueOnce(new Error("Lightspeed 429 rate limit")); // vBad
+
+        const payload = JSON.stringify({ id: "parent_partial", variant_parent_id: null });
+        // Should NOT throw — failed variant is skipped with a warning
+        const result = await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        expect(result).toEqual({ success: true });
+
+        const updated = await Product.findOne({ "product.id": "parent_partial" }).lean();
+        // vGood was processed; vBad was skipped
+        expect(updated.variantsData).toHaveLength(1);
+        expect(updated.variantsData[0].id).toBe("vGood");
+    });
+
+    it("deducts parked qty from inventory via lookup table in fetchProductInventoryDetails", async () => {
+        cache.get.mockResolvedValue(null);
+
+        const variants = [
+            { id: "vParked", price: "100.00", is_active: true },
+        ];
+
+        // Parked sale has 2 units of vParked reserved
+        await Product.create({
+            product: { id: "parent_parked", name: "Parked" },
+            variantsData: [{ id: "vParked", qty: 10, price: "100.00" }],
+            totalQty: 10,
+            status: true,
+        });
+
+        axios.get
+            .mockResolvedValueOnce(makeProductResponse("parent_parked"))
+            .mockResolvedValueOnce(makeParkedSalesResponse([{ id: "vParked", qty: 2 }])) // 2 parked
+            .mockResolvedValueOnce(makeMultiVariantProductResponse("parent_parked", variants))
+            .mockResolvedValueOnce(makeInventoryResponse(10)); // raw level = 10
+
+        const payload = JSON.stringify({ id: "parent_parked", variant_parent_id: null });
+        await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        const updated = await Product.findOne({ "product.id": "parent_parked" }).lean();
+        // 10 raw - 2 parked = 8 available
+        expect(updated.variantsData[0].qty).toBe(8);
+        expect(updated.totalQty).toBe(8);
+    });
+
+    it("all inventory calls are made concurrently (Promise.all semantics)", async () => {
+        cache.get.mockResolvedValue(null);
+
+        // 4 variants — track call order to verify they're issued before any resolves
+        const callOrder = [];
+        const variants = ['v1', 'v2', 'v3', 'v4'].map(id => ({ id, price: "100.00", is_active: true }));
+
+        await Product.create({
+            product: { id: "parent_concurrent", name: "Concurrent" },
+            variantsData: [],
+            totalQty: 0,
+            status: true,
+        });
+
+        let inventoryCallCount = 0;
+        axios.get.mockImplementation((url) => {
+            if (url.includes('/inventory')) {
+                inventoryCallCount++;
+                callOrder.push(url.split('/products/')[1].split('/')[0]);
+                return Promise.resolve(makeInventoryResponse(2));
+            }
+            if (url.includes('/api/3.0/')) return Promise.resolve(makeMultiVariantProductResponse("parent_concurrent", variants));
+            if (url.includes('/api/2.0/products/parent_concurrent')) return Promise.resolve(makeProductResponse("parent_concurrent"));
+            if (url.includes('search?type=sales')) return Promise.resolve(makeParkedSalesResponse([]));
+            return Promise.resolve(makeProductResponse("parent_concurrent"));
+        });
+
+        const payload = JSON.stringify({ id: "parent_concurrent", variant_parent_id: null });
+        await productSyncService.handleProductUpdate({ payload, type: "product.update" });
+
+        // All 4 variants should have had inventory fetched
+        expect(inventoryCallCount).toBe(4);
+        const updated = await Product.findOne({ "product.id": "parent_concurrent" }).lean();
+        expect(updated.variantsData).toHaveLength(4);
+        expect(updated.totalQty).toBe(8); // 4 variants × 2 each
+    });
+});
