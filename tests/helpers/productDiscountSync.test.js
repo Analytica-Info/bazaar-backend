@@ -93,11 +93,34 @@ describe('syncDiscountFieldsForParentIds', () => {
             expect(mockCache.set).not.toHaveBeenCalled();
         });
 
-        it('marks target as isHighest when its discount ties for the cached max', async () => {
-            mockCache.get.mockResolvedValue('50');
+        it('marks target as isHighest on tie but does NOT demote co-leaders', async () => {
+            // taxInclusive=100, variantPrice=50 → originalPrice=100/0.65≈153.85
+            // discount = round((153.85-50)/153.85*100) = 68
+            // Set cached max = 68 so this is a genuine tie
+            mockCache.get.mockResolvedValue('68');
 
-            // taxInclusive=100, variantPrice=50 → discount = 50%
             const target = makeProduct('p1', 100, 50, false);
+
+            Product.find
+                .mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve([target]) }) });
+
+            Product.bulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+
+            const result = await syncDiscountFieldsForParentIds(['p1'], 'webhook', 'now');
+
+            expect(result.path).toBe('fast');
+            const ops = Product.bulkWrite.mock.calls[0][0];
+            // Only one op: set isHighest: true on the target — no demote on a tie
+            expect(ops).toHaveLength(1);
+            expect(ops[0].updateOne.update.$set.isHighest).toBe(true);
+            expect(ops.find(op => op.updateMany)).toBeUndefined();
+        });
+
+        it('demotes old leader when target is a strictly new leader (> cached max)', async () => {
+            mockCache.get.mockResolvedValue('40');
+
+            // taxInclusive=100, variantPrice=40 → ~74% discount > 40
+            const target = makeProduct('p1', 100, 40, false);
 
             Product.find
                 .mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve([target]) }) });
@@ -108,9 +131,8 @@ describe('syncDiscountFieldsForParentIds', () => {
 
             expect(result.path).toBe('fast');
             const ops = Product.bulkWrite.mock.calls[0][0];
-            // First op: target product with isHighest: true
             expect(ops[0].updateOne.update.$set.isHighest).toBe(true);
-            // Second op: demote old leader
+            // Demote op IS present for a strictly new leader
             expect(ops[1].updateMany).toBeDefined();
         });
 

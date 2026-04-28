@@ -15,7 +15,7 @@ jest.mock('../../src/utilities/cache', () => ({
 const fs = require('fs');
 const axios = require('axios');
 const Product = require('../../src/models/Product');
-const { updateParkedDetails } = require('../../src/scripts/updateProductsNew');
+const { updateParkedDetails, updateSoldItems } = require('../../src/scripts/updateProductsNew');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -328,5 +328,122 @@ describe('updateParkedDetails — batch DB fetch (N+1 fix)', () => {
         expect(updated.variantsData.find(v => v.id === 'vm2').qty).toBe(5);  // updated
         expect(updated.variantsData.find(v => v.id === 'vm3').qty).toBe(4);  // untouched
         expect(updated.totalQty).toBe(19); // 10 + 5 + 4
+    });
+
+    it('correctly computes totalQty when two variants of the same parent are both parked (stale-snapshot fix)', async () => {
+        // Parent has two variants: va (qty=10) and vb (qty=8).
+        // Both are in the parked list. Without the fix the second iteration would
+        // compute totalQty from the pre-fetch snapshot (va=10, vb live), getting
+        // the wrong total. With the fix the Map is updated after each iteration
+        // so the second iteration sees the already-committed va qty.
+        await Product.create(makeProductDoc({
+            parentId: 'p_two_parked',
+            variants: [
+                { id: 'va', qty: 10 },
+                { id: 'vb', qty: 8 },
+            ],
+        }));
+
+        axios.get
+            // Iteration 1: va — raw=9, SAVED-1 → 8
+            .mockResolvedValueOnce(makeLightspeedProductResponse('p_two_parked'))
+            .mockResolvedValueOnce(makeInventoryResponse(9))
+            // Iteration 2: vb — raw=6, SAVED-2 → 4
+            .mockResolvedValueOnce(makeLightspeedProductResponse('p_two_parked'))
+            .mockResolvedValueOnce(makeInventoryResponse(6));
+
+        const count = await updateParkedDetails([
+            { product: 'va', qty: 1, status: 'SAVED' },
+            { product: 'vb', qty: 2, status: 'SAVED' },
+        ]);
+
+        expect(count).toBe(2);
+
+        const updated = await Product.findOne({ 'product.id': 'p_two_parked' }).lean();
+        expect(updated.variantsData.find(v => v.id === 'va').qty).toBe(8);
+        expect(updated.variantsData.find(v => v.id === 'vb').qty).toBe(4);
+        // totalQty must reflect both iterations: 8 + 4 = 12, NOT 10 + 4 = 14 (stale)
+        expect(updated.totalQty).toBe(12);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// updateSoldItems — sold qty summed across ALL variants (not just first)
+// ---------------------------------------------------------------------------
+
+const makeSalesApiResponse = (lineItems, versionMax = '') => ({
+    data: {
+        data: lineItems.map(item => ({
+            line_items: [{ product_id: item.variantId, quantity: item.qty }],
+        })),
+        version: { max: versionMax },
+    },
+});
+
+describe('updateSoldItems — aggregate sold qty across all variants', () => {
+    it('sums sold qty from all variants of a multi-variant product', async () => {
+        await Product.create(makeProductDoc({
+            parentId: 'p_sold_multi',
+            variants: [
+                { id: 'sv1', qty: 5 },
+                { id: 'sv2', qty: 3 },
+            ],
+        }));
+
+        // sv1 sold 10, sv2 sold 5 → total should be 15
+        axios.get.mockResolvedValueOnce(makeSalesApiResponse([
+            { variantId: 'sv1', qty: 10 },
+            { variantId: 'sv2', qty: 5 },
+        ]));
+
+        await updateSoldItems();
+
+        const updated = await Product.findOne({ 'product.id': 'p_sold_multi' }).lean();
+        expect(updated.sold).toBe(15); // NOT 10 (first-variant-only bug)
+    });
+
+    it('records sold qty correctly for a single-variant product', async () => {
+        await Product.create(makeProductDoc({
+            parentId: 'p_sold_single',
+            variants: [{ id: 'sv_only', qty: 8 }],
+        }));
+
+        axios.get.mockResolvedValueOnce(makeSalesApiResponse([
+            { variantId: 'sv_only', qty: 7 },
+        ]));
+
+        await updateSoldItems();
+
+        const updated = await Product.findOne({ 'product.id': 'p_sold_single' }).lean();
+        expect(updated.sold).toBe(7);
+    });
+
+    it('does not write a sold record when no variants of the product appear in sales', async () => {
+        await Product.create(makeProductDoc({
+            parentId: 'p_no_sales',
+            variants: [{ id: 'sv_unsold', qty: 10 }],
+        }));
+
+        // Sales for a completely different variant
+        axios.get.mockResolvedValueOnce(makeSalesApiResponse([
+            { variantId: 'other_variant', qty: 3 },
+        ]));
+
+        await updateSoldItems();
+
+        const updated = await Product.findOne({ 'product.id': 'p_no_sales' }).lean();
+        // sold field should not have been written by updateSoldItems (may be 0 from schema default)
+        expect(updated.sold ?? 0).toBe(0);
+    });
+
+    it('handles empty sales response without throwing', async () => {
+        await Product.create(makeProductDoc({
+            parentId: 'p_empty_sales',
+            variants: [{ id: 'sv_e', qty: 5 }],
+        }));
+
+        axios.get.mockResolvedValueOnce(makeSalesApiResponse([]));
+
+        await expect(updateSoldItems()).resolves.not.toThrow();
     });
 });

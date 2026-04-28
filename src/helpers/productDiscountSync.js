@@ -128,8 +128,11 @@ async function fastSync(targetProduct, newFields, maxDiscount, isNewLeader, webh
     },
   });
 
-  if (isNewLeader) {
-    // Demote any product that previously held isHighest (there should be at most one).
+  const targetDiscount = newFields.discount;
+  if (isNewLeader && targetDiscount > maxDiscount) {
+    // Only demote previous leader when this product is a STRICTLY new leader.
+    // On a tie (targetDiscount === maxDiscount) other products may legitimately
+    // share isHighest — demoting them would incorrectly remove co-leaders.
     ops.push({
       updateMany: {
         filter: { isHighest: true, _id: { $ne: targetProduct._id } },

@@ -129,6 +129,11 @@ const updateParkedDetails = async (productIds) => {
           }
         );
 
+        // Keep the in-memory snapshot current so that if another parked item
+        // shares the same parent product, the next iteration starts from the
+        // already-updated variantsData rather than the stale pre-fetch values.
+        matchedProduct.variantsData = updatedVariants;
+
         console.log(
           `✅ Parked Sale Inventory Updated Product with ID : ${id.product} | Parent ID : ${itemId}`
         );
@@ -429,14 +434,16 @@ async function updateSoldItems() {
 
     const bulkOps = [];
     for (const product of soldProducts) {
-      // Find which variant IDs from soldCounts match this product's variantsData.
-      const matchingVariantId = (product.variantsData || []).find(
-        (v) => soldCounts[v.id] !== undefined
-      )?.id;
+      // Sum sold qty across ALL variants of this product, not just the first
+      // matching one. Array.find would stop at the first variant with sales and
+      // undercount multi-variant products where several variants were sold.
+      const soldQty = (product.variantsData || []).reduce(
+        (sum, v) => sum + (soldCounts[v.id] || 0),
+        0
+      );
 
-      if (!matchingVariantId) continue;
+      if (!soldQty) continue;
 
-      const soldQty = soldCounts[matchingVariantId];
       const safeSoldQty =
         soldQty && typeof soldQty === "number" && soldQty > 0 ? soldQty : 0;
 
@@ -623,3 +630,4 @@ const calculateDiscount = (product) => {
 
 module.exports = updateProductsNew;
 module.exports.updateParkedDetails = updateParkedDetails;
+module.exports.updateSoldItems = updateSoldItems;
