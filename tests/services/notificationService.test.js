@@ -268,3 +268,92 @@ describe("notificationService", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// getUserNotifications — pagination (v2)
+// These tests define the CONTRACT for the future paginated implementation.
+// They WILL FAIL until getUserNotifications(userId, { page, limit }) is added.
+// ---------------------------------------------------------------------------
+describe("getUserNotifications — pagination (v2)", () => {
+  let paginationUser;
+
+  // Helper: create N notifications for a user, spaced 1ms apart so sort order
+  // is deterministic without relying on wall-clock timing.
+  async function createNotificationsForUser(userId, count) {
+    const docs = [];
+    const base = new Date("2024-01-01T00:00:00.000Z");
+    for (let i = 0; i < count; i++) {
+      docs.push({
+        userId,
+        title: `Notif ${i + 1}`,
+        message: `Message ${i + 1}`,
+        read: i % 2 === 0, // alternating read/unread
+        createdAt: new Date(base.getTime() + i * 1000), // 1 s apart
+      });
+    }
+    await Notification.insertMany(docs);
+  }
+
+  beforeEach(async () => {
+    const User = require("../../src/models/User");
+    paginationUser = await User.create({
+      name: "Pagination User",
+      email: "pagination@test.com",
+      phone: "1111111111",
+    });
+    await createNotificationsForUser(paginationUser._id, 5);
+  });
+
+  it("page=1, limit=2 with 5 notifications returns exactly 2 notifications", async () => {
+    const result = await notificationService.getUserNotifications(
+      paginationUser._id,
+      { page: 1, limit: 2 }
+    );
+    expect(result.notifications).toHaveLength(2);
+  });
+
+  it("page=2, limit=2 with 5 notifications returns the next 2 notifications", async () => {
+    const result = await notificationService.getUserNotifications(
+      paginationUser._id,
+      { page: 2, limit: 2 }
+    );
+    expect(result.notifications).toHaveLength(2);
+  });
+
+  it("page=3, limit=2 with 5 notifications returns the remaining 1 notification", async () => {
+    const result = await notificationService.getUserNotifications(
+      paginationUser._id,
+      { page: 3, limit: 2 }
+    );
+    expect(result.notifications).toHaveLength(1);
+  });
+
+  it("result includes notificationsCount (total, not page count) and unreadCount", async () => {
+    const result = await notificationService.getUserNotifications(
+      paginationUser._id,
+      { page: 1, limit: 2 }
+    );
+    // Total across ALL pages, not just the current page
+    expect(result.notificationsCount).toBe(5);
+    // 5 notifications: indices 0,2,4 are read=true → 2 unread (indices 1,3)
+    expect(result.unreadCount).toBe(2);
+  });
+
+  it("notifications are sorted newest first (descending createdAt)", async () => {
+    const result = await notificationService.getUserNotifications(
+      paginationUser._id,
+      { page: 1, limit: 5 }
+    );
+    const dates = result.notifications.map((n) => new Date(n.createdAt).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i - 1]).toBeGreaterThanOrEqual(dates[i]);
+    }
+  });
+
+  it("calling without page/limit still returns notifications (backward compat)", async () => {
+    const result = await notificationService.getUserNotifications(paginationUser._id);
+    expect(result).toHaveProperty("notifications");
+    expect(Array.isArray(result.notifications)).toBe(true);
+    expect(result.notifications.length).toBeGreaterThan(0);
+  });
+});

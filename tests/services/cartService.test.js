@@ -203,3 +203,128 @@ describe("cartService", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// cartService — gift-with-purchase logic
+//
+// The gift logic is driven by a Product document with { isGift: true }.
+// getGiftProductInfo() queries: Product.findOne({ isGift: true, status: true })
+// Threshold defaults to AED 400 (GIFT_THRESHOLD_DEFAULT_AED) or
+// product.giftThreshold if set.
+// GIFT_MIN_STOCK = 5 — gift product must have totalQty >= 5 to be considered
+// "in stock".
+// ---------------------------------------------------------------------------
+describe("cartService — gift-with-purchase logic", () => {
+  let userId;
+  let regularProductId;
+  let giftProductId;
+
+  const GIFT_THRESHOLD = 400; // matches GIFT_THRESHOLD_DEFAULT_AED in service
+
+  beforeEach(async () => {
+    userId = new mongoose.Types.ObjectId();
+
+    // Regular product priced at AED 100
+    const regular = await Product.create({
+      product: { name: "Regular Product", id: "reg-001", product_type_id: "cat-1" },
+      variantsData: [{ id: "v1", name: "Default", qty: 20 }],
+      totalQty: 20,
+      status: true,
+      discount: 0,
+      originalPrice: 100,
+      discountedPrice: 100,
+    });
+    regularProductId = regular._id.toString();
+
+    // Gift product — isGift:true, sufficient stock (>= 5)
+    const gift = await Product.create({
+      product: { name: "Free Gift", id: "gift-001", product_type_id: "cat-gift" },
+      variantsData: [{ id: "gv1", name: "Default", qty: 10 }],
+      totalQty: 10,
+      status: true,
+      isGift: true,
+      giftVariantId: "gv1",
+      // giftThreshold omitted → defaults to AED 400
+    });
+    giftProductId = gift._id.toString();
+  });
+
+  it("subtotal BELOW threshold: giftEligible is false", async () => {
+    // 3 × AED 100 = AED 300 < AED 400
+    await Cart.create({
+      user: userId,
+      items: [cartItem(regularProductId, { quantity: 3, variantPrice: "100" })],
+    });
+
+    const result = await cartService.getCart(userId, { includeGiftLogic: true });
+
+    expect(result.giftEligible).toBe(false);
+    expect(result.cartSubtotal).toBe(300);
+  });
+
+  it("subtotal AT threshold: giftEligible is true", async () => {
+    // 4 × AED 100 = AED 400 >= AED 400
+    await Cart.create({
+      user: userId,
+      items: [cartItem(regularProductId, { quantity: 4, variantPrice: "100" })],
+    });
+
+    const result = await cartService.getCart(userId, { includeGiftLogic: true });
+
+    expect(result.giftEligible).toBe(true);
+    expect(result.cartSubtotal).toBe(400);
+  });
+
+  it("eligible and gift in stock: giftAdded is true and promoMessage mentions the gift", async () => {
+    // 5 × AED 100 = AED 500 >= AED 400; gift has totalQty=10 (>= GIFT_MIN_STOCK=5)
+    await Cart.create({
+      user: userId,
+      items: [cartItem(regularProductId, { quantity: 5, variantPrice: "100" })],
+    });
+
+    const result = await cartService.getCart(userId, { includeGiftLogic: true });
+
+    expect(result.giftEligible).toBe(true);
+    expect(result.giftAdded).toBe(true);
+    expect(result.promoMessage).toMatch(/gift/i);
+  });
+
+  it("the free gift item added to cart has price '0' and isGiftWithPurchase true", async () => {
+    await Cart.create({
+      user: userId,
+      items: [cartItem(regularProductId, { quantity: 5, variantPrice: "100" })],
+    });
+
+    const result = await cartService.getCart(userId, { includeGiftLogic: true });
+
+    const giftInCart = result.cart.find((i) => i.isGiftWithPurchase === true);
+    expect(giftInCart).toBeDefined();
+    expect(giftInCart.price).toBe("0");
+    expect(giftInCart.variantPrice).toBe("0");
+    expect(giftInCart.isGiftWithPurchase).toBe(true);
+  });
+
+  it("includeGiftLogic: false does NOT add giftEligible / giftAdded fields", async () => {
+    await Cart.create({
+      user: userId,
+      items: [cartItem(regularProductId, { quantity: 5, variantPrice: "100" })],
+    });
+
+    const result = await cartService.getCart(userId, { includeGiftLogic: false });
+
+    expect(result.giftEligible).toBeUndefined();
+    expect(result.giftAdded).toBeUndefined();
+    expect(result.promoMessage).toBeUndefined();
+    expect(result.cartSubtotal).toBeUndefined();
+  });
+
+  it("empty cart with includeGiftLogic: true returns giftEligible false and cartSubtotal 0", async () => {
+    // No cart in DB at all
+    const result = await cartService.getCart(userId, { includeGiftLogic: true });
+
+    expect(result.giftEligible).toBe(false);
+    expect(result.cartSubtotal).toBe(0);
+    expect(result.giftAdded).toBe(false);
+    expect(result.cart).toEqual([]);
+  });
+});

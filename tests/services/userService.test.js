@@ -255,3 +255,198 @@ describe('userService.addReview', () => {
         expect(result.reviews[0].name).toBe('Updated Name');
     });
 });
+
+// ---------------------------------------------------------------------------
+// getPaymentHistory
+// ---------------------------------------------------------------------------
+describe('userService.getPaymentHistory', () => {
+    it('throws 404 when user has no orders', async () => {
+        const user = await createTestUser({ email: 'payment-history-none@example.com' });
+
+        await expect(
+            userService.getPaymentHistory(user._id.toString())
+        ).rejects.toEqual(expect.objectContaining({ status: 404, message: 'No payment history found.' }));
+    });
+
+    it('returns { history } with populated order details when orders exist', async () => {
+        const user = await createTestUser({ email: 'payment-history-exists@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-PH-001', name: 'Payment Product' } });
+        const order = await createTestOrder(user._id, { email: 'payment-history-exists@example.com' });
+        await createTestOrderDetail(order._id, product._id);
+
+        const result = await userService.getPaymentHistory(user._id.toString());
+
+        expect(result).toHaveProperty('history');
+        expect(result.history).toHaveLength(1);
+    });
+
+    it('history[0] has order_details array attached', async () => {
+        const user = await createTestUser({ email: 'payment-history-details@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-PH-002', name: 'Payment Product 2' } });
+        const order = await createTestOrder(user._id, { email: 'payment-history-details@example.com' });
+        await createTestOrderDetail(order._id, product._id);
+
+        const result = await userService.getPaymentHistory(user._id.toString());
+
+        expect(result.history[0]).toHaveProperty('order_details');
+        expect(Array.isArray(result.history[0].order_details)).toBe(true);
+        expect(result.history[0].order_details.length).toBeGreaterThan(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getSinglePaymentHistory
+// ---------------------------------------------------------------------------
+describe('userService.getSinglePaymentHistory', () => {
+    it('throws 404 when order not found for user', async () => {
+        const user = await createTestUser({ email: 'single-payment-none@example.com' });
+        const fakeOrderId = new mongoose.Types.ObjectId();
+
+        await expect(
+            userService.getSinglePaymentHistory(user._id.toString(), fakeOrderId.toString())
+        ).rejects.toEqual(expect.objectContaining({ status: 404, message: 'No payment history found.' }));
+    });
+
+    it('returns { history } with the single order when found', async () => {
+        const user = await createTestUser({ email: 'single-payment-found@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-SPH-001', name: 'Single Payment Product' } });
+        const order = await createTestOrder(user._id, { email: 'single-payment-found@example.com' });
+        await createTestOrderDetail(order._id, product._id);
+
+        const result = await userService.getSinglePaymentHistory(user._id.toString(), order._id.toString());
+
+        expect(result).toHaveProperty('history');
+        expect(result.history).toHaveLength(1);
+        expect(result.history[0]._id.toString()).toBe(order._id.toString());
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getMobilePaymentHistory
+// ---------------------------------------------------------------------------
+describe('userService.getMobilePaymentHistory', () => {
+    it('returns correct structure { payment: { order_history, buyer_history } } when user has orders', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-struct@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-MPH-001', name: 'Mobile Product' } });
+        const order = await createTestOrder(user._id, {
+            user_id: user._id,
+            email: 'mobile-payment-struct@example.com',
+        });
+        await createTestOrderDetail(order._id, product._id);
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        expect(result).toHaveProperty('payment');
+        expect(result.payment).toHaveProperty('order_history');
+        expect(result.payment).toHaveProperty('buyer_history');
+        expect(Array.isArray(result.payment.order_history)).toBe(true);
+    });
+
+    it('buyer_history.loyalty_level counts only successful orders (excludes pending/failed/cancelled/refunded/expired)', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-loyalty@example.com' });
+        let i = 0;
+        const nextId = () => ({ order_id: `ORD-LOYALTY-${i++}` });
+
+        await createTestOrder(user._id, { ...nextId(), user_id: user._id, email: 'mobile-payment-loyalty@example.com', payment_status: 'paid' });
+        await createTestOrder(user._id, { ...nextId(), user_id: user._id, email: 'mobile-payment-loyalty@example.com', payment_status: 'paid' });
+        await createTestOrder(user._id, { ...nextId(), user_id: user._id, email: 'mobile-payment-loyalty@example.com', payment_status: 'pending' });
+        await createTestOrder(user._id, { ...nextId(), user_id: user._id, email: 'mobile-payment-loyalty@example.com', payment_status: 'failed' });
+        await createTestOrder(user._id, { ...nextId(), user_id: user._id, email: 'mobile-payment-loyalty@example.com', payment_status: 'cancelled' });
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        expect(result.payment.buyer_history.loyalty_level).toBe(2);
+    });
+
+    it('buyer_history.registered_since equals the userCreatedAt passed in', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-since@example.com' });
+        const registeredDate = new Date('2022-06-15');
+
+        const result = await userService.getMobilePaymentHistory(user._id, registeredDate);
+
+        expect(result.payment.buyer_history.registered_since).toEqual(registeredDate);
+    });
+
+    it('maps order status correctly (Confirmed → newOne, Delivered → delivered)', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-status@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-MPH-STATUS', name: 'Status Product' } });
+
+        const confirmedOrder = await createTestOrder(user._id, {
+            order_id: 'ORD-STATUS-1',
+            user_id: user._id,
+            email: 'mobile-payment-status@example.com',
+            status: 'Confirmed',
+        });
+        await createTestOrderDetail(confirmedOrder._id, product._id);
+
+        const deliveredOrder = await createTestOrder(user._id, {
+            order_id: 'ORD-STATUS-2',
+            user_id: user._id,
+            email: 'mobile-payment-status@example.com',
+            status: 'Delivered',
+        });
+        await createTestOrderDetail(deliveredOrder._id, product._id);
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        const statuses = result.payment.order_history.map(o => o.status);
+        expect(statuses).toContain('newOne');
+        expect(statuses).toContain('delivered');
+    });
+
+    it('maps payment method correctly (card → card, tabby → tabby)', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-method@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-MPH-METHOD', name: 'Method Product' } });
+
+        const cardOrder = await createTestOrder(user._id, {
+            order_id: 'ORD-METHOD-1',
+            user_id: user._id,
+            email: 'mobile-payment-method@example.com',
+            payment_method: 'card',
+        });
+        await createTestOrderDetail(cardOrder._id, product._id);
+
+        const tabbyOrder = await createTestOrder(user._id, {
+            order_id: 'ORD-METHOD-2',
+            user_id: user._id,
+            email: 'mobile-payment-method@example.com',
+            payment_method: 'tabby',
+        });
+        await createTestOrderDetail(tabbyOrder._id, product._id);
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        const methods = result.payment.order_history.map(o => o.paymentMethod);
+        expect(methods).toContain('card');
+        expect(methods).toContain('tabby');
+    });
+
+    it('returns empty order_history: [] when user has no orders (should NOT throw)', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-empty@example.com' });
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        expect(result.payment.order_history).toEqual([]);
+    });
+
+    it('order_history items include buyer name/email/phone from the order', async () => {
+        const user = await createTestUser({ email: 'mobile-payment-buyer@example.com' });
+        const product = await createTestProduct({ product: { sku_number: 'SKU-MPH-BUYER', name: 'Buyer Product' } });
+        const order = await createTestOrder(user._id, {
+            user_id: user._id,
+            name: 'John Doe',
+            email: 'mobile-payment-buyer@example.com',
+            phone: '9876543210',
+        });
+        await createTestOrderDetail(order._id, product._id);
+
+        const result = await userService.getMobilePaymentHistory(user._id, new Date('2023-01-01'));
+
+        const firstItem = result.payment.order_history[0];
+        expect(firstItem.buyer).toEqual(expect.objectContaining({
+            name: 'John Doe',
+            email: 'mobile-payment-buyer@example.com',
+            phone: '9876543210',
+        }));
+    });
+});

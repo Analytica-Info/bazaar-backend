@@ -586,3 +586,339 @@ describe('authService.register - platform differences', () => {
         }));
     });
 });
+
+// ---------------------------------------------------------------------------
+// loginWithCredentials — return bundle
+// ---------------------------------------------------------------------------
+describe('authService.loginWithCredentials — return bundle', () => {
+    it('success case asserts all return fields', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'Bundle User',
+            email: 'bundle@example.com',
+            phone: '1000000001',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const result = await authService.loginWithCredentials({
+            email: 'bundle@example.com',
+            password: VALID_PASSWORD,
+        });
+
+        expect(result.tokens.accessToken).toBeDefined();
+        expect(result.tokens.refreshToken).toBeDefined();
+        expect(result.coupon).toBeDefined();
+        expect(typeof result.totalOrderCount).toBe('number');
+        expect(typeof result.usedFirst15Coupon).toBe('boolean');
+        expect(result.user.name).toBe('Bundle User');
+        expect(result.user.email).toBe('bundle@example.com');
+    });
+
+    it('rememberMe: true returns cookieMaxAge of 30 days', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'Remember User',
+            email: 'remember-true@example.com',
+            phone: '1000000002',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const result = await authService.loginWithCredentials({
+            email: 'remember-true@example.com',
+            password: VALID_PASSWORD,
+            rememberMe: true,
+            platform: 'web',
+        });
+
+        expect(result.cookieMaxAge).toBe(30 * 24 * 60 * 60 * 1000);
+    });
+
+    it('rememberMe: false returns cookieMaxAge of 7 days', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'No Remember User',
+            email: 'remember-false@example.com',
+            phone: '1000000003',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const result = await authService.loginWithCredentials({
+            email: 'remember-false@example.com',
+            password: VALID_PASSWORD,
+            rememberMe: false,
+            platform: 'web',
+        });
+
+        expect(result.cookieMaxAge).toBe(7 * 24 * 60 * 60 * 1000);
+    });
+
+    it('platform: mobile does not return cookieMaxAge', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'Mobile Login User',
+            email: 'mobile-login@example.com',
+            phone: '1000000004',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const result = await authService.loginWithCredentials({
+            email: 'mobile-login@example.com',
+            password: VALID_PASSWORD,
+            platform: 'mobile',
+        });
+
+        expect(result.cookieMaxAge).toBeUndefined();
+    });
+
+    it('throws 403 when user isBlocked: true', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'Blocked User',
+            email: 'blocked-login@example.com',
+            phone: '1000000005',
+            password: hashedPassword,
+            authProvider: 'local',
+            isBlocked: true,
+            blockedAt: new Date(),
+        });
+
+        await expect(
+            authService.loginWithCredentials({
+                email: 'blocked-login@example.com',
+                password: VALID_PASSWORD,
+            })
+        ).rejects.toEqual(expect.objectContaining({ status: 403 }));
+    });
+
+    it('throws 403 with admin-deleted message when isDeleted and deletedBy: admin', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        await User.create({
+            name: 'Admin Deleted User',
+            email: 'admin-deleted@example.com',
+            phone: '1000000006',
+            password: hashedPassword,
+            authProvider: 'local',
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedBy: 'admin',
+        });
+
+        await expect(
+            authService.loginWithCredentials({
+                email: 'admin-deleted@example.com',
+                password: VALID_PASSWORD,
+            })
+        ).rejects.toEqual(expect.objectContaining({
+            status: 403,
+            message: expect.stringContaining('administrator'),
+        }));
+    });
+
+    it('throws 400 on social-only account (mobile, authProvider: google, no password)', async () => {
+        await User.create({
+            name: 'Google User',
+            email: 'google-only@example.com',
+            phone: '1000000007',
+            authProvider: 'google',
+        });
+
+        await expect(
+            authService.loginWithCredentials({
+                email: 'google-only@example.com',
+                password: VALID_PASSWORD,
+                platform: 'mobile',
+            })
+        ).rejects.toEqual(expect.objectContaining({ status: 400 }));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// authService.refreshToken
+// ---------------------------------------------------------------------------
+describe('authService.refreshToken', () => {
+    it('throws 401 when no token provided', async () => {
+        await expect(
+            authService.refreshToken(null)
+        ).rejects.toEqual(expect.objectContaining({ status: 401, message: 'No token provided' }));
+    });
+
+    it('throws 403 on invalid/tampered token string', async () => {
+        await expect(
+            authService.refreshToken('invalid.token.string')
+        ).rejects.toEqual(expect.objectContaining({ status: 403 }));
+    });
+
+    it('throws 403 when session not found (valid token but no matching session)', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Refresh No Session',
+            email: 'refresh-nosession@example.com',
+            phone: '2000000001',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const token = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+        await expect(
+            authService.refreshToken(token)
+        ).rejects.toEqual(expect.objectContaining({ status: 403 }));
+    });
+
+    it('success: returns new accessToken and refreshToken', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Refresh Success',
+            email: 'refresh-success@example.com',
+            phone: '2000000002',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const signedToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+        user.sessions.push({ refreshToken: signedToken, deviceId: 'test-device', revokedAt: null });
+        await user.save();
+
+        const result = await authService.refreshToken(signedToken);
+
+        expect(result.accessToken).toBeDefined();
+        expect(result.refreshToken).toBeDefined();
+    });
+
+    it('success: updates session.refreshToken and session.lastUsed in DB', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Refresh DB Update',
+            email: 'refresh-dbupdate@example.com',
+            phone: '2000000003',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const signedToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+        user.sessions.push({ refreshToken: signedToken, deviceId: 'test-device', revokedAt: null });
+        await user.save();
+
+        const result = await authService.refreshToken(signedToken);
+
+        const updatedUser = await User.findById(user._id);
+        const session = updatedUser.sessions.find(s => s.refreshToken === result.refreshToken);
+        expect(session).toBeDefined();
+        expect(session.lastUsed).toBeDefined();
+    });
+
+    it('throws 403 when session has revokedAt set', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Refresh Revoked',
+            email: 'refresh-revoked@example.com',
+            phone: '2000000004',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const signedToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+        user.sessions.push({ refreshToken: signedToken, deviceId: 'test-device', revokedAt: new Date() });
+        await user.save();
+
+        await expect(
+            authService.refreshToken(signedToken)
+        ).rejects.toEqual(expect.objectContaining({ status: 403 }));
+    });
+});
+
+// ---------------------------------------------------------------------------
+// authService.checkAccessToken
+// ---------------------------------------------------------------------------
+describe('authService.checkAccessToken', () => {
+    it('throws 401 when accessToken is missing/null', async () => {
+        await expect(
+            authService.checkAccessToken(null, null)
+        ).rejects.toEqual(expect.objectContaining({ status: 401 }));
+    });
+
+    it('returns { valid: true, userId } for a valid non-expired access token', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Check Token Valid',
+            email: 'check-valid@example.com',
+            phone: '3000000001',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const accessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+        const result = await authService.checkAccessToken(accessToken, null);
+
+        expect(result.valid).toBe(true);
+        expect(result.userId).toBeDefined();
+    });
+
+    it('throws 401 on completely invalid (not JWT) access token', async () => {
+        await expect(
+            authService.checkAccessToken('not-a-jwt-token', null)
+        ).rejects.toEqual(expect.objectContaining({ status: 401 }));
+    });
+
+    it('expired access token + no refreshToken throws 401', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Check Expired No Refresh',
+            email: 'check-expired-norefresh@example.com',
+            phone: '3000000002',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const expiredToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '-1s' });
+
+        await expect(
+            authService.checkAccessToken(expiredToken, null)
+        ).rejects.toEqual(expect.objectContaining({ status: 401 }));
+    });
+
+    it('expired access token + invalid refreshToken throws 403', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Check Expired Bad Refresh',
+            email: 'check-expired-badrefresh@example.com',
+            phone: '3000000003',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const expiredToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '-1s' });
+
+        await expect(
+            authService.checkAccessToken(expiredToken, 'invalid.refresh.token')
+        ).rejects.toEqual(expect.objectContaining({ status: 403 }));
+    });
+
+    it('expired access token + valid refreshToken with matching session returns new tokens', async () => {
+        const hashedPassword = await bcrypt.hash(VALID_PASSWORD, 10);
+        const user = await User.create({
+            name: 'Check Expired Good Refresh',
+            email: 'check-expired-goodrefresh@example.com',
+            phone: '3000000004',
+            password: hashedPassword,
+            authProvider: 'local',
+        });
+
+        const expiredToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '-1s' });
+        const validRefreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+        user.sessions.push({ refreshToken: validRefreshToken, deviceId: 'test-device', revokedAt: null });
+        await user.save();
+
+        const result = await authService.checkAccessToken(expiredToken, validRefreshToken);
+
+        expect(result.valid).toBe(false);
+        expect(result.accessToken).toBeDefined();
+        expect(result.refreshToken).toBeDefined();
+    });
+});
