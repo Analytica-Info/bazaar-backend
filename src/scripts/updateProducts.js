@@ -37,10 +37,21 @@ const updateProducts = async () => {
 
     const productIds = products.map((product) => product.id);
 
-    for (const id of productIds) {
-      const existingProduct = await ProductId.findOne({ productId: id });
-      if (!existingProduct) {
-        await ProductId.create({ productId: id });
+    // Batch upsert ProductId registry: one find to identify unknowns, one insertMany
+    // for new entries — replaces N sequential findOne+create pairs.
+    if (productIds.length > 0) {
+      const existing = await ProductId.find(
+        { productId: { $in: productIds } },
+        { productId: 1, _id: 0 }
+      ).lean();
+      const existingSet = new Set(existing.map((p) => p.productId));
+      const newIds = productIds.filter((id) => !existingSet.has(id));
+      if (newIds.length > 0) {
+        await ProductId.insertMany(
+          newIds.map((id) => ({ productId: id })),
+          { ordered: false }
+        );
+        console.log(`ProductId registry: ${newIds.length} new, ${existingSet.size} already known`);
       }
     }
 
@@ -61,20 +72,38 @@ const updateProducts = async () => {
 const storeProductDetails = async (productIds) => {
   console.log('storeProductDetails');
   try {
-    let storedCount = 0;
-    let updatedCount = 0;
     const totalProducts = productIds.length;
     console.log(`Starting to process ${totalProducts} products...`);
+
+    // Pre-fetch which product IDs already exist in the Product collection so the
+    // per-product loop below can decide insert vs update without a DB round-trip.
+    // One query instead of N sequential findOne calls.
+    const existingDocs = await Product.find(
+      { "product.id": { $in: productIds } },
+      { "product.id": 1, _id: 0 }
+    ).lean();
+    const existingIdSet = new Set(existingDocs.map((d) => d.product.id));
+
+    const timeFormatted = await currentTime();
+    const type = "cron";
+
+    const bulkOps = [];
+    let storedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
 
     for (const id of productIds) {
       try {
         const result = await fetchProductDetails(id);
-        if (!result) continue; // inactive product
+        if (!result) {
+          skippedCount++;
+          continue; // inactive product
+        }
 
         const { product, variantsData, totalQty } = result;
 
-        // Fix: when parent tax_inclusive is 0 but variants have real prices,
-        // use the first variant's price so frontend displays correctly
+        // When parent tax_inclusive is 0 but variants have real prices,
+        // use the first variant's price so frontend displays correctly.
         const taxIncl = parseFloat(product.price_standard?.tax_inclusive) || 0;
         if (taxIncl === 0 && variantsData.length > 0) {
           const firstVariantPrice = parseFloat(variantsData[0].price) || 0;
@@ -84,27 +113,13 @@ const storeProductDetails = async (productIds) => {
           }
         }
 
-        const timeFormatted = await currentTime();
-        const type = "cron";
+        const productStatus = totalQty > 0;
+        const isNew = !existingIdSet.has(product.id);
 
-        const existingEntry = await Product.findOne({ "product.id": product.id });
-        const productStatus = totalQty > 0 ? true : false;
-
-        if (!existingEntry) {
-          const newProductDetails = new Product({
-            product,
-            variantsData,
-            totalQty,
-            webhook: type,
-            webhookTime: timeFormatted,
-            status: productStatus,
-          });
-          await newProductDetails.save();
-          storedCount++;
-        } else {
-          await Product.updateOne(
-            { "product.id": product.id },
-            {
+        bulkOps.push({
+          updateOne: {
+            filter: { "product.id": product.id },
+            update: {
               $set: {
                 product,
                 variantsData,
@@ -113,16 +128,29 @@ const storeProductDetails = async (productIds) => {
                 webhookTime: timeFormatted,
                 status: productStatus,
               },
-            }
-          );
-          updatedCount++;
-        }
+              // setOnInsert only runs when the document is newly created (upsert).
+              $setOnInsert: { createdAt: new Date() },
+            },
+            upsert: true,
+          },
+        });
+
+        if (isNew) storedCount++;
+        else updatedCount++;
       } catch (err) {
         console.error(`Error processing product ${id}:`, err.message);
         // Continue with next product instead of failing entire batch
       }
     }
 
+    // Execute all writes in a single bulkWrite roundtrip (chunked at 1000 to
+    // stay well under MongoDB's 100 MB BSON limit per batch).
+    const CHUNK = 1000;
+    for (let i = 0; i < bulkOps.length; i += CHUNK) {
+      await Product.bulkWrite(bulkOps.slice(i, i + CHUNK), { ordered: false });
+    }
+
+    console.log(`storeProductDetails: ${storedCount} new, ${updatedCount} updated, ${skippedCount} skipped`);
     const summaryMessage = `Total New Products: ${storedCount} | Total Updated Products: ${updatedCount}\n`;
     fs.appendFileSync(LOG_FILE, summaryMessage);
     return { storedCount, updatedCount };
@@ -464,3 +492,4 @@ const currentTime = async () => {
 };
 
 module.exports = updateProducts;
+module.exports.storeProductDetails = storeProductDetails;
