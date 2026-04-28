@@ -74,7 +74,10 @@ async function fullScanAndSync(targetIdSet, webhook, webhookTime) {
   const maxDiscount = Math.max(0, ...enriched.map((p) => p.discount || 0));
 
   // Persist the new global max so future webhooks can skip this scan.
-  cache.set(MAX_DISCOUNT_CACHE_KEY, String(maxDiscount), MAX_DISCOUNT_TTL).catch(() => {});
+  cache.set(MAX_DISCOUNT_CACHE_KEY, String(maxDiscount), MAX_DISCOUNT_TTL).catch((err) => {
+    logger.warn({ err: err.message, maxDiscount }, 'discountSync: cache.set failed — next webhook will full-scan again');
+    metrics.recordError('discountSync:cache-set', err.message).catch(() => {});
+  });
 
   const syncedParentIds = new Set();
   const bulkOps = enriched.map((p) => {
@@ -222,7 +225,10 @@ async function syncDiscountFieldsForParentIds(parentProductIds, webhook, webhook
 
   if (newDiscount > globalMax) {
     // Case 1 — new leader, update cached max.
-    cache.set(MAX_DISCOUNT_CACHE_KEY, String(newDiscount), MAX_DISCOUNT_TTL).catch(() => {});
+    cache.set(MAX_DISCOUNT_CACHE_KEY, String(newDiscount), MAX_DISCOUNT_TTL).catch((err) => {
+      logger.warn({ err: err.message, newDiscount }, 'discountSync: cache.set failed — next webhook will full-scan again');
+      metrics.recordError('discountSync:cache-set', err.message).catch(() => {});
+    });
   }
 
   const isNewLeader = newDiscount >= globalMax;

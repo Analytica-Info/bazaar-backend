@@ -44,7 +44,10 @@ jest.mock("../../src/utilities/backendLogger", () => ({
   logBackendActivity: jest.fn(),
 }));
 
+jest.mock("axios");
+
 const mongoose = require("mongoose");
+const axios = require("axios");
 const User = require("../../src/models/User");
 const Order = require("../../src/models/Order");
 const OrderDetail = require("../../src/models/OrderDetail");
@@ -500,9 +503,277 @@ describe("orderService", () => {
     });
   });
 
+  // ---- markCouponUsed ----
+  describe("markCouponUsed", () => {
+    const { markCouponUsed } = require("../../src/services/orderService");
+
+    const makeUser = (overrides = {}) => ({
+      usedFirst15Coupon: false,
+      usedUAE10Coupon: false,
+      save: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    });
+
+    it("sets usedFirst15Coupon and calls save once for FIRST15", async () => {
+      const user = makeUser();
+      await markCouponUsed(user, "FIRST15");
+      expect(user.usedFirst15Coupon).toBe(true);
+      expect(user.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("sets usedUAE10Coupon and calls save once for UAE10 when not yet used", async () => {
+      const user = makeUser();
+      await markCouponUsed(user, "UAE10");
+      expect(user.usedUAE10Coupon).toBe(true);
+      expect(user.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT call save when UAE10 already used", async () => {
+      const user = makeUser({ usedUAE10Coupon: true });
+      await markCouponUsed(user, "UAE10");
+      expect(user.save).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call save for an unrecognised coupon code", async () => {
+      const user = makeUser();
+      await markCouponUsed(user, "UNKNOWN50");
+      expect(user.usedFirst15Coupon).toBe(false);
+      expect(user.usedUAE10Coupon).toBe(false);
+      expect(user.save).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when user is null", async () => {
+      await expect(markCouponUsed(null, "FIRST15")).resolves.toBeUndefined();
+    });
+
+    it("does nothing when couponCode is null", async () => {
+      const user = makeUser();
+      await markCouponUsed(user, null);
+      expect(user.save).not.toHaveBeenCalled();
+    });
+
+    it("calls save exactly once even when both flags could apply (only one code per order)", async () => {
+      // Sanity check: a single coupon code → single save, not two saves
+      const user = makeUser();
+      await markCouponUsed(user, "FIRST15");
+      expect(user.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // ---- validateInventoryBeforeCheckout ----
   describe("validateInventoryBeforeCheckout", () => {
-    it.skip("requires Lightspeed API", () => {});
+    const lsInventoryResponse = (qty) => ({
+      data: { data: [{ inventory_level: qty }] },
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("returns isValid=true when both local and Lightspeed have sufficient stock", async () => {
+      const product = await makeProduct({
+        product: { name: "Available", id: "pv-001", sku_number: "SKU-AV" },
+        variantsData: [{ id: "var-pv-001", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+
+      axios.get.mockResolvedValueOnce(lsInventoryResponse(15));
+
+      const result = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: product._id.toString(), qty: 3 }],
+        {},
+        "test"
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.results[0].isValid).toBe(true);
+      expect(result.results[0].lightspeedQty).toBe(15);
+      expect(result.results[0].localMongoQty).toBe(10);
+    });
+
+    it("throws 400 when Lightspeed stock is insufficient", async () => {
+      const product = await makeProduct({
+        product: { name: "LowStock", id: "pv-002", sku_number: "SKU-LS" },
+        variantsData: [{ id: "var-pv-002", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+
+      axios.get.mockResolvedValueOnce(lsInventoryResponse(1)); // only 1 available
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: product._id.toString(), qty: 5 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      expect(err.data.isValid).toBe(false);
+      const r = err.data.results[0];
+      expect(r.dbIndex).toBe("lightspeed");
+      expect(r.lightspeedQty).toBe(1);
+    });
+
+    it("throws 400 when local stock is insufficient", async () => {
+      const product = await makeProduct({
+        product: { name: "LocalLow", id: "pv-003", sku_number: "SKU-LL" },
+        variantsData: [{ id: "var-pv-003", qty: 2, name: "Default" }],
+        totalQty: 2,
+      });
+
+      axios.get.mockResolvedValueOnce(lsInventoryResponse(20));
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: product._id.toString(), qty: 5 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      expect(err.data.results[0].dbIndex).toBe("local");
+    });
+
+    it("fetches Lightspeed inventory in parallel for multi-item cart", async () => {
+      const p1 = await makeProduct({
+        product: { name: "P1", id: "pv-p1", sku_number: "SKU-P1" },
+        variantsData: [{ id: "var-pv-p1", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+      const p2 = await makeProduct({
+        product: { name: "P2", id: "pv-p2", sku_number: "SKU-P2" },
+        variantsData: [{ id: "var-pv-p2", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+      const p3 = await makeProduct({
+        product: { name: "P3", id: "pv-p3", sku_number: "SKU-P3" },
+        variantsData: [{ id: "var-pv-p3", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+
+      axios.get
+        .mockResolvedValueOnce(lsInventoryResponse(10))
+        .mockResolvedValueOnce(lsInventoryResponse(10))
+        .mockResolvedValueOnce(lsInventoryResponse(10));
+
+      const result = await orderService.validateInventoryBeforeCheckout(
+        [
+          { product_id: p1._id.toString(), qty: 1 },
+          { product_id: p2._id.toString(), qty: 1 },
+          { product_id: p3._id.toString(), qty: 1 },
+        ],
+        {},
+        "test"
+      );
+
+      // All three Lightspeed calls must have fired
+      expect(axios.get).toHaveBeenCalledTimes(3);
+      expect(result.isValid).toBe(true);
+      expect(result.results).toHaveLength(3);
+    });
+
+    it("throws 400 with lightspeedApiError when Lightspeed call fails", async () => {
+      const product = await makeProduct({
+        product: { name: "ApiErr", id: "pv-err", sku_number: "SKU-ERR" },
+        variantsData: [{ id: "var-pv-err", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+
+      axios.get.mockRejectedValueOnce(new Error("Lightspeed 503"));
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: product._id.toString(), qty: 2 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      const r = err.data.results[0];
+      expect(r.lightspeedApiError).toBeDefined();
+      expect(r.lightspeedApiError.message).toBe("Lightspeed 503");
+    });
+
+    it("continues processing remaining items when one Lightspeed call fails", async () => {
+      const p1 = await makeProduct({
+        product: { name: "Good", id: "pv-good", sku_number: "SKU-GOOD" },
+        variantsData: [{ id: "var-pv-good", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+      const p2 = await makeProduct({
+        product: { name: "Fail", id: "pv-fail", sku_number: "SKU-FAIL" },
+        variantsData: [{ id: "var-pv-fail", qty: 10, name: "Default" }],
+        totalQty: 10,
+      });
+
+      axios.get
+        .mockResolvedValueOnce(lsInventoryResponse(10))  // p1 OK
+        .mockRejectedValueOnce(new Error("timeout"));    // p2 fails
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [
+          { product_id: p1._id.toString(), qty: 1 },
+          { product_id: p2._id.toString(), qty: 1 },
+        ],
+        {},
+        "test"
+      ).catch(e => e);
+
+      // p2 failure causes a 400 throw; both results are in the payload
+      expect(err.status).toBe(400);
+      expect(err.data.results).toHaveLength(2);
+      const goodResult = err.data.results.find(r => r.productName === "Good");
+      const failResult = err.data.results.find(r => r.productName === "Fail");
+      expect(goodResult.isValid).toBe(true);
+      expect(failResult.lightspeedApiError).toBeDefined();
+    });
+
+    it("throws 400 with dbIndex=both when both local and Lightspeed are insufficient", async () => {
+      const product = await makeProduct({
+        product: { name: "BothLow", id: "pv-both", sku_number: "SKU-BOTH" },
+        variantsData: [{ id: "var-pv-both", qty: 1, name: "Default" }],
+        totalQty: 1,
+      });
+
+      axios.get.mockResolvedValueOnce(lsInventoryResponse(1));
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: product._id.toString(), qty: 5 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      expect(err.data.results[0].dbIndex).toBe("both");
+    });
+
+    it("throws 400 when product not found in DB", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ product_id: fakeId, qty: 1 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      expect(err.data.results[0].message).toMatch(/not found/i);
+      expect(axios.get).not.toHaveBeenCalled();
+    });
+
+    it("throws 400 for item missing product_id", async () => {
+      const err = await orderService.validateInventoryBeforeCheckout(
+        [{ qty: 2 }],
+        {},
+        "test"
+      ).catch(e => e);
+
+      expect(err.status).toBe(400);
+      expect(err.data.results[0].message).toMatch(/missing required fields/i);
+    });
+
+    it("throws 400 when products array is empty", async () => {
+      await expect(
+        orderService.validateInventoryBeforeCheckout([], {}, "test")
+      ).rejects.toMatchObject({ status: 400 });
+    });
   });
 
   // ---- createStripeCheckoutSession ----

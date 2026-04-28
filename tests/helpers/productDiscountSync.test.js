@@ -1,9 +1,11 @@
 'use strict';
 
 jest.mock('../../src/models/Product');
-jest.mock('../../src/services/metricsService', () => ({
+const mockMetrics = {
     recordDiscountSync: jest.fn().mockResolvedValue(undefined),
-}));
+    recordError: jest.fn().mockResolvedValue(undefined),
+};
+jest.mock('../../src/services/metricsService', () => mockMetrics);
 
 // Cache mock — controls what cachedMax is returned
 // Variable must be prefixed with "mock" for jest.mock factory hoisting rules.
@@ -194,6 +196,82 @@ describe('syncDiscountFieldsForParentIds', () => {
             const result = await syncDiscountFieldsForParentIds(['p_unknown'], 'webhook', 'now');
 
             expect(result.path).toBe('full-scan');
+        });
+    });
+
+    describe('cache write failure — observable signal', () => {
+        const logger = require('../../src/utilities/logger');
+
+        it('logs a warning and records a metric when cache.set fails after full scan', async () => {
+            mockCache.get.mockResolvedValue(null); // cache miss → full scan
+            mockCache.set.mockRejectedValue(new Error('Redis ECONNREFUSED'));
+
+            const target = makeProduct('p1', 100, 50);
+            Product.find
+                .mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve([target]) }) })
+                .mockReturnValueOnce({ lean: () => Promise.resolve([target]) });
+            Product.bulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+
+            const result = await syncDiscountFieldsForParentIds(['p1'], 'webhook', 'now');
+
+            // Sync still completes — cache failure is non-fatal
+            expect(result.path).toBe('full-scan');
+            expect(result.bulkWriteCount).toBe(1);
+
+            // Give the fire-and-forget .catch() a tick to run
+            await new Promise(r => setImmediate(r));
+
+            expect(logger.warn).toHaveBeenCalledWith(
+                expect.objectContaining({ err: 'Redis ECONNREFUSED' }),
+                expect.stringContaining('next webhook will full-scan again')
+            );
+            expect(mockMetrics.recordError).toHaveBeenCalledWith(
+                'discountSync:cache-set',
+                'Redis ECONNREFUSED'
+            );
+        });
+
+        it('logs a warning and records a metric when cache.set fails on fast-path new leader', async () => {
+            mockCache.get.mockResolvedValue('40'); // cached max = 40
+            mockCache.set.mockRejectedValue(new Error('Redis timeout'));
+
+            // taxInclusive=100, variantPrice=40 → ~74% discount > 40 → new leader
+            const target = makeProduct('p1', 100, 40, false);
+            Product.find
+                .mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve([target]) }) });
+            Product.bulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+
+            const result = await syncDiscountFieldsForParentIds(['p1'], 'webhook', 'now');
+
+            expect(result.path).toBe('fast');
+
+            await new Promise(r => setImmediate(r));
+
+            expect(logger.warn).toHaveBeenCalledWith(
+                expect.objectContaining({ err: 'Redis timeout' }),
+                expect.stringContaining('next webhook will full-scan again')
+            );
+            expect(mockMetrics.recordError).toHaveBeenCalledWith(
+                'discountSync:cache-set',
+                'Redis timeout'
+            );
+        });
+
+        it('does NOT log a warning when cache.set succeeds', async () => {
+            mockCache.get.mockResolvedValue(null);
+            mockCache.set.mockResolvedValue(undefined); // success
+
+            const target = makeProduct('p1', 100, 50);
+            Product.find
+                .mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve([target]) }) })
+                .mockReturnValueOnce({ lean: () => Promise.resolve([target]) });
+            Product.bulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+
+            await syncDiscountFieldsForParentIds(['p1'], 'webhook', 'now');
+            await new Promise(r => setImmediate(r));
+
+            expect(logger.warn).not.toHaveBeenCalled();
+            expect(mockMetrics.recordError).not.toHaveBeenCalled();
         });
     });
 });

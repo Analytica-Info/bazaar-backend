@@ -18,6 +18,9 @@ const ENVIRONMENT = process.env.ENVIRONMENT;
 const TABBY_AUTH_KEY = process.env.TABBY_AUTH_KEY;
 const TABBY_SECRET_KEY = process.env.TABBY_SECRET_KEY;
 const { sendPushNotification } = require('../helpers/sendPushNotification');
+const { mapLimit } = require('async');
+
+const INVENTORY_CONCURRENCY = 5;
 const cache = require('../utilities/cache');
 const logger = require('../utilities/logger');
 const PendingPayment = require('../models/PendingPayment');
@@ -205,20 +208,18 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
         productDocs.map((p) => [String(p._id), p])
     );
 
-    for (const item of products) {
+    const itemResults = await mapLimit(products, INVENTORY_CONCURRENCY, async (item) => {
         const productId = item.product_id;
         const requestedQty = item.qty;
 
         if (!productId || !requestedQty) {
-            validationResults.push({
+            return {
                 productId: productId || 'unknown',
                 productName: 'Unknown',
                 isValid: false,
                 message: 'Missing required fields (product_id or qty)',
                 dbIndex: null
-            });
-            allValid = false;
-            continue;
+            };
         }
 
         let variantId = null;
@@ -228,15 +229,13 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
         try {
             productDoc = productDocMap[String(productId)] || null;
             if (!productDoc) {
-                validationResults.push({
+                return {
                     productId,
                     productName: 'Unknown',
                     isValid: false,
                     message: 'Product not found in database',
                     dbIndex: 'local'
-                });
-                allValid = false;
-                continue;
+                };
             }
 
             productName = productDoc.product?.name || 'Unknown';
@@ -248,27 +247,23 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
             }
 
             if (!variantId) {
-                validationResults.push({
+                return {
                     productId,
                     productName,
                     isValid: false,
                     message: 'Variant ID not found for product',
                     dbIndex: 'local'
-                });
-                allValid = false;
-                continue;
+                };
             }
         } catch (error) {
-            logger.error({ err: error }, 'Error finding product in MongoDB:');
-            validationResults.push({
+            logger.error({ err: error }, 'validateInventoryBeforeCheckout: error finding product in MongoDB');
+            return {
                 productId,
                 productName: 'Unknown',
                 isValid: false,
                 message: 'Error finding product in database',
                 dbIndex: 'local'
-            });
-            allValid = false;
-            continue;
+            };
         }
 
         let localMongoQty = 0;
@@ -279,24 +274,17 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
                 if (variant) {
                     localMongoQty = variant.qty || 0;
                     localMongoValid = localMongoQty >= requestedQty;
-                } else {
-                    localMongoQty = 0;
-                    localMongoValid = false;
                 }
-            } else {
-                localMongoQty = 0;
-                localMongoValid = false;
             }
         } catch (error) {
-            logger.error({ err: error }, 'Error checking local MongoDB:');
-            localMongoQty = 0;
-            localMongoValid = false;
+            logger.error({ err: error }, 'validateInventoryBeforeCheckout: error checking local MongoDB');
         }
 
         let lightspeedQty = 0;
         let lightspeedValid = false;
         let lightspeedApiError = null;
         try {
+            logger.debug({ productId, variantId }, 'validateInventoryBeforeCheckout: fetching Lightspeed inventory');
             const inventoryResponse = await axios.get(
                 `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${variantId}/inventory`,
                 {
@@ -308,10 +296,9 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
             );
             lightspeedQty = inventoryResponse.data.data?.[0]?.inventory_level || 0;
             lightspeedValid = lightspeedQty >= requestedQty;
+            logger.debug({ productId, variantId, lightspeedQty, requestedQty }, 'validateInventoryBeforeCheckout: inventory fetched');
         } catch (error) {
-            logger.error({ err: error }, 'Error checking Lightspeed API:');
-            lightspeedQty = 0;
-            lightspeedValid = false;
+            logger.error({ productId, variantId, err: error.message }, 'validateInventoryBeforeCheckout: Lightspeed API error');
             lightspeedApiError = {
                 message: error.message,
                 responseStatus: error.response?.status,
@@ -326,22 +313,18 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
         if (localMongoValid && lightspeedValid) {
             isValid = true;
             message = 'Quantity available';
-            dbIndex = null;
         } else if (!localMongoValid && !lightspeedValid) {
-            isValid = false;
             message = `Insufficient quantity. Available: ${Math.min(localMongoQty, lightspeedQty)}, Requested: ${requestedQty}`;
             dbIndex = 'both';
         } else if (!localMongoValid) {
-            isValid = false;
             message = `Insufficient quantity in local database. Available: ${localMongoQty}, Requested: ${requestedQty}`;
             dbIndex = 'local';
-        } else if (!lightspeedValid) {
-            isValid = false;
+        } else {
             message = `Insufficient quantity in Lightspeed database. Available: ${lightspeedQty}, Requested: ${requestedQty}`;
             dbIndex = 'lightspeed';
         }
 
-        validationResults.push({
+        return {
             productId,
             variantId,
             productName,
@@ -352,11 +335,12 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
             message,
             dbIndex: dbIndex || null,
             lightspeedApiError: lightspeedApiError || undefined
-        });
+        };
+    });
 
-        if (!isValid) {
-            allValid = false;
-        }
+    for (const result of itemResults) {
+        validationResults.push(result);
+        if (!result.isValid) allValid = false;
     }
 
     if (allValid) {
@@ -698,6 +682,23 @@ async function applyGiftLogic(normalizedCartData) {
     return normalizedCartData;
 }
 
+// Marks the relevant coupon flag on the user document and saves exactly once.
+// Exported for unit testing; called after every successful order creation.
+async function markCouponUsed(user, couponCode) {
+    if (!user || !couponCode) return;
+    let dirty = false;
+    if (couponCode === 'FIRST15') {
+        user.usedFirst15Coupon = true;
+        dirty = true;
+    }
+    if (couponCode === 'UAE10' && !user.usedUAE10Coupon) {
+        user.usedUAE10Coupon = true;
+        dirty = true;
+    }
+    if (dirty) await user.save();
+}
+exports.markCouponUsed = markCouponUsed;
+
 exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
     const {
         cartData,
@@ -949,22 +950,9 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
         }
     }
 
-    if (couponCode === 'FIRST15') {
-        const user = await User.findById(user_id);
-        if (user) {
-            user.usedFirst15Coupon = true;
-            await user.save();
-            logger.info(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
-        }
-    }
-
-    if (couponCode === 'UAE10') {
-        const user = await User.findById(user_id);
-        if (user && !user.usedUAE10Coupon) {
-            user.usedUAE10Coupon = true;
-            await user.save();
-            logger.info(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
-        }
+    await markCouponUsed(user, couponCode);
+    if (couponCode === 'FIRST15' || couponCode === 'UAE10') {
+        logger.info(`${couponCode} coupon marked as used for user: ${user_id} after order creation.`);
     }
 
     const orderDetails = cartDataValue.map((item) => {
@@ -1731,22 +1719,9 @@ async function processPendingPayment(paymentId, payment) {
             }
         }
 
-        if (orderData.couponCode === 'FIRST15') {
-            const user = await User.findById(user_id);
-            if (user) {
-                user.usedFirst15Coupon = true;
-                await user.save();
-                logger.info(`FIRST15 coupon marked as used for user: ${user_id} after order creation.`);
-            }
-        }
-
-        if (orderData.couponCode === 'UAE10') {
-            const user = await User.findById(user_id);
-            if (user && !user.usedUAE10Coupon) {
-                user.usedUAE10Coupon = true;
-                await user.save();
-                logger.info(`UAE10 coupon marked as used for user: ${user_id} after order creation.`);
-            }
+        await markCouponUsed(user, orderData.couponCode);
+        if (orderData.couponCode === 'FIRST15' || orderData.couponCode === 'UAE10') {
+            logger.info(`${orderData.couponCode} coupon marked as used for user: ${user_id} after order creation.`);
         }
 
         const orderDetails = cartDataValue.map((item) => {
@@ -2063,22 +2038,21 @@ async function getDiagnosticInventory(lightspeedVariantId) {
 async function updateQuantities(cartData, orderId = null) {
     try {
         const emailDetails = [];
-        const updateResults = await Promise.all(
-            cartData.map(async (item, index) => {
+        const updateResults = await mapLimit(
+            cartData,
+            INVENTORY_CONCURRENCY,
+            async (item) => {
                 const updateQty = item.total_qty - item.qty;
                 const mongoId = item.product_id || item.id;
                 const name = item.name;
                 const lightspeedVariantId = item.variantId || item.id;
-
-                const beforeDiag = await getDiagnosticInventory(lightspeedVariantId);
 
                 let update = false;
                 try {
                     // update = await updateQuantity(lightspeedVariantId, updateQty, name, lightspeedVariantId);
                     update = true;
                 } catch (lsError) {
-                    const afterDiagOnThrow = await getDiagnosticInventory(lightspeedVariantId);
-                    const qtyMsgThrow = `BEFORE: Lightspeed=${beforeDiag.lightspeedQty} Local=${beforeDiag.localQty} | AFTER (unchanged): Lightspeed=${afterDiagOnThrow.lightspeedQty} Local=${afterDiagOnThrow.localQty} | Expected=${updateQty}. Lightspeed API THREW: ${lsError?.message}`;
+                    const qtyMsgThrow = `Local before=${null} | Expected=${updateQty}. Lightspeed API THREW: ${lsError?.message}`;
                     await logActivity({
                         platform: 'Mobile App Backend',
                         log_type: 'backend_activity',
@@ -2092,8 +2066,6 @@ async function updateQuantities(cartData, orderId = null) {
                             product_name: name,
                             error_details: lsError?.message,
                             response_data: lsError?.response?.data || null,
-                            qty_before: { lightspeed: beforeDiag.lightspeedQty, local: beforeDiag.localQty },
-                            qty_after: { lightspeed: afterDiagOnThrow.lightspeedQty, local: afterDiagOnThrow.localQty },
                             expected_after: updateQty,
                             qty_sold: item.qty,
                         }
@@ -2102,12 +2074,12 @@ async function updateQuantities(cartData, orderId = null) {
                         platform: 'Mobile App Backend',
                         activity_name: 'Product Database Update',
                         status: 'failure',
-                        message: `Product ${name} - Lightspeed API threw. ${qtyMsgThrow}`,
+                        message: `Product ${name} - Lightspeed API threw. ${lsError?.message}`,
                         product_id: lightspeedVariantId?.toString?.(),
                         product_name: name,
                         order_id: orderId,
                         execution_path: 'orderController.updateQuantities -> Lightspeed API',
-                        error_details: qtyMsgThrow
+                        error_details: lsError?.message
                     });
                     throw lsError;
                 }
@@ -2121,6 +2093,13 @@ async function updateQuantities(cartData, orderId = null) {
                         if (!currentDoc) {
                             throw new Error(`Product not found for _id=${mongoObjectId}`);
                         }
+
+                        // Capture before-state from the document already in hand — no extra DB/API call needed.
+                        const beforeVariant = currentDoc.variantsData?.find(
+                            (v) => String(v.id) === String(lightspeedVariantId)
+                        );
+                        const beforeLocalQty = beforeVariant?.qty ?? null;
+
                         const mainProductId = currentDoc.product?.id;
                         let variantsData = [];
                         if (mainProductId) {
@@ -2140,7 +2119,7 @@ async function updateQuantities(cartData, orderId = null) {
                             variantsData.push({ id: lightspeedVariantId, qty: updateQty });
                         }
                         const totalQty = variantsData.reduce((sum, v) => sum + (Number(v.qty) || 0), 0);
-                        const productStatus = totalQty > 0 ? true : false;
+                        const productStatus = totalQty > 0;
                         updatedEntry = await Product.findByIdAndUpdate(
                             mongoObjectId,
                             {
@@ -2150,8 +2129,12 @@ async function updateQuantities(cartData, orderId = null) {
                             { new: true }
                         );
                         if (updatedEntry) {
-                            const afterDiag = await getDiagnosticInventory(lightspeedVariantId);
-                            const qtyMsg = `BEFORE: Lightspeed=${beforeDiag.lightspeedQty} Local=${beforeDiag.localQty} | AFTER: Lightspeed=${afterDiag.lightspeedQty} Local=${afterDiag.localQty} | Expected=${updateQty} QtySold=${item.qty}`;
+                            // after-state read from the document returned by findByIdAndUpdate — no extra call.
+                            const afterVariant = updatedEntry.variantsData?.find(
+                                (v) => String(v.id) === String(lightspeedVariantId)
+                            );
+                            const afterLocalQty = afterVariant?.qty ?? updateQty;
+                            const qtyMsg = `BEFORE: Local=${beforeLocalQty} | AFTER: Local=${afterLocalQty} | Expected=${updateQty} QtySold=${item.qty}`;
                             await logActivity({
                                 platform: 'Mobile App Backend',
                                 log_type: 'backend_activity',
@@ -2163,8 +2146,8 @@ async function updateQuantities(cartData, orderId = null) {
                                     order_id: orderId,
                                     product_id: lightspeedVariantId?.toString?.(),
                                     product_name: name,
-                                    qty_before: { lightspeed: beforeDiag.lightspeedQty, local: beforeDiag.localQty },
-                                    qty_after: { lightspeed: afterDiag.lightspeedQty, local: afterDiag.localQty },
+                                    qty_before: { local: beforeLocalQty },
+                                    qty_after: { local: afterLocalQty },
                                     expected_after: updateQty,
                                     qty_sold: item.qty,
                                     total_before: item.total_qty,
@@ -2181,22 +2164,20 @@ async function updateQuantities(cartData, orderId = null) {
                                 execution_path: 'orderController.updateQuantities -> Product.findOneAndUpdate'
                             });
                         } else {
-                            const afterDiag = await getDiagnosticInventory(lightspeedVariantId);
-                            const qtyMsgFail = `BEFORE: Lightspeed=${beforeDiag.lightspeedQty} Local=${beforeDiag.localQty} | AFTER: Lightspeed=${afterDiag.lightspeedQty} Local=${afterDiag.localQty} | Expected=${updateQty}. Local DB sync FAILED.`;
+                            const qtyMsgFail = `BEFORE: Local=${beforeLocalQty} | Expected=${updateQty}. Local DB sync FAILED.`;
                             await logActivity({
                                 platform: 'Mobile App Backend',
                                 log_type: 'backend_activity',
                                 action: 'Inventory Update',
                                 status: 'failure',
-                                message: `Product ${name} - Lightspeed updated but local DB NOT synced. ${qtyMsgFail}`,
+                                message: `Product ${name} - local DB NOT synced. ${qtyMsgFail}`,
                                 user: null,
                                 details: {
                                     order_id: orderId,
                                     product_id: lightspeedVariantId?.toString?.(),
                                     product_name: name,
                                     error_details: 'findOneAndUpdate returned null - product may not exist in local DB',
-                                    qty_before: { lightspeed: beforeDiag.lightspeedQty, local: beforeDiag.localQty },
-                                    qty_after: { lightspeed: afterDiag.lightspeedQty, local: afterDiag.localQty },
+                                    qty_before: { local: beforeLocalQty },
                                     expected_after: updateQty,
                                     qty_sold: item.qty,
                                 }
@@ -2210,44 +2191,39 @@ async function updateQuantities(cartData, orderId = null) {
                                 product_name: name,
                                 order_id: orderId,
                                 execution_path: 'orderController.updateQuantities -> Product.findOneAndUpdate',
-                                error_details: `findOneAndUpdate returned null. ${qtyMsgFail}`
+                                error_details: qtyMsgFail
                             });
                         }
                     } catch (dbError) {
                         throw dbError;
                     }
                 } else {
-                    const afterDiag = await getDiagnosticInventory(lightspeedVariantId);
-                    const qtyMsgLsFail = `BEFORE: Lightspeed=${beforeDiag.lightspeedQty} Local=${beforeDiag.localQty} | AFTER (unchanged): Lightspeed=${afterDiag.lightspeedQty} Local=${afterDiag.localQty} | Expected=${updateQty}. Lightspeed API update FAILED.`;
                     await logActivity({
                         platform: 'Mobile App Backend',
                         log_type: 'backend_activity',
                         action: 'Inventory Update',
                         status: 'failure',
-                        message: `Product ${name} - Lightspeed API update failed. ${qtyMsgLsFail}`,
+                        message: `Product ${name} - Lightspeed API update returned false. Expected=${updateQty}`,
                         user: null,
                         details: {
                             order_id: orderId,
                             product_id: lightspeedVariantId?.toString?.(),
                             product_name: name,
                             error_details: 'Lightspeed API updateQuantity returned false',
-                            qty_before: { lightspeed: beforeDiag.lightspeedQty, local: beforeDiag.localQty },
-                            qty_after: { lightspeed: afterDiag.lightspeedQty, local: afterDiag.localQty },
                             expected_after: updateQty,
                             qty_sold: item.qty,
-                            lightspeedError: beforeDiag.lightspeedError || undefined,
                         }
                     });
                     await logBackendActivity({
                         platform: 'Mobile App Backend',
                         activity_name: 'Product Database Update',
                         status: 'failure',
-                        message: `Product ${name} - Lightspeed API failed. ${qtyMsgLsFail}`,
+                        message: `Product ${name} - Lightspeed API update returned false. Expected=${updateQty}`,
                         product_id: lightspeedVariantId?.toString?.(),
                         product_name: name,
                         order_id: orderId,
                         execution_path: 'orderController.updateQuantities -> Lightspeed API',
-                        error_details: qtyMsgLsFail
+                        error_details: 'updateQuantity returned false'
                     });
                 }
 
@@ -2261,7 +2237,7 @@ async function updateQuantities(cartData, orderId = null) {
 
                 logger.info({ lightspeedVariantId, name, success: !!update }, `Update for product`);
                 return update;
-            })
+            }
         );
 
         logger.info({ updateResults }, "All updates completed");
