@@ -46,63 +46,92 @@ const updateProductsNew = async () => {
   }
 };
 
-const updateParkedDetails = async (productIds, res) => {
+const updateParkedDetails = async (productIds) => {
   try {
     let parkedCount = 0;
+
+    if (!productIds || productIds.length === 0) {
+      console.log("No parked products to process.");
+      fs.appendFileSync(LOG_FILE, "Total Updated Products: 0\n");
+      return 0;
+    }
+
+    // Batch fetch: one query to find all parent products that own any of the
+    // parked variant IDs, instead of one findOne per variant (N+1 eliminated).
+    const allVariantIds = productIds.map((item) => item.product);
+    const batchedProducts = await Product.find({
+      "variantsData.id": { $in: allVariantIds },
+    })
+      .select("product variantsData")
+      .lean();
+
+    // Build variant-id → parent-product map for O(1) lookups in the loop below.
+    const variantToProductMap = new Map();
+    for (const prod of batchedProducts) {
+      for (const v of prod.variantsData || []) {
+        variantToProductMap.set(v.id, prod);
+      }
+    }
+
+    console.log(
+      `updateParkedDetails: ${productIds.length} parked items, ${batchedProducts.length} parent products fetched in one query`
+    );
+
     for (const id of productIds) {
-      const matchedProduct = await Product.findOne({
-        "variantsData.id": id.product,
-      });
+      const matchedProduct = variantToProductMap.get(id.product);
 
       if (matchedProduct) {
-        console.log(`Parent Parked Product Id: ${matchedProduct.product.id}`);
         const itemId = matchedProduct.product.id;
-        // Reuse matchedProduct — it already contains product.id and variantsData.
-        const productDoc = matchedProduct;
-        if (productDoc) {
-          const { inventoryLevel } = await fetchProductInventory(
-            itemId,
-            id.product,
-            id.qty,
-            id.status
-          );
-          const updatedVariants = productDoc.variantsData.map((variant) => {
-            if (variant.id === id.product) {
-              return {
-                ...variant,
-                qty: inventoryLevel,
-              };
-            }
-            return variant;
-          });
+        console.log(`Parent Parked Product Id: ${itemId}`);
 
-          const totalQty = updatedVariants.reduce(
-            (sum, v) => sum + (v.qty || 0),
-            0
-          );
-          const status = totalQty === 0 ? false : true;
-          const webhook = "updateParkedDetails";
-          const webhookTime = await currentTime();
+        const inventoryResult = await fetchProductInventory(
+          itemId,
+          id.product,
+          id.qty,
+          id.status
+        );
 
-          await Product.updateOne(
-            {
-              "product.id": itemId,
-            },
-            {
-              $set: {
-                variantsData: updatedVariants,
-                totalQty: totalQty,
-                status: status,
-                webhook,
-                webhookTime,
-              },
-            }
-          );
-
+        // fetchProductInventory returns undefined when product is inactive.
+        if (!inventoryResult) {
           console.log(
-            `✅ Parked Sale Inventory Updated Product with ID : ${id.product} | Parent ID : ${itemId}`
+            `⚠️  Product inactive, skipping inventory update for variant ID : ${id.product} | Parent ID : ${itemId}`
           );
+          continue;
         }
+
+        const { inventoryLevel } = inventoryResult;
+
+        const updatedVariants = matchedProduct.variantsData.map((variant) => {
+          if (variant.id === id.product) {
+            return { ...variant, qty: inventoryLevel };
+          }
+          return variant;
+        });
+
+        const totalQty = updatedVariants.reduce(
+          (sum, v) => sum + (v.qty || 0),
+          0
+        );
+        const status = totalQty > 0;
+        const webhook = "updateParkedDetails";
+        const webhookTime = await currentTime();
+
+        await Product.updateOne(
+          { "product.id": itemId },
+          {
+            $set: {
+              variantsData: updatedVariants,
+              totalQty,
+              status,
+              webhook,
+              webhookTime,
+            },
+          }
+        );
+
+        console.log(
+          `✅ Parked Sale Inventory Updated Product with ID : ${id.product} | Parent ID : ${itemId}`
+        );
         parkedCount++;
       } else {
         console.log(
@@ -110,6 +139,7 @@ const updateParkedDetails = async (productIds, res) => {
         );
       }
     }
+
     console.log(`Parked Product details processed successfully.`);
     const summaryMessage = `Total Updated Products: ${parkedCount}\n`;
     console.log(summaryMessage);
@@ -592,3 +622,4 @@ const calculateDiscount = (product) => {
 };
 
 module.exports = updateProductsNew;
+module.exports.updateParkedDetails = updateParkedDetails;
