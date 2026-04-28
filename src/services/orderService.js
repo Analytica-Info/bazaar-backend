@@ -415,19 +415,25 @@ exports.validateInventoryBeforeCheckout = async (products, user, platform) => {
     }
 };
 
-exports.getOrders = async (userId) => {
-    const orders = await Order.find({
-        $or: [
-            { userId: userId },
-            { user_id: userId }
-        ]
-    });
+exports.getOrders = async (userId, { page = 1, limit = 20 } = {}) => {
+    const userFilter = { $or: [{ userId }, { user_id: userId }] };
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+        Order.find(userFilter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Order.countDocuments(userFilter),
+    ]);
+
     const orderIds = orders.map(order => order._id);
-    const orderDetails = await OrderDetail.find({ order_id: { $in: orderIds } });
+    const orderDetails = orderIds.length
+        ? await OrderDetail.find({ order_id: { $in: orderIds } })
+        : [];
 
     const productIds = [...new Set(orderDetails.map(detail => detail.product_id))];
 
-    const products = await Product.find({ _id: { $in: productIds } });
+    const products = productIds.length
+        ? await Product.find({ _id: { $in: productIds } }).select('product.id')
+        : [];
     const productsMap = {};
     products.forEach(product => {
         productsMap[product._id.toString()] = product;
@@ -465,7 +471,7 @@ exports.getOrders = async (userId) => {
         return orderObj;
     });
 
-    return ordersWithDetails;
+    return { orders: ordersWithDetails, total, page, limit };
 };
 
 exports.initStripePayment = async (userId, amountAED) => {

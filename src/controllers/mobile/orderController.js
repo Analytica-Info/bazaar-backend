@@ -142,12 +142,14 @@ exports.verifyNomodPayment = async (req, res) => {
 exports.getOrders = async (req, res) => {
     try {
         const userId = req.user._id;
-        const ordersWithDetails = await orderService.getOrders(userId);
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+        const result = await orderService.getOrders(userId, { page, limit });
 
         res.status(200).json({
             success: true,
             message: "Orders retrieved successfully",
-            data: ordersWithDetails
+            data: result,
         });
     } catch (error) {
         logger.error({ err: error }, "Error fetching orders:");

@@ -461,7 +461,8 @@ describe("orderService", () => {
       const user = await makeUser();
 
       const result = await orderService.getOrders(user._id.toString());
-      expect(result).toHaveLength(0);
+      expect(result.orders).toHaveLength(0);
+      expect(result.total).toBe(0);
     });
 
     it("should return orders with details", async () => {
@@ -475,10 +476,42 @@ describe("orderService", () => {
 
       const result = await orderService.getOrders(user._id.toString());
 
-      expect(result).toHaveLength(1);
-      expect(result[0].order_id).toBe("BZR-00010");
-      expect(result[0].details).toHaveLength(1);
-      expect(result[0].details[0].product_name).toBe("Test Product");
+      expect(result.orders).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.orders[0].order_id).toBe("BZR-00010");
+      expect(result.orders[0].details).toHaveLength(1);
+      expect(result.orders[0].details[0].product_name).toBe("Test Product");
+    });
+
+    it("paginates orders and returns correct page metadata", async () => {
+      const user = await makeUser({ email: "paginate@test.com" });
+      for (let i = 1; i <= 5; i++) {
+        await makeOrder(user._id, { order_id: `BZR-PAG0${i}`, order_no: 8000 + i });
+      }
+
+      const page1 = await orderService.getOrders(user._id.toString(), { page: 1, limit: 2 });
+      expect(page1.orders).toHaveLength(2);
+      expect(page1.total).toBe(5);
+      expect(page1.page).toBe(1);
+      expect(page1.limit).toBe(2);
+
+      const page3 = await orderService.getOrders(user._id.toString(), { page: 3, limit: 2 });
+      expect(page3.orders).toHaveLength(1);
+      expect(page3.total).toBe(5);
+    });
+
+    it("returns most recent orders first", async () => {
+      const user = await makeUser({ email: "sortorder@test.com" });
+      // Create older order with an explicit past timestamp
+      await makeOrder(user._id, {
+        order_id: "BZR-OLD1",
+        order_no: 9001,
+        createdAt: new Date(Date.now() - 60000),
+      });
+      await makeOrder(user._id, { order_id: "BZR-NEW1", order_no: 9002 });
+
+      const result = await orderService.getOrders(user._id.toString());
+      expect(result.orders[0].order_id).toBe("BZR-NEW1");
     });
   });
 
@@ -915,11 +948,11 @@ describe("orderService", () => {
 
       const result = await orderService.getOrders(user._id.toString());
 
-      expect(result).toHaveLength(1);
-      expect(result[0].details).toHaveLength(1);
-      expect(result[0].details[0].product_name).toBe("Detail Product");
-      expect(result[0].details[0].amount).toBe(75);
-      expect(result[0].details[0].quantity).toBe(2);
+      expect(result.orders).toHaveLength(1);
+      expect(result.orders[0].details).toHaveLength(1);
+      expect(result.orders[0].details[0].product_name).toBe("Detail Product");
+      expect(result.orders[0].details[0].amount).toBe(75);
+      expect(result.orders[0].details[0].quantity).toBe(2);
     });
 
     it("should map userId to user_id in response", async () => {
@@ -931,9 +964,9 @@ describe("orderService", () => {
 
       const result = await orderService.getOrders(user._id.toString());
 
-      expect(result).toHaveLength(1);
-      expect(result[0].user_id).toBeDefined();
-      expect(result[0].userId).toBeUndefined();
+      expect(result.orders).toHaveLength(1);
+      expect(result.orders[0].user_id).toBeDefined();
+      expect(result.orders[0].userId).toBeUndefined();
     });
   });
 });
