@@ -58,6 +58,7 @@ const ActivityLogRepository = require('./ActivityLogRepository');
 const BackendLogRepository = require('./BackendLogRepository');
 const CoPurchasePairRepository = require('./CoPurchasePairRepository');
 const RecommendationEventRepository = require('./RecommendationEventRepository');
+const ProductEmbeddingRepository = require('./ProductEmbeddingRepository');
 const unitOfWork = require('./UnitOfWork');
 
 const repos = {
@@ -107,6 +108,7 @@ const repos = {
     backendLogs: new BackendLogRepository(),
     coPurchasePairs: new CoPurchasePairRepository(),
     recommendationEvents: new RecommendationEventRepository(),
+    productEmbeddings: new ProductEmbeddingRepository(),
 };
 
 module.exports = {

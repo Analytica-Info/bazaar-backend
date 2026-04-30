@@ -29,6 +29,8 @@ router.get('/recommendations/for-you', auth.optional(), recCtrl.forYou);
 router.get('/recommendations/similar/:productId', auth.optional(), recCtrl.similar);
 router.get('/recommendations/frequently-bought/:productId', auth.optional(), recCtrl.frequentlyBought);
 router.post('/recommendations/events', auth.optional(), recCtrl.logEvents);
+router.get('/recommendations/experiments/:key/assign', auth.optional(), recCtrl.assign);
+router.get('/recommendations/metrics', auth.required(), recCtrl.metrics);
 
 // ── Wishlist ──────────────────────────────────────────────────────
 router.get('/wishlist', auth.required(), wishlistCtrl.getWishlist);

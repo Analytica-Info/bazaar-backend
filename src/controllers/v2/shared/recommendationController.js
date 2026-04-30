@@ -6,6 +6,7 @@
  */
 
 const recommendationService = require('../../../services/recommendations/recommendationService');
+const experimentService = require('../../../services/recommendations/experimentService');
 const { wrap } = require('../_shared/responseEnvelope');
 const { handleError } = require('../_shared/errors');
 const { REC_EVENT_TYPES, REC_SOURCES } = require('../../../models/RecommendationEvent');
@@ -52,6 +53,31 @@ exports.forYou = async (req, res) => {
             limit: req.query.limit,
         });
         return res.status(200).json(wrap(result));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.assign = async (req, res) => {
+    try {
+        const userId = req.user?._id || null;
+        const sessionId = req.query.sessionId || req.headers['x-session-id'] || null;
+        const result = await experimentService.assign({
+            key: req.params.key,
+            userId,
+            sessionId,
+        });
+        return res.status(200).json(wrap(result));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.metrics = async (req, res) => {
+    try {
+        const since = req.query.since ? new Date(req.query.since) : undefined;
+        const result = await experimentService.metrics({ key: req.query.key, since });
+        return res.status(200).json(wrap({ rows: result }));
     } catch (error) {
         return handleError(res, error);
     }

@@ -20,6 +20,8 @@ const crypto = require('crypto');
 const repos = require('../../repositories');
 const cache = require('../../utilities/cache');
 const logger = require('../../utilities/logger');
+const { cosine } = require('./embeddingService');
+const personalization = require('./personalizationService');
 
 const TTL = {
     trending: 60 * 60,
@@ -87,7 +89,16 @@ async function getSimilar(productId, { limit } = {}) {
         const anchor = await Product.findById(productId).lean();
         if (!anchor) return { recId: makeRecId(), source: 'similar', items: [] };
 
+        const lim = clampLimit(limit);
         const category = anchor?.product?.categories?.[0] || anchor?.category;
+
+        // Phase 2 path: embedding kNN if available.
+        const embedded = await tryEmbeddingSimilar(anchor, { limit: lim, category });
+        if (embedded.length >= Math.min(lim, 4)) {
+            return { recId: makeRecId(), source: 'similar', items: embedded };
+        }
+
+        // Phase 1 fallback: category + price band heuristic.
         const price = Number(anchor?.product?.price?.sale_price ?? anchor?.product?.price ?? 0);
         const filter = { _id: { $ne: anchor._id } };
         if (category) filter['product.categories'] = category;
@@ -97,13 +108,44 @@ async function getSimilar(productId, { limit } = {}) {
                 $lte: price * 2,
             };
         }
-        const docs = await Product.find(filter).limit(clampLimit(limit) * 2).lean();
+        const docs = await Product.find(filter).limit(lim * 2).lean();
         return {
             recId: makeRecId(),
             source: 'similar',
-            items: docs.filter(inStock).slice(0, clampLimit(limit)),
+            items: docs.filter(inStock).slice(0, lim),
         };
     });
+}
+
+async function tryEmbeddingSimilar(anchor, { limit, category }) {
+    const anchorEmbed = await repos.productEmbeddings.findByProductId(anchor._id);
+    if (!anchorEmbed) return [];
+
+    // Atlas Vector Search path
+    const knn = await repos.productEmbeddings.vectorSearch(anchorEmbed.embedding, {
+        limit: limit * 2,
+        category,
+        excludeIds: [anchor._id],
+    });
+    if (knn.length) {
+        const products = await hydrateProducts(knn.map((d) => d.productId), {
+            excludeId: anchor._id,
+        });
+        return products.slice(0, limit);
+    }
+
+    // In-memory cosine fallback over a small candidate set.
+    const candidateFilter = category ? { category } : {};
+    const candidates = await repos.productEmbeddings.model
+        .find(candidateFilter)
+        .limit(500)
+        .lean();
+    const ranked = candidates
+        .filter((c) => String(c.productId) !== String(anchor._id))
+        .map((c) => ({ id: c.productId, score: cosine(anchorEmbed.embedding, c.embedding) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit * 2);
+    return hydrateProducts(ranked.map((r) => r.id), { excludeId: anchor._id });
 }
 
 async function getFrequentlyBought(productId, { limit } = {}) {
@@ -136,6 +178,38 @@ async function getForYou(userId, { limit } = {}) {
     }
     const k = `bazaar:rec:foryou:${userId}:${lim}`;
     return cache.getOrSet(k, TTL.forYou, async () => {
+        // Phase 3 path: user vector kNN over embeddings.
+        const userVec = await personalization.getUserVector(userId);
+        if (userVec) {
+            const knn = await repos.productEmbeddings.vectorSearch(userVec, {
+                limit: lim * 2,
+            });
+            if (knn.length) {
+                const items = await hydrateProducts(knn.map((d) => d.productId));
+                if (items.length >= Math.min(lim, 4)) {
+                    const trimmed = items.slice(0, lim);
+                    const candidateIds = trimmed.map((p) => String(p._id));
+                    const alsScores = await personalization.alsScore({
+                        userId,
+                        candidateIds,
+                        k: lim,
+                    });
+                    if (alsScores && alsScores.length) {
+                        const scoreById = new Map(
+                            alsScores.map((s) => [String(s.productId), s.score])
+                        );
+                        trimmed.sort(
+                            (a, b) =>
+                                (scoreById.get(String(b._id)) || 0) -
+                                (scoreById.get(String(a._id)) || 0)
+                        );
+                    }
+                    return { recId: makeRecId(), source: 'for_you', items: trimmed };
+                }
+            }
+        }
+
+        // Phase 1 fallback: category history + trending blend.
         const OrderDetail = repos.orderDetails.rawModel();
         const Order = repos.orders.rawModel();
         const orders = await Order.find({
