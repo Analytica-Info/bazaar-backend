@@ -56,6 +56,8 @@ const SyncStateRepository = require('./SyncStateRepository');
 const AboutRepository = require('./AboutRepository');
 const ActivityLogRepository = require('./ActivityLogRepository');
 const BackendLogRepository = require('./BackendLogRepository');
+const CoPurchasePairRepository = require('./CoPurchasePairRepository');
+const RecommendationEventRepository = require('./RecommendationEventRepository');
 const unitOfWork = require('./UnitOfWork');
 
 const repos = {
@@ -103,6 +105,8 @@ const repos = {
     abouts: new AboutRepository(),
     activityLogs: new ActivityLogRepository(),
     backendLogs: new BackendLogRepository(),
+    coPurchasePairs: new CoPurchasePairRepository(),
+    recommendationEvents: new RecommendationEventRepository(),
 };
 
 module.exports = {

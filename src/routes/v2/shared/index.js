@@ -9,6 +9,7 @@ const createUpload = require('../../../utilities/fileUpload');
 
 const productCtrl = require('../../../controllers/v2/shared/productController');
 const wishlistCtrl = require('../../../controllers/v2/shared/wishlistController');
+const recCtrl = require('../../../controllers/v2/shared/recommendationController');
 
 const reviewUpload = createUpload(/jpeg|jpg|png|pdf/, 'uploads/users');
 
@@ -21,6 +22,13 @@ router.get('/products/category/:id', productCtrl.categoriesProduct);
 router.get('/products/sub-category/:id', productCtrl.subCategoriesProduct);
 router.get('/products/sub-sub-category/:id', productCtrl.subSubCategoriesProduct);
 router.get('/products/similar', productCtrl.similarProducts);
+
+// ── Recommendations (Phase 1) ─────────────────────────────────────
+router.get('/recommendations/trending', auth.optional(), recCtrl.trending);
+router.get('/recommendations/for-you', auth.optional(), recCtrl.forYou);
+router.get('/recommendations/similar/:productId', auth.optional(), recCtrl.similar);
+router.get('/recommendations/frequently-bought/:productId', auth.optional(), recCtrl.frequentlyBought);
+router.post('/recommendations/events', auth.optional(), recCtrl.logEvents);
 
 // ── Wishlist ──────────────────────────────────────────────────────
 router.get('/wishlist', auth.required(), wishlistCtrl.getWishlist);
