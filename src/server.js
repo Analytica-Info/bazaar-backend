@@ -71,6 +71,11 @@ const mobileBannerImages = require("./routes/mobile/bannerImages.js");
 const mobileConfigRoutes = require("./routes/mobile/configRoutes.js");
 
 // ==========================================
+// V2 UNIFIED API ROUTES (BFF — gated by V2_ENABLED env flag)
+// ==========================================
+const v2Router = require("./routes/v2/index.js");
+
+// ==========================================
 // APP SETUP
 // ==========================================
 const app = express();
@@ -265,6 +270,12 @@ const connectAndRun = async () => {
   app.use("/api", requestMetrics("user-api"), mobilePublicRoutes);
   app.use("/api", requestMetrics("user-api"), mobileBannerImages);
   app.use("/api/mobile", requestMetrics("user-api"), mobileConfigRoutes);
+
+  // --- V2 Unified API (gated by V2_ENABLED env flag) ---
+  if (process.env.V2_ENABLED === 'true') {
+    app.use("/v2", requestMetrics("v2-api"), v2Router);
+    logger.info("V2 API routes mounted at /v2");
+  }
 
   // ==========================================
   // GLOBAL ERROR HANDLER (must be after all routes)

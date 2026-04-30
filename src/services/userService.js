@@ -226,14 +226,14 @@ exports.getSinglePaymentHistory = async (userId, paymentId) => {
 };
 
 /**
- * Get mobile payment history (last 10 orders, formatted for Tabby/payment providers).
- * From mobile authController.getPaymentHistory
+ * Get Tabby buyer history (last 10 orders, formatted for Tabby credit assessment).
+ * Used by Tabby to assess buyer risk — NOT a user-facing payment history endpoint.
  *
  * userCreatedAt: the user's registration date (for buyer_history)
  *
  * Returns { payment: { order_history, buyer_history } }
  */
-exports.getMobilePaymentHistory = async (userId, userCreatedAt) => {
+exports.getTabbyBuyerHistory = async (userId, userCreatedAt) => {
     const allOrders = await Order.find({ user_id: userId })
         .sort({ createdAt: -1 })
         .limit(10)
@@ -605,4 +605,50 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
             : 'Review created successfully',
         reviews: mappedReviews,
     };
+};
+
+// ---------------------------------------------------------------------------
+// Backward-compatibility alias (mobile authController still imports this name)
+// ---------------------------------------------------------------------------
+exports.getMobilePaymentHistory = exports.getTabbyBuyerHistory;
+
+// ---------------------------------------------------------------------------
+// V2 helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get lightweight profile for the current user.
+ * Returns only fields needed by the profile screen — no order queries.
+ */
+exports.getProfile = async (userId) => {
+    const user = await User.findById(userId)
+        .select('_id name first_name email username avatar role phone authProvider createdAt')
+        .lean();
+
+    if (!user) {
+        throw { status: 404, message: 'User not found' };
+    }
+
+    return { user };
+};
+
+/**
+ * Get total order count for a user, cached in Redis for 60 s.
+ */
+exports.getOrderCount = async (userId) => {
+    const cacheKey = cache.key('orderCount', String(userId));
+    const cached = await cache.get(cacheKey);
+    if (cached !== null) {
+        return { count: Number(cached) };
+    }
+
+    const count = await Order.countDocuments({
+        $or: [
+            { userId: new mongoose.Types.ObjectId(userId) },
+            { user_id: new mongoose.Types.ObjectId(userId) },
+        ],
+    });
+
+    await cache.set(cacheKey, String(count), 60);
+    return { count };
 };

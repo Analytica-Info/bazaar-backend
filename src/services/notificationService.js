@@ -396,22 +396,33 @@ async function getAllUsersForNotification() {
 // ---------------------------------------------------------------------------
 
 /**
- * Get notifications for a specific user.
- * @returns {{ notificationsCount: number, unreadCount: number, notifications: Array }}
+ * Get notifications for a specific user with optional pagination.
+ * @param {string|ObjectId} userId
+ * @param {{ page?: number, limit?: number }} [opts]
+ * @returns {{ notificationsCount: number, unreadCount: number, notifications: Array, total: number, page: number, limit: number }}
  */
-async function getUserNotifications(userId) {
-    const allNotifications = await Notification.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .lean()
-        .exec();
+async function getUserNotifications(userId, { page = 1, limit = 20 } = {}) {
+    const query = { userId };
+    const skip = (page - 1) * limit;
 
-    const unreadCount = allNotifications.filter(n => !n.read).length;
+    const [notifications, total, unreadCount] = await Promise.all([
+        Notification.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec(),
+        Notification.countDocuments(query),
+        Notification.countDocuments({ ...query, read: { $ne: true } }),
+    ]);
 
     return {
-        notificationsCount: allNotifications.length,
+        notificationsCount: total,
         unreadCount,
-        notifications: allNotifications,
+        notifications,
+        total,
+        page,
+        limit,
     };
 }
 

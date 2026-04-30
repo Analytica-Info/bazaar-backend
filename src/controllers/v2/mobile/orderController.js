@@ -1,0 +1,147 @@
+/**
+ * V2 Mobile Order Controller (BFF layer)
+ */
+const orderService = require('../../../services/orderService');
+const { wrap, paginated } = require('../_shared/responseEnvelope');
+const { handleError } = require('../_shared/errors');
+const logger = require('../../../utilities/logger');
+
+exports.getOrders = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+        const result = await orderService.getOrders(userId, { page, limit });
+        return res.status(200).json(paginated(result.orders, result.total, result.page, result.limit));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.validateInventory = async (req, res) => {
+    try {
+        const { products } = req.body;
+        const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Mobile App Backend');
+        return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
+    } catch (error) {
+        if (error.status === 400 && error.data) {
+            return res.status(200).json({ success: false, ...error.data });
+        }
+        return handleError(res, error);
+    }
+};
+
+exports.checkoutStripe = async (req, res) => {
+    try {
+        const result = await orderService.createStripeCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
+        return res.status(200).json(wrap({ orderId: result.orderId }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.checkoutTabby = async (req, res) => {
+    try {
+        const result = await orderService.createTabbyCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
+        return res.status(200).json(wrap({ paymentId: result.paymentId, status: result.status }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.verifyTabby = async (req, res) => {
+    try {
+        const result = await orderService.verifyTabbyPayment(req.query.paymentId);
+        return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.checkoutNomod = async (req, res) => {
+    try {
+        const result = await orderService.createNomodCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
+        return res.status(200).json(wrap({ paymentId: result.paymentId, status: result.status }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.verifyNomod = async (req, res) => {
+    try {
+        const result = await orderService.verifyNomodPayment(req.query.paymentId);
+        return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.initStripePayment = async (req, res) => {
+    try {
+        const { amountAED } = req.body;
+        if (!amountAED || isNaN(amountAED) || Number(amountAED) <= 0) {
+            return res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'amountAED is required and must be a positive number' } });
+        }
+        const result = await orderService.initStripePayment(req.user._id, Number(amountAED));
+        return res.status(200).json(wrap(result));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.getPaymentMethods = async (req, res) => {
+    try {
+        const methods = await orderService.getPaymentMethods();
+        return res.status(200).json(wrap({ methods }));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.getAddress = async (req, res) => {
+    try {
+        const result = await orderService.getAddresses(req.user._id);
+        return res.status(200).json(wrap({ address: result.address, flag: result.flag }));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.storeAddress = async (req, res) => {
+    try {
+        const result = await orderService.storeAddress(req.user._id, req.body);
+        return res.status(200).json(wrap({ addresses: result.addresses }, result.message));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.deleteAddress = async (req, res) => {
+    try {
+        const result = await orderService.deleteAddress(req.user._id, req.params.addressId);
+        return res.status(200).json(wrap({ addresses: result.addresses }, 'Address deleted successfully'));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.setPrimaryAddress = async (req, res) => {
+    try {
+        const result = await orderService.setPrimaryAddress(req.user._id, req.params.addressId);
+        return res.status(200).json(wrap({ addresses: result.addresses }, 'Primary address set successfully'));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { status } = req.body;
+        const filePath = req.file ? req.file.path : null;
+        const order = await orderService.updateOrderStatus(orderId, status, filePath);
+        return res.status(200).json(wrap({ order }, 'Order status updated successfully'));
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
