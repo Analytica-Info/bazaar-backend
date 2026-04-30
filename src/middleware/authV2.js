@@ -8,11 +8,12 @@
  * - USER_AUTH_PROJECTION identical to v1 (audited 2026-04-24)
  */
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Admin = require('../models/Admin');
+const User = require('../repositories').users.rawModel();
+const Admin = require('../repositories').admins.rawModel();
 const JWT_SECRET = require('../config/jwtSecret');
 const cache = require('../utilities/cache');
 const logger = require('../utilities/logger');
+const { wrapError } = require('../controllers/v2/_shared/responseEnvelope');
 
 const USER_AUTH_PROJECTION =
     '_id isBlocked name first_name email username avatar role phone authProvider fcmToken createdAt';
@@ -33,7 +34,7 @@ async function authenticate(req, res, next, { required: isRequired = true, role 
             req.user = null;
             return next();
         }
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'No token provided' } });
+        return res.status(401).json(wrapError('UNAUTHORIZED', 'No token provided'));
     }
 
     try {
@@ -47,11 +48,11 @@ async function authenticate(req, res, next, { required: isRequired = true, role 
         }
 
         if (!userData) {
-            return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'User not found' } });
+            return res.status(401).json(wrapError('UNAUTHORIZED', 'User not found'));
         }
 
         if (userData.isBlocked) {
-            return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Your account has been blocked' } });
+            return res.status(403).json(wrapError('FORBIDDEN', 'Your account has been blocked'));
         }
 
         req.user = userData;
@@ -70,13 +71,13 @@ async function authenticate(req, res, next, { required: isRequired = true, role 
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
             // V2 always returns 401 (unlike v1 which returns 402 for cookie clients)
-            return res.status(401).json({ success: false, error: { code: 'TOKEN_EXPIRED', message: 'Token expired. Please log in again.' } });
+            return res.status(401).json(wrapError('TOKEN_EXPIRED', 'Token expired. Please log in again.'));
         }
         if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid token' } });
+            return res.status(401).json(wrapError('INVALID_TOKEN', 'Invalid token'));
         }
         logger.error({ err: error }, 'authV2 middleware error:');
-        return res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+        return res.status(500).json(wrapError('INTERNAL_ERROR', 'Internal server error'));
     }
 }
 

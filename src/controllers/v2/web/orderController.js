@@ -16,7 +16,15 @@ exports.getAddress = async (req, res) => {
 
 exports.storeAddress = async (req, res) => {
     try {
-        const result = await orderService.storeAddress(req.user._id, req.body);
+        const b = req.body;
+        const allowed = {
+            _id: b._id, name: b.name, email: b.email, mobile: b.mobile,
+            city: b.city, area: b.area, state: b.state,
+            country: b.country, countryCode: b.countryCode,
+            floorNo: b.floorNo, apartmentNo: b.apartmentNo,
+            buildingName: b.buildingName, landmark: b.landmark,
+        };
+        const result = await orderService.storeAddress(req.user._id, allowed);
         return res.status(200).json(wrap({ addresses: result.addresses }, result.message));
     } catch (error) {
         return handleError(res, error);
@@ -47,9 +55,6 @@ exports.validateInventory = async (req, res) => {
         const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Web');
         return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
     } catch (error) {
-        if (error.status === 400 && error.data) {
-            return res.status(400).json({ success: false, ...error.data });
-        }
         return handleError(res, error);
     }
 };

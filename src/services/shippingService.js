@@ -1,4 +1,4 @@
-const ShippingCountry = require("../models/ShippingCountry");
+const ShippingCountry = require('../repositories').shippingCountries.rawModel();
 
 // ============================================
 // COUNTRY CRUD

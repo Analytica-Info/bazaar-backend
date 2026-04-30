@@ -22,10 +22,13 @@ const HTTP_CODE_MAP = {
  * Usage: return handleError(res, error);
  */
 exports.handleError = (res, error) => {
-    if (error.status && error.data) {
-        return res.status(error.status).json({ success: false, ...error.data });
-    }
     const status = error.status || 500;
-    const code = HTTP_CODE_MAP[status] || 'INTERNAL_ERROR';
-    return res.status(status).json(wrapError(code, error.message || 'Internal server error'));
+    const code = error.code || HTTP_CODE_MAP[status] || 'INTERNAL_ERROR';
+    const isProd = process.env.NODE_ENV === 'production';
+    const isServerError = status >= 500;
+    const message = (isServerError && isProd)
+        ? 'Internal server error'
+        : (error.message || 'Internal server error');
+    const details = isServerError && isProd ? undefined : error.data;
+    return res.status(status).json(wrapError(code, message, details));
 };

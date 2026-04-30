@@ -1,5 +1,5 @@
-const BankPromoCode = require("../models/BankPromoCode");
-const BankPromoCodeUsage = require("../models/BankPromoCodeUsage");
+const BankPromoCode = require('../repositories').bankPromoCodes.rawModel();
+const BankPromoCodeUsage = require('../repositories').bankPromoCodeUsages.rawModel();
 
 function formatPromo(doc, uniqueCustomers = 0) {
   return {

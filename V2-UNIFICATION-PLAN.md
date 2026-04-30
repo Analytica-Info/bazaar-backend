@@ -570,3 +570,67 @@ src/
 - **Does not change webhooks** — external contracts
 - **Does not introduce GraphQL** — appropriate for a future phase if mobile needs field-level control
 - **Does not remove legacy routes** until traffic data confirms it is safe
+
+---
+
+## Frontend Migration Notes (post-review fixes)
+
+These changes were made after the initial implementation in response to a frontend integration review. Web and mobile clients integrating against `/v2` should be aware of the following contracts.
+
+### Required headers
+
+All `/v2` requests should set `X-Client: web` or `X-Client: mobile`. Requests with no `X-Client` header, no `user_token` cookie, and no `Authorization: Bearer` header will receive `400 UNKNOWN_PLATFORM`. The middleware also infers platform from cookie (web) and bearer token (mobile) for backwards-compatible browser cases, but explicit `X-Client` is recommended.
+
+### Response envelope (uniform across all v2 endpoints)
+
+Success:
+```json
+{ "success": true, "data": { ... }, "message": "optional" }
+```
+
+Paginated success:
+```json
+{ "success": true, "data": [ ... ], "meta": { "total": 100, "page": 1, "limit": 20, "pages": 5 } }
+```
+Pagination-related extras (e.g. `unreadCount` on notifications) live inside `meta`, not at the top level.
+
+Error (always — no exceptions):
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "...", "details": { ... } } }
+```
+`details` is optional. Error codes are stable identifiers — clients should branch on `error.code`, not `error.message`.
+
+### Auth contracts
+
+**Mobile** receives tokens in the response body. Login, google-login, apple-login all return:
+```json
+{ "success": true, "data": { "accessToken": "...", "refreshToken": "...", "user": {...}, "coupon": ..., "totalOrderCount": ..., "usedFirst15Coupon": ... } }
+```
+Refresh-token response also uses `accessToken` (not `token`). All authenticated mobile requests must send `Authorization: Bearer <accessToken>`.
+
+**Web** uses an httpOnly `user_token` cookie set automatically by login/google-login/apple-login. The body returns the same user/coupon shape as mobile (without tokens):
+```json
+{ "success": true, "data": { "user": {...}, "coupon": ..., "totalOrderCount": ..., "usedFirst15Coupon": ... } }
+```
+
+`GET /v2/auth/check` (web only) returns `{ authenticated: boolean }` and **does not** return user data. Clients that need user data should call `GET /v2/auth/user-data`.
+
+### Rate limits
+
+The following v2 paths inherit existing rate limiters in `server.js`:
+
+- 20 req/15min: `/v2/auth/login`, `/v2/auth/register`, `/v2/auth/google-login`, `/v2/auth/apple-login`, `/v2/auth/refresh-token`
+- 5 req/15min: `/v2/auth/forgot-password`, `/v2/auth/reset-password`, `/v2/auth/verify-code`, `/v2/auth/resend-recovery-code`
+
+429 responses use the legacy `{ success: false, message: "..." }` shape (shared with v1).
+
+### CORS / cookies (web)
+
+Cookies are issued with `secure: true`, `sameSite: 'none'`, and `domain` from the `DOMAIN` env var. The web frontend must:
+- Use HTTPS (cookies will not be sent on plain HTTP)
+- Send `credentials: 'include'` on fetch / `withCredentials: true` on axios
+- Be served from a subdomain of `DOMAIN`
+
+### Feature flag
+
+The v2 router is mounted only when `V2_ENABLED=true`. v1 routes remain fully operational and unchanged.

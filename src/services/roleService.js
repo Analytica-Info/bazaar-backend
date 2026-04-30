@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
-const Role = require("../models/Role");
-const Permission = require("../models/Permission");
-const Admin = require("../models/Admin");
+const Role = require('../repositories').roles.rawModel();
+const Permission = require('../repositories').permissions.rawModel();
+const Admin = require('../repositories').admins.rawModel();
 
 const POPULATE_PERMISSIONS = { path: "permissions", select: "name slug module action isActive" };
 

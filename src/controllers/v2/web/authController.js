@@ -44,9 +44,9 @@ exports.login = async (req, res) => {
 
         return res.status(200).json(wrap({
             user: result.user,
-            coupon: result.coupon,
-            totalOrderCount: result.totalOrderCount,
-            usedFirst15Coupon: result.usedFirst15Coupon,
+            coupon: result.coupon ?? null,
+            totalOrderCount: result.totalOrderCount ?? null,
+            usedFirst15Coupon: result.usedFirst15Coupon ?? null,
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 web login error');
@@ -67,7 +67,12 @@ exports.googleLogin = async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000,
         });
 
-        return res.status(200).json(wrap({ user: result.user, coupon: result.coupon }));
+        return res.status(200).json(wrap({
+            user: result.user,
+            coupon: result.coupon ?? null,
+            totalOrderCount: result.totalOrderCount ?? null,
+            usedFirst15Coupon: result.usedFirst15Coupon ?? null,
+        }));
     } catch (error) {
         return handleError(res, error);
     }
@@ -86,7 +91,12 @@ exports.appleLogin = async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000,
         });
 
-        return res.status(200).json(wrap({ user: result.user }));
+        return res.status(200).json(wrap({
+            user: result.user,
+            coupon: result.coupon ?? null,
+            totalOrderCount: result.totalOrderCount ?? null,
+            usedFirst15Coupon: result.usedFirst15Coupon ?? null,
+        }));
     } catch (error) {
         return handleError(res, error);
     }
@@ -100,9 +110,9 @@ exports.logout = (req, res) => {
 exports.checkAuth = (req, res) => {
     const token = req.cookies.user_token;
     if (!token) return res.status(200).json(wrap({ authenticated: false }));
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, (err) => {
         if (err) return res.status(200).json(wrap({ authenticated: false }));
-        return res.status(200).json(wrap({ authenticated: true, user: decoded }));
+        return res.status(200).json(wrap({ authenticated: true }));
     });
 };
 
@@ -147,7 +157,12 @@ exports.updatePassword = async (req, res) => {
 exports.getUserData = async (req, res) => {
     try {
         const result = await authService.getUserData(req.user._id, 'web');
-        return res.status(200).json(wrap({ user: result.data, coupon: result.coupon }));
+        return res.status(200).json(wrap({
+            user: result.data,
+            coupon: result.coupon ?? null,
+            totalOrderCount: result.totalOrderCount ?? null,
+            usedFirst15Coupon: result.usedFirst15Coupon ?? null,
+        }));
     } catch (error) {
         return handleError(res, error);
     }

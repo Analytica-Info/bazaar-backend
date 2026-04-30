@@ -17,7 +17,7 @@ exports.wrap = (data, message) => ({
 /**
  * Paginated success response.
  */
-exports.paginated = (items, total, page, limit) => ({
+exports.paginated = (items, total, page, limit, extraMeta) => ({
     success: true,
     data: items,
     meta: {
@@ -25,6 +25,7 @@ exports.paginated = (items, total, page, limit) => ({
         page,
         limit,
         pages: Math.ceil(total / limit),
+        ...(extraMeta || {}),
     },
 });
 

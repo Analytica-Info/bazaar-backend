@@ -1,10 +1,10 @@
-const CartData = require("../models/CartData");
-const Cart = require("../models/Cart");
-const Order = require("../models/Order");
-const CouponMobile = require("../models/Coupons");
-const User = require("../models/User");
-const OrderDetail = require("../models/OrderDetail");
-const Product = require("../models/Product");
+const CartData = require('../repositories').cartData.rawModel();
+const Cart = require('../repositories').carts.rawModel();
+const Order = require('../repositories').orders.rawModel();
+const CouponMobile = require('../repositories').couponsMobile.rawModel();
+const User = require('../repositories').users.rawModel();
+const OrderDetail = require('../repositories').orderDetails.rawModel();
+const Product = require('../repositories').products.rawModel();
 const stripe = require("stripe")(process.env.STRIPE_SK);
 const crypto = require("crypto");
 const { sendEmail } = require("../mail/emailService");
@@ -23,7 +23,7 @@ const { mapLimit } = require('async');
 const INVENTORY_CONCURRENCY = 5;
 const cache = require('../utilities/cache');
 const logger = require('../utilities/logger');
-const PendingPayment = require('../models/PendingPayment');
+const PendingPayment = require('../repositories').pendingPayments.rawModel();
 const PaymentProviderFactory = require('./payments/PaymentProviderFactory');
 const WEBURL = process.env.URL;
 const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
@@ -557,7 +557,7 @@ exports.getPaymentIntent = async () => {
     return response.data;
 };
 
-exports.updateOrderStatus = async (orderId, status, filePath) => {
+exports.updateOrderStatus = async (orderId, status, filePath, requestingUserId = null) => {
     if (!status) {
         throw { status: 400, message: "Status is required" };
     }
@@ -581,6 +581,13 @@ exports.updateOrderStatus = async (orderId, status, filePath) => {
     const order = await Order.findById(orderId);
     if (!order) {
         throw { status: 404, message: "Order not found" };
+    }
+
+    if (requestingUserId) {
+        const ownerId = String(order.userId || order.user_id || '');
+        if (ownerId && ownerId !== String(requestingUserId)) {
+            throw { status: 403, message: "Not authorized to update this order" };
+        }
     }
 
     let imagePath = null;
@@ -1279,9 +1286,17 @@ exports.createTabbyCheckoutSession = async (userId, bodyData, metadata) => {
     };
 };
 
-exports.verifyTabbyPayment = async (paymentId) => {
+exports.verifyTabbyPayment = async (paymentId, requestingUserId = null) => {
     if (!paymentId) {
         throw { status: 400, message: 'paymentId is required' };
+    }
+
+    if (requestingUserId) {
+        const PendingPayment = require('../repositories').pendingPayments.rawModel();
+        const pending = await PendingPayment.findOne({ payment_id: paymentId }).select('user_id').lean();
+        if (pending && String(pending.user_id) !== String(requestingUserId)) {
+            throw { status: 403, message: 'Not authorized to verify this payment' };
+        }
     }
 
     const paymentResp = await axios.get(`https://api.tabby.ai/api/v2/payments/${paymentId}`, {
@@ -1370,9 +1385,17 @@ exports.createNomodCheckoutSession = async (userId, bodyData, metadata) => {
 /**
  * Verify Nomod payment status (mobile flow)
  */
-exports.verifyNomodPayment = async (paymentId) => {
+exports.verifyNomodPayment = async (paymentId, requestingUserId = null) => {
     if (!paymentId) {
         throw { status: 400, message: 'paymentId is required' };
+    }
+
+    if (requestingUserId) {
+        const PendingPayment = require('../repositories').pendingPayments.rawModel();
+        const pending = await PendingPayment.findOne({ payment_id: paymentId }).select('user_id').lean();
+        if (pending && String(pending.user_id) !== String(requestingUserId)) {
+            throw { status: 403, message: 'Not authorized to verify this payment' };
+        }
     }
 
     const provider = PaymentProviderFactory.create('nomod');

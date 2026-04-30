@@ -114,6 +114,11 @@ app.use("/user/register", authLimiter);
 app.use("/admin/login", authLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+app.use("/v2/auth/login", authLimiter);
+app.use("/v2/auth/register", authLimiter);
+app.use("/v2/auth/google-login", authLimiter);
+app.use("/v2/auth/apple-login", authLimiter);
+app.use("/v2/auth/refresh-token", authLimiter);
 
 // Stricter rate limit for password reset
 const passwordResetLimiter = rateLimit({
@@ -124,6 +129,10 @@ const passwordResetLimiter = rateLimit({
 app.use("/user/forgot-password", passwordResetLimiter);
 app.use("/admin/forgot-password", passwordResetLimiter);
 app.use("/api/auth/forgot-password", passwordResetLimiter);
+app.use("/v2/auth/forgot-password", passwordResetLimiter);
+app.use("/v2/auth/reset-password", passwordResetLimiter);
+app.use("/v2/auth/verify-code", passwordResetLimiter);
+app.use("/v2/auth/resend-recovery-code", passwordResetLimiter);
 
 // ==========================================
 // CORE MIDDLEWARE
@@ -136,8 +145,31 @@ app.post("/tabby/webhook", bodyParser.raw({ type: "*/*" }), (req, res, next) => 
 
 app.use(cookieParser());
 
-// CORS — open (same as old Mobile API)
-app.use(cors({ credentials: true, origin: true }));
+// CORS — allowlist when ALLOWED_ORIGINS is set, fall back to open (legacy mobile API).
+// V2 web cookies require an allowlist; mixed mode lets us roll out gradually.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+if (ALLOWED_ORIGINS.length > 0) {
+  app.use(
+    cors({
+      credentials: true,
+      origin: (origin, cb) => {
+        // Allow requests with no Origin (mobile apps, curl, server-to-server)
+        if (!origin) return cb(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(new Error("Not allowed by CORS"));
+      },
+    })
+  );
+} else {
+  if (isProduction) {
+    logger.warn("ALLOWED_ORIGINS not set — CORS is open. This is unsafe for v2 web cookie sessions.");
+  }
+  app.use(cors({ credentials: true, origin: true }));
+}
 
 // Body parsing with size limits (Express 5 has built-in parsers)
 app.use(express.json({ limit: "10mb" }));

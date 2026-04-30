@@ -1,67 +1,21 @@
 const mongoose = require('mongoose');
-const User = require('../models/User');
-const Order = require('../models/Order');
-const OrderDetail = require('../models/OrderDetail');
-const Product = require('../models/Product');
-const Review = require('../models/Review');
-const Wishlist = require('../models/Wishlist');
-const Category = require('../models/Category');
-const backendLogger = require('../utilities/backendLogger');
+const repos = require('../repositories');
 const cache = require('../utilities/cache');
-
-const BACKEND_URL = process.env.BACKEND_URL;
 
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
 
 /**
- * For a list of order details, fetch products in bulk and attach SKU to each detail.
- * Shared logic used by getUserOrders, getPaymentHistory, and getDashboard.
- */
-const attachSkuToOrderDetails = async (orderDetails) => {
-    const productIds = orderDetails
-        .map(detail => detail.product_id)
-        .filter(id => id)
-        .map(id => new mongoose.Types.ObjectId(id));
-
-    // Only the SKU number is needed from the Product document.
-    const products = await Product.find({ _id: { $in: productIds } }).select("product.sku_number").lean();
-
-    const productSkuMap = {};
-    products.forEach(product => {
-        const productId = product._id.toString();
-        const sku = product.product?.sku_number || null;
-        productSkuMap[productId] = sku;
-    });
-
-    return orderDetails.map(detail => {
-        const productId = detail.product_id?.toString();
-        const sku = productSkuMap[productId] || null;
-        return {
-            ...detail.toObject(),
-            sku: sku,
-        };
-    });
-};
-
-/**
  * For a list of orders, populate each with its order details + SKU info.
- * Used by getUserOrders, getPaymentHistory, getDashboard.
- *
- * Previously: N+1 — one OrderDetail.find() + one Product.find() per order.
- * Now: two total queries (all OrderDetails + all Products in $in batch).
+ * Two queries total — all OrderDetails + all Products in $in batch (no N+1).
  */
 const populateOrdersWithDetails = async (orders, { includeSku = true } = {}) => {
     if (orders.length === 0) return [];
 
-    // Batch 1: fetch ALL order details for ALL orders in a single query
     const orderIds = orders.map((o) => new mongoose.Types.ObjectId(o._id));
-    const allOrderDetails = await OrderDetail.find({
-        order_id: { $in: orderIds },
-    }).lean();
+    const allOrderDetails = await repos.orderDetails.findForOrders(orderIds);
 
-    // Group order details by order_id
     const detailsByOrderId = {};
     for (const d of allOrderDetails) {
         const k = String(d.order_id);
@@ -69,7 +23,6 @@ const populateOrdersWithDetails = async (orders, { includeSku = true } = {}) => 
         detailsByOrderId[k].push(d);
     }
 
-    // Batch 2: fetch ALL products referenced by ALL order details in a single query
     let productSkuMap = {};
     if (includeSku) {
         const productIds = [
@@ -81,14 +34,7 @@ const populateOrdersWithDetails = async (orders, { includeSku = true } = {}) => 
             ),
         ].map((id) => new mongoose.Types.ObjectId(id));
 
-        if (productIds.length > 0) {
-            const products = await Product.find({ _id: { $in: productIds } })
-                .select("product.sku_number")
-                .lean();
-            for (const p of products) {
-                productSkuMap[String(p._id)] = p.product?.sku_number || null;
-            }
-        }
+        productSkuMap = await repos.products.findSkuMap(productIds);
     }
 
     return orders.map((order) => {
@@ -112,18 +58,10 @@ const populateOrdersWithDetails = async (orders, { includeSku = true } = {}) => 
 
 /**
  * Get all orders for a user with order details and SKUs.
- * From ecommerce userController.orders
- *
- * Returns { orders, totalOrders, shippedOrders, deliveredOrders, canceledOrders }
+ * Returns { orders, total_orders, shipped_orders, delivered_orders, canceled_orders }
  */
-exports.getUserOrders = async (userId) => {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    });
+exports.getUserOrders = async (userId, opts) => {
+    const orders = await repos.orders.findForUser(userId, opts);
 
     const updatedOrders = await populateOrdersWithDetails(orders);
 
@@ -153,19 +91,9 @@ exports.getUserOrders = async (userId) => {
 
 /**
  * Get a single order with its details.
- * From ecommerce userController.order
- *
- * Returns { orders }
  */
 exports.getOrder = async (userId, orderId) => {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        _id: orderId,
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    });
+    const orders = await repos.orders.findOneForUser(userId, orderId);
 
     const updatedOrders = await populateOrdersWithDetails(orders, { includeSku: false });
 
@@ -178,18 +106,9 @@ exports.getOrder = async (userId, orderId) => {
 
 /**
  * Get payment history (all orders with details + SKUs).
- * From ecommerce userController.paymentHistory
- *
- * Returns { history }
  */
 exports.getPaymentHistory = async (userId) => {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    });
+    const orders = await repos.orders.findForUser(userId);
 
     const updatedOrders = await populateOrdersWithDetails(orders);
 
@@ -202,19 +121,9 @@ exports.getPaymentHistory = async (userId) => {
 
 /**
  * Get a single payment history entry.
- * From ecommerce userController.singlePaymentHistory
- *
- * Returns { history }
  */
 exports.getSinglePaymentHistory = async (userId, paymentId) => {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        _id: paymentId,
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    });
+    const orders = await repos.orders.findOneForUser(userId, paymentId);
 
     const updatedOrders = await populateOrdersWithDetails(orders, { includeSku: false });
 
@@ -227,23 +136,12 @@ exports.getSinglePaymentHistory = async (userId, paymentId) => {
 
 /**
  * Get Tabby buyer history (last 10 orders, formatted for Tabby credit assessment).
- * Used by Tabby to assess buyer risk — NOT a user-facing payment history endpoint.
- *
- * userCreatedAt: the user's registration date (for buyer_history)
- *
- * Returns { payment: { order_history, buyer_history } }
  */
 exports.getTabbyBuyerHistory = async (userId, userCreatedAt) => {
-    const allOrders = await Order.find({ user_id: userId })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .select('order_id order_no order_datetime amount_total status payment_status payment_method createdAt name email phone address state')
-        .lean();
-
-    const recentOrders = allOrders;
+    const recentOrders = await repos.orders.findRecentForTabbyHistory(userId, { limit: 10 });
 
     const orderIds = recentOrders.map(order => order._id);
-    const orderDetails = await OrderDetail.find({ order_id: { $in: orderIds } }).lean();
+    const orderDetails = await repos.orderDetails.findForOrders(orderIds);
 
     const detailsMap = {};
     orderDetails.forEach(detail => {
@@ -252,12 +150,7 @@ exports.getTabbyBuyerHistory = async (userId, userCreatedAt) => {
         detailsMap[key].push(detail);
     });
 
-    const successfulOrders = await Order.countDocuments({
-        user_id: userId,
-        payment_status: {
-            $nin: ['pending', 'failed', 'cancelled', 'refunded', 'expired'],
-        },
-    });
+    const successfulOrders = await repos.orders.countSuccessfulOrders(userId);
 
     const registeredSince = userCreatedAt;
 
@@ -332,18 +225,9 @@ exports.getTabbyBuyerHistory = async (userId, userCreatedAt) => {
 
 /**
  * Get dashboard data: recent orders, totals, wishlist count.
- * From ecommerce userController.dashboard
- *
- * Returns { recentOrders, totalSpent, totalOrders, activeOrders, wishlistItem }
  */
 exports.getDashboard = async (userId) => {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    }).sort({ createdAt: -1 });
+    const orders = await repos.orders.findForUser(userId);
 
     const updatedOrders = await populateOrdersWithDetails(orders);
 
@@ -361,8 +245,7 @@ exports.getDashboard = async (userId) => {
         (order) => order.status.toLowerCase() !== 'delivered'
     ).length;
 
-    const wishlist = await Wishlist.findOne({ user: userObjectId });
-    const wishlistItem = wishlist ? wishlist.items.length : 0;
+    const wishlistItem = await repos.wishlists.countItemsForUser(userId);
 
     return {
         recent_orders: updatedOrders,
@@ -375,21 +258,13 @@ exports.getDashboard = async (userId) => {
 
 /**
  * Get current month's top 5 order categories.
- * From ecommerce userController.currentMonthOrderCategories
- *
- * Returns { data, message }
  */
 exports.getCurrentMonthOrderCategories = async () => {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const orders = await Order.find({
-        createdAt: {
-            $gte: currentMonthStart,
-            $lte: currentMonthEnd,
-        },
-    }).exec();
+    const orders = await repos.orders.findByDateRange(currentMonthStart, currentMonthEnd);
 
     if (orders.length === 0) {
         return {
@@ -399,16 +274,10 @@ exports.getCurrentMonthOrderCategories = async () => {
     }
 
     const orderIds = orders.map(order => order._id);
-
-    const orderDetails = await OrderDetail.find({
-        order_id: { $in: orderIds },
-    }).exec();
+    const orderDetails = await repos.orderDetails.findForOrders(orderIds);
 
     const productIds = [...new Set(orderDetails.map(detail => detail.product_id))];
-
-    const products = await Product.find({
-        _id: { $in: productIds },
-    });
+    const products = await repos.products.findByIds(productIds);
 
     const productCategoryMap = {};
     products.forEach(product => {
@@ -417,15 +286,11 @@ exports.getCurrentMonthOrderCategories = async () => {
         }
     });
 
-    // Category is a singleton collection — use findOne() and project only the needed array.
-    const categoryDoc = await Category.findOne().select("search_categoriesList").lean();
+    const searchList = await repos.categories.getSearchCategoriesList();
     const categoryMap = {};
-
-    if (categoryDoc && Array.isArray(categoryDoc.search_categoriesList)) {
-        categoryDoc.search_categoriesList.forEach(category => {
-            categoryMap[category.id] = category.name;
-        });
-    }
+    searchList.forEach(category => {
+        categoryMap[category.id] = category.name;
+    });
 
     const categoryCount = {};
 
@@ -454,39 +319,24 @@ exports.getCurrentMonthOrderCategories = async () => {
 
 /**
  * Get user's purchased products with review status.
- * From ecommerce userController.review
- *
- * Returns { products }
  */
 exports.getUserReviews = async (userId) => {
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    const orders = await Order.find({
-        $or: [
-            { userId: userObjectId },
-            { user_id: userObjectId },
-        ],
-    });
+    const orders = await repos.orders.findForUser(userId);
 
     if (orders.length === 0) {
         return { products: [] };
     }
 
     const orderIds = orders.map(order => order._id);
-    const orderDetails = await OrderDetail.find({
-        order_id: { $in: orderIds },
-    });
+    const orderDetails = await repos.orderDetails.findForOrders(orderIds);
 
     const productIds = orderDetails.map(detail => detail.product_id);
     const productObjectIds = productIds.map(id => new mongoose.Types.ObjectId(id));
 
-    const products = await Product.find({
-        _id: { $in: productObjectIds },
-    }).select("-product.variants -product.product_codes -product.suppliers -product.composite_bom -product.tag_ids -product.attributes -product.account_code_sales -product.account_code_purchase -product.price_outlet -product.brand_id -product.deleted_at -product.version -product.created_at -product.updated_at -webhook -webhookTime -__v").lean();
+    const products = await repos.products.findByIdsForReviews(productObjectIds);
 
-    const userReviews = await Review.find({
-        user_id: userObjectId,
-        product_id: { $in: productObjectIds },
-    });
+    const userReviews = await repos.reviews.findForUserByProducts(userObjectId, productObjectIds);
 
     const userReviewsByProduct = {};
     userReviews.forEach(review => {
@@ -547,11 +397,6 @@ exports.getUserReviews = async (userId) => {
 
 /**
  * Add or update a review for a product.
- * From ecommerce userController.addReview
- *
- * imagePath: full URL for the uploaded image (controller builds it)
- *
- * Returns { message, reviews }
  */
 exports.addReview = async (userId, { productId, name, description, title, qualityRating, valueRating, priceRating }, imagePath) => {
     let file = '';
@@ -559,7 +404,7 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
         file = imagePath;
     }
 
-    const existingReview = await Review.findOne({ user_id: userId, product_id: productId });
+    const existingReview = await repos.reviews.findOneForUserAndProduct(userId, productId);
 
     if (existingReview) {
         existingReview.nickname = name;
@@ -572,7 +417,7 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
 
         await existingReview.save();
     } else {
-        await Review.create({
+        await repos.reviews.create({
             user_id: userId,
             nickname: name,
             summary: description,
@@ -588,10 +433,7 @@ exports.addReview = async (userId, { productId, name, description, title, qualit
     // Invalidate top-rated cache — new/updated review changes product ratings
     await cache.del(cache.key('catalog', 'top-rated', 'v1')).catch(() => {});
 
-    // Select only the fields the client maps — avoids fetching the full document for every review.
-    const reviews = await Review.find()
-        .select("nickname summary texttext image product_id quality_rating value_rating price_rating user_id createdAt updatedAt")
-        .lean();
+    const reviews = await repos.reviews.listAllProjected();
     const mappedReviews = reviews.map(r => ({
         ...r,
         name: r.nickname,
@@ -621,15 +463,16 @@ exports.getMobilePaymentHistory = exports.getTabbyBuyerHistory;
  * Returns only fields needed by the profile screen — no order queries.
  */
 exports.getProfile = async (userId) => {
-    const user = await User.findById(userId)
-        .select('_id name first_name email username avatar role phone authProvider createdAt')
-        .lean();
+    const user = await repos.users.findProfileFields(userId);
 
     if (!user) {
         throw { status: 404, message: 'User not found' };
     }
 
-    return { user };
+    const couponDoc = await repos.coupons.findByPhone(user.phone);
+    const coupon = { data: couponDoc || [], status: !!couponDoc };
+
+    return { user, coupon };
 };
 
 /**
@@ -642,12 +485,7 @@ exports.getOrderCount = async (userId) => {
         return { count: Number(cached) };
     }
 
-    const count = await Order.countDocuments({
-        $or: [
-            { userId: new mongoose.Types.ObjectId(userId) },
-            { user_id: new mongoose.Types.ObjectId(userId) },
-        ],
-    });
+    const count = await repos.orders.countForUser(userId);
 
     await cache.set(cacheKey, String(count), 60);
     return { count };

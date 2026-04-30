@@ -14,6 +14,7 @@ const platformMiddleware = require('../../middleware/platform');
 const mobileRouter = require('./mobile');
 const webRouter = require('./web');
 const sharedRouter = require('./shared');
+const { wrapError } = require('../../controllers/v2/_shared/responseEnvelope');
 
 router.use(platformMiddleware);
 
@@ -28,8 +29,10 @@ router.use((req, res, next) => {
     if (req.platform === 'web') {
         return webRouter(req, res, next);
     }
-    // Unknown platform — still try web router (browser without X-Client header)
-    return webRouter(req, res, next);
+    return res.status(400).json(wrapError(
+        'UNKNOWN_PLATFORM',
+        'X-Client header required. Valid values: web, mobile'
+    ));
 });
 
 module.exports = router;

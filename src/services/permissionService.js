@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Permission = require("../models/Permission");
+const Permission = require('../repositories').permissions.rawModel();
 
 async function getAllPermissions() {
   const permissions = await Permission.find({ isActive: true }).sort({

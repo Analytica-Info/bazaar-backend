@@ -1,5 +1,5 @@
 const smartCategoriesService = require("../../services/smartCategoriesService");
-const Product = require("../../models/Product");
+const Product = require('../../repositories').products.rawModel();
 const mongoose = require('mongoose');
 const fs = require("fs");
 const path = require("path");

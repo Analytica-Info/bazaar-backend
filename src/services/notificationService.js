@@ -1,13 +1,12 @@
-const Notification = require('../models/Notification');
-const User = require('../models/User');
-const Admin = require('../models/Admin');
 const mongoose = require('mongoose');
+const repos = require('../repositories');
 const { sendNotificationToUsers } = require('../helpers/sendPushNotification');
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 
 const logger = require("../utilities/logger");
 const { escapeRegex } = require("../utilities/stringUtils");
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -71,13 +70,13 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
     }
 
     if (targetUsers && targetUsers.length > 0) {
-        const validUsers = await User.find({ _id: { $in: targetUsers } });
-        if (validUsers.length !== targetUsers.length) {
+        const allValid = await repos.users.allExist(targetUsers);
+        if (!allValid) {
             throw { status: 400, message: 'Some user IDs are invalid' };
         }
     }
 
-    const notification = new Notification({
+    const created = await repos.notifications.create({
         title,
         message,
         scheduledDateTime: scheduledDateTime ? new Date(scheduledDateTime) : null,
@@ -88,14 +87,10 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
         createdAt: getUaeDateTime(),
     });
 
-    await notification.save();
-
     // Activity logging
-    const adminForLog = adminId
-        ? await Admin.findById(adminId).select('firstName lastName email').lean()
-        : null;
-    const createMessage = notification.scheduledDateTime
-        ? `Notification created and scheduled for ${new Date(notification.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })} (Dubai).`
+    const adminForLog = adminId ? await repos.admins.findForActivityLog(adminId) : null;
+    const createMessage = created.scheduledDateTime
+        ? `Notification created and scheduled for ${new Date(created.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })} (Dubai).`
         : 'Notification created and sent instantly.';
 
     await logActivity({
@@ -112,10 +107,10 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
               }
             : null,
         details: {
-            notification_id: notification._id.toString(),
-            title: notification.title,
-            scheduledDateTime: notification.scheduledDateTime || null,
-            sendToAll: notification.sendToAll,
+            notification_id: created._id.toString(),
+            title: created.title,
+            scheduledDateTime: created.scheduledDateTime || null,
+            sendToAll: created.sendToAll,
         },
     }).catch(() => {});
 
@@ -130,19 +125,19 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
     // Determine whether to send now
     const shouldSendNow = !scheduledDateTime || new Date(scheduledDateTime) <= getUaeDateTime();
     if (shouldSendNow) {
-        logger.info({ notificationId: notification._id.toString(), trigger: sendInstantly ? 'Send Instantly' : 'Past schedule' }, '[Notification Create] Sending now');
-        await sendNotificationToUsers(notification._id);
+        logger.info({ notificationId: created._id.toString(), trigger: sendInstantly ? 'Send Instantly' : 'Past schedule' }, '[Notification Create] Sending now');
+        await sendNotificationToUsers(created._id);
     } else {
-        const s = notification.scheduledDateTime ? new Date(notification.scheduledDateTime).toISOString() : null;
-        const dubai = notification.scheduledDateTime
-            ? new Date(notification.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })
+        const s = created.scheduledDateTime ? new Date(created.scheduledDateTime).toISOString() : null;
+        const dubai = created.scheduledDateTime
+            ? new Date(created.scheduledDateTime).toLocaleString('en-US', { timeZone: 'Asia/Dubai', hour12: true })
             : null;
-        logger.info({ notificationId: notification._id.toString(), utc: s, dubai }, '[Notification Create] Scheduled for later');
+        logger.info({ notificationId: created._id.toString(), utc: s, dubai }, '[Notification Create] Scheduled for later');
     }
 
     // Return fresh doc so caller gets correct status/sentAt
-    const notificationToReturn = await Notification.findById(notification._id).lean().exec() || notification;
-    return notificationToReturn;
+    const fresh = await repos.notifications.findById(created._id);
+    return fresh || created;
 }
 
 /**
@@ -150,20 +145,10 @@ async function createNotification({ title, message, scheduledDateTime, sendToAll
  * @returns {{ notifications: Array, pagination: Object }}
  */
 async function getNotifications({ page = 1, limit = 10 } = {}) {
-    const skip = (page - 1) * limit;
-    const query = { createdBy: { $exists: true, $ne: null } };
+    const { items, total } = await repos.notifications.listAdminNotificationsPaginated({ page, limit });
+    const totalPages = Math.ceil(total / limit);
 
-    const notifications = await Notification.find(query)
-        .populate('createdBy', 'firstName lastName email')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .exec();
-
-    const totalCount = await Notification.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
-
-    const notificationsWithCounts = notifications.map(notif => {
+    const notificationsWithCounts = items.map(notif => {
         const notificationObj = notif.toObject();
         notificationObj.totalTargetUsers = notif.sendToAll ? 'All Users' : notif.targetUsers.length;
         notificationObj.totalClickedUsers = notif.clickedUsers.length;
@@ -175,7 +160,7 @@ async function getNotifications({ page = 1, limit = 10 } = {}) {
         pagination: {
             currentPage: page,
             totalPages,
-            totalNotifications: totalCount,
+            totalNotifications: total,
             notificationsPerPage: limit,
         },
     };
@@ -186,20 +171,14 @@ async function getNotifications({ page = 1, limit = 10 } = {}) {
  * @returns {Object} Enriched notification object.
  */
 async function getNotificationDetails(notificationId) {
-    // Fetch without populating large user arrays — we query them separately with caps.
-    const notification = await Notification.findById(notificationId)
-        .populate('createdBy', 'firstName lastName email')
-        .exec();
-
+    const notification = await repos.notifications.findByIdWithCreator(notificationId);
     if (!notification) {
         throw { status: 404, message: 'Notification not found' };
     }
 
     // For sendToAll notifications avoid loading the entire user collection.
-    // Return counts and a capped sample — the UI shows summaries, not full lists.
     const MAX_USER_SAMPLE = 500;
 
-    // Raw ObjectId arrays from the document (no populate)
     const targetUserIds = notification.targetUsers || [];
     const clickedUserIdRefs = notification.clickedUsers || [];
 
@@ -211,52 +190,25 @@ async function getNotificationDetails(notificationId) {
     let notClickedUsers;
 
     if (notification.sendToAll) {
-        totalTargetUsers = await User.countDocuments();
+        totalTargetUsers = await repos.users.countAll();
 
-        // Fetch both buckets with a cap — avoid loading the entire user collection
+        const clickedObjectIds = [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id));
         [clickedUsers, notClickedUsers] = await Promise.all([
-            User.find({ _id: { $in: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
-                .select('name email phone')
-                .limit(MAX_USER_SAMPLE)
-                .lean()
-                .exec(),
-            User.find({ _id: { $nin: [...clickedUserIdSet].map(id => new mongoose.Types.ObjectId(id)) } })
-                .select('name email phone')
-                .limit(MAX_USER_SAMPLE)
-                .lean()
-                .exec(),
+            repos.users.findByIdsCapped(clickedObjectIds, { limit: MAX_USER_SAMPLE }),
+            repos.users.findExcludingIdsCapped(clickedObjectIds, { limit: MAX_USER_SAMPLE }),
         ]);
     } else {
         totalTargetUsers = targetUserIds.length;
 
-        // Fetch actual user docs for both buckets with a cap
         [clickedUsers, notClickedUsers] = await Promise.all([
-            clickedUserIdRefs.length
-                ? User.find({ _id: { $in: clickedUserIdRefs } })
-                    .select('name email phone')
-                    .limit(MAX_USER_SAMPLE)
-                    .lean()
-                    .exec()
-                : Promise.resolve([]),
-            notClickedIds.length
-                ? User.find({ _id: { $in: notClickedIds } })
-                    .select('name email phone')
-                    .limit(MAX_USER_SAMPLE)
-                    .lean()
-                    .exec()
-                : Promise.resolve([]),
+            repos.users.findByIdsCapped(clickedUserIdRefs, { limit: MAX_USER_SAMPLE }),
+            repos.users.findByIdsCapped(notClickedIds, { limit: MAX_USER_SAMPLE }),
         ]);
     }
 
-    // targetUsers in toObject() are raw ObjectIds (no populate) — fetch a capped
-    // sample so the admin UI still gets named objects for the targeted-users list.
     const targetUsersSample = notification.sendToAll
         ? []
-        : await User.find({ _id: { $in: targetUserIds } })
-            .select('name email phone')
-            .limit(MAX_USER_SAMPLE)
-            .lean()
-            .exec();
+        : await repos.users.findByIdsCapped(targetUserIds, { limit: MAX_USER_SAMPLE });
 
     return {
         ...notification.toObject(),
@@ -276,7 +228,7 @@ async function getNotificationDetails(notificationId) {
  * @returns {Object} The updated notification document.
  */
 async function updateNotification(notificationId, { title, message, scheduledDateTime, sendToAll, targetUsers }) {
-    const notification = await Notification.findById(notificationId);
+    const notification = await repos.notifications.findByIdAsDocument(notificationId);
     if (!notification) {
         throw { status: 404, message: 'Notification not found' };
     }
@@ -303,8 +255,8 @@ async function updateNotification(notificationId, { title, message, scheduledDat
     }
 
     if (targetUsers && targetUsers.length > 0) {
-        const validUsers = await User.find({ _id: { $in: targetUsers } });
-        if (validUsers.length !== targetUsers.length) {
+        const allValid = await repos.users.allExist(targetUsers);
+        if (!allValid) {
             throw { status: 400, message: 'Some user IDs are invalid' };
         }
     }
@@ -323,7 +275,7 @@ async function updateNotification(notificationId, { title, message, scheduledDat
  * @returns {{}}
  */
 async function deleteNotification(notificationId) {
-    const notification = await Notification.findById(notificationId);
+    const notification = await repos.notifications.findById(notificationId);
     if (!notification) {
         throw { status: 404, message: 'Notification not found' };
     }
@@ -332,7 +284,7 @@ async function deleteNotification(notificationId) {
         throw { status: 400, message: 'Cannot delete notification that has already been sent' };
     }
 
-    await Notification.findByIdAndDelete(notificationId);
+    await repos.notifications.deleteById(notificationId);
     return {};
 }
 
@@ -341,34 +293,16 @@ async function deleteNotification(notificationId) {
  * @returns {{ users: Array, pagination: Object }}
  */
 async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
-    const skip = (page - 1) * limit;
-
-    let query = {};
-    if (search) {
-        const safeSearch = escapeRegex(search);
-        query.$or = [
-            { name: { $regex: safeSearch, $options: 'i' } },
-            { email: { $regex: safeSearch, $options: 'i' } },
-            { phone: { $regex: safeSearch, $options: 'i' } },
-        ];
-    }
-
-    const users = await User.find(query)
-        .select('name email phone fcmToken')
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 })
-        .exec();
-
-    const totalCount = await User.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
+    const regexSafe = search ? escapeRegex(search) : null;
+    const { items, total } = await repos.users.searchPaginated({ regexSafe, page, limit });
+    const totalPages = Math.ceil(total / limit);
 
     return {
-        users,
+        users: items,
         pagination: {
             currentPage: page,
             totalPages,
-            totalUsers: totalCount,
+            totalUsers: total,
             usersPerPage: limit,
         },
     };
@@ -379,16 +313,7 @@ async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
  * @returns {Array} Users array.
  */
 async function getAllUsersForNotification() {
-    // Hard cap to prevent a full collection scan on large user bases.
-    // Admin UI should use searchUsers() for targeted selection beyond this cap.
-    const users = await User.find()
-        .select('name email phone fcmToken')
-        .sort({ name: 1 })
-        .limit(1000)
-        .lean()
-        .exec();
-
-    return users;
+    return repos.users.listForNotificationTargeting({ limit: 1000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -401,25 +326,25 @@ async function getAllUsersForNotification() {
  * @param {{ page?: number, limit?: number }} [opts]
  * @returns {{ notificationsCount: number, unreadCount: number, notifications: Array, total: number, page: number, limit: number }}
  */
-async function getUserNotifications(userId, { page = 1, limit = 20 } = {}) {
-    const query = { userId };
-    const skip = (page - 1) * limit;
+async function getUserNotifications(userId, opts) {
+    // v1 callers pass no opts — preserve legacy behavior: cap at 50, no skip,
+    // notificationsCount = items returned (NOT total in DB).
+    // v2 callers pass { page, limit } — paginate and return total separately.
+    const paginate = !!(opts && (opts.page !== undefined || opts.limit !== undefined));
+    const page = paginate ? Math.max(1, opts.page || 1) : 1;
+    const limit = paginate ? Math.max(1, opts.limit || 20) : 50;
 
-    const [notifications, total, unreadCount] = await Promise.all([
-        Notification.find(query)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec(),
-        Notification.countDocuments(query),
-        Notification.countDocuments({ ...query, read: { $ne: true } }),
-    ]);
+    const { items, total, unreadCount } = await repos.notifications.listForUser(userId, {
+        paginate: true, // always apply the limit (legacy used .limit(50))
+        page,
+        limit,
+    });
 
     return {
-        notificationsCount: total,
+        // Preserve v1 semantics: notificationsCount = items returned (not DB total)
+        notificationsCount: paginate ? total : items.length,
         unreadCount,
-        notifications,
+        notifications: items,
         total,
         page,
         limit,
@@ -435,11 +360,7 @@ async function markNotificationsAsRead(userId, ids) {
         throw { status: 400, message: 'No notification IDs provided.' };
     }
 
-    await Notification.updateMany(
-        { _id: { $in: ids }, userId },
-        { $set: { read: true } }
-    );
-
+    await repos.notifications.markReadForUser(userId, ids);
     return {};
 }
 
@@ -452,7 +373,7 @@ async function trackNotificationClick(userId, notificationId) {
         throw { status: 400, message: 'Notification ID is required.' };
     }
 
-    const notification = await Notification.findById(notificationId);
+    const notification = await repos.notifications.findByIdAsDocument(notificationId);
     if (!notification) {
         throw { status: 404, message: 'Notification not found.' };
     }
@@ -492,7 +413,7 @@ module.exports = {
     deleteNotification,
     searchUsers,
     getAllUsersForNotification,
-    // User (mobile)
+    // User
     getUserNotifications,
     markNotificationsAsRead,
     trackNotificationClick,

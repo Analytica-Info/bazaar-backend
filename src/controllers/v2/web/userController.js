@@ -5,15 +5,20 @@ const userService = require('../../../services/userService');
 const { wrap } = require('../_shared/responseEnvelope');
 const { handleError } = require('../_shared/errors');
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
-const Coupon = require('../../../models/Coupon');
 
 exports.getProfile = async (req, res) => {
     try {
-        const { name, email, avatar, username, role, phone, authProvider: provider } = req.user;
-        const couponDoc = await Coupon.findOne({ phone });
+        const result = await userService.getProfile(req.user._id);
+        const u = result.user;
         return res.status(200).json(wrap({
-            name, email, avatar, username, role, phone, provider,
-            coupon: { data: couponDoc || [], status: !!couponDoc },
+            name: u.name,
+            email: u.email,
+            avatar: u.avatar,
+            username: u.username,
+            role: u.role,
+            phone: u.phone,
+            provider: u.authProvider,
+            coupon: result.coupon,
         }));
     } catch (error) {
         return handleError(res, error);
@@ -22,8 +27,16 @@ exports.getProfile = async (req, res) => {
 
 exports.getOrders = async (req, res) => {
     try {
-        const result = await userService.getUserOrders(req.user._id);
-        return res.status(200).json(wrap(result));
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+        const result = await userService.getUserOrders(req.user._id, { page, limit });
+        return res.status(200).json(wrap({
+            orders: result.orders,
+            total_orders: result.total_orders,
+            shipped_orders: result.shipped_orders,
+            delivered_orders: result.delivered_orders,
+            canceled_orders: result.canceled_orders,
+        }));
     } catch (error) {
         return handleError(res, error);
     }

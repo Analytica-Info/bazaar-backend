@@ -39,9 +39,6 @@ exports.search = async (req, res) => {
         const result = await productService.searchProducts(req.body);
         return res.status(200).json(wrap(result));
     } catch (error) {
-        if (error.status && error.data) {
-            return res.status(error.status).json({ success: false, message: error.message, ...error.data });
-        }
         return handleError(res, error);
     }
 };

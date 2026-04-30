@@ -52,12 +52,12 @@ router.get('/orders/verify/tabby', auth.required(), orderCtrl.verifyTabby);
 router.post('/orders/checkout/nomod', auth.required(), orderCtrl.checkoutNomod);
 router.get('/orders/verify/nomod', auth.required(), orderCtrl.verifyNomod);
 router.post('/orders/stripe/init', auth.required(), orderCtrl.initStripePayment);
-router.get('/orders/payment-methods', orderCtrl.getPaymentMethods);
+router.get('/orders/payment-methods', auth.required(), orderCtrl.getPaymentMethods);
 router.get('/orders/address', auth.required(), orderCtrl.getAddress);
 router.post('/orders/address', auth.required(), orderCtrl.storeAddress);
 router.delete('/orders/address/:addressId', auth.required(), orderCtrl.deleteAddress);
 router.patch('/orders/address/:addressId/set-primary', auth.required(), orderCtrl.setPrimaryAddress);
-router.post('/orders/:orderId/status', auth.required(), orderUpload.single('file'), orderCtrl.updateOrderStatus);
+router.patch('/orders/:orderId/status', auth.required(), orderUpload.single('file'), orderCtrl.updateOrderStatus);
 
 // ── Cart ──────────────────────────────────────────────────────────
 router.get('/cart', auth.required(), cartCtrl.getCart);

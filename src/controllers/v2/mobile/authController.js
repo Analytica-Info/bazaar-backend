@@ -31,7 +31,7 @@ exports.login = async (req, res) => {
         };
         const result = await authService.loginWithCredentials({ email, password, fcmToken, deviceInfo, platform: 'mobile' });
         return res.status(200).json(wrap({
-            token: result.tokens.accessToken,
+            accessToken: result.tokens.accessToken,
             refreshToken: result.tokens.refreshToken,
             user: result.user,
             coupon: result.coupon,
@@ -55,7 +55,7 @@ exports.googleLogin = async (req, res) => {
         };
         const result = await authService.googleLogin({ tokenId, accessToken, fcmToken, deviceInfo, platform: 'mobile', userAgent: req.headers['user-agent'] || '' });
         return res.status(200).json(wrap({
-            token: result.tokens.accessToken,
+            accessToken: result.tokens.accessToken,
             refreshToken: result.tokens.refreshToken,
             user: result.user,
             coupon: result.coupon,
@@ -79,7 +79,7 @@ exports.appleLogin = async (req, res) => {
         };
         const result = await authService.appleLogin({ idToken, name, fcmToken, deviceInfo, platform: 'mobile' });
         return res.status(200).json(wrap({
-            token: result.tokens.accessToken,
+            accessToken: result.tokens.accessToken,
             refreshToken: result.tokens.refreshToken,
             user: result.user,
             coupon: result.coupon,
@@ -145,7 +145,7 @@ exports.refreshToken = async (req, res) => {
         return res.status(200).json(wrap({ accessToken: result.accessToken, refreshToken: result.refreshToken }));
     } catch (error) {
         logger.error({ err: error }, 'v2 refreshToken error');
-        return res.status(403).json(wrapError('INVALID_TOKEN', error.message || 'Invalid or expired refresh token'));
+        return handleError(res, { status: 403, code: 'INVALID_TOKEN', message: error.message || 'Invalid or expired refresh token' });
     }
 };
 

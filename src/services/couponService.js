@@ -1,8 +1,8 @@
-const Coupon = require("../models/Coupon");
-const CouponsCount = require("../models/CouponsCount");
-const BankPromoCode = require("../models/BankPromoCode");
-const BankPromoCodeUsage = require("../models/BankPromoCodeUsage");
-const User = require("../models/User");
+const Coupon = require('../repositories').coupons.rawModel();
+const CouponsCount = require('../repositories').couponsCount.rawModel();
+const BankPromoCode = require('../repositories').bankPromoCodes.rawModel();
+const BankPromoCodeUsage = require('../repositories').bankPromoCodeUsages.rawModel();
+const User = require('../repositories').users.rawModel();
 const axios = require("axios");
 const { sendEmail } = require("../mail/emailService");
 const { getAdminEmail, getCcEmails } = require("../utilities/emailHelper");

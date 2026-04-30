@@ -1,4 +1,4 @@
-const Wishlist = require("../models/Wishlist");
+const Wishlist = require('../repositories').wishlists.rawModel();
 
 async function getWishlist(userId) {
   // Exclude large internal Lightspeed sync fields — same set as LIST_EXCLUDE_SELECT

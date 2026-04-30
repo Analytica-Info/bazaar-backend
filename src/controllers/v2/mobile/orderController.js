@@ -2,7 +2,7 @@
  * V2 Mobile Order Controller (BFF layer)
  */
 const orderService = require('../../../services/orderService');
-const { wrap, paginated } = require('../_shared/responseEnvelope');
+const { wrap, paginated, wrapError } = require('../_shared/responseEnvelope');
 const { handleError } = require('../_shared/errors');
 const logger = require('../../../utilities/logger');
 
@@ -24,9 +24,6 @@ exports.validateInventory = async (req, res) => {
         const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Mobile App Backend');
         return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
     } catch (error) {
-        if (error.status === 400 && error.data) {
-            return res.status(200).json({ success: false, ...error.data });
-        }
         return handleError(res, error);
     }
 };
@@ -51,7 +48,7 @@ exports.checkoutTabby = async (req, res) => {
 
 exports.verifyTabby = async (req, res) => {
     try {
-        const result = await orderService.verifyTabbyPayment(req.query.paymentId);
+        const result = await orderService.verifyTabbyPayment(req.query.paymentId, req.user._id);
         return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
     } catch (error) {
         return handleError(res, error);
@@ -69,7 +66,7 @@ exports.checkoutNomod = async (req, res) => {
 
 exports.verifyNomod = async (req, res) => {
     try {
-        const result = await orderService.verifyNomodPayment(req.query.paymentId);
+        const result = await orderService.verifyNomodPayment(req.query.paymentId, req.user._id);
         return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
     } catch (error) {
         return handleError(res, error);
@@ -80,7 +77,7 @@ exports.initStripePayment = async (req, res) => {
     try {
         const { amountAED } = req.body;
         if (!amountAED || isNaN(amountAED) || Number(amountAED) <= 0) {
-            return res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'amountAED is required and must be a positive number' } });
+            return res.status(400).json(wrapError('BAD_REQUEST', 'amountAED is required and must be a positive number'));
         }
         const result = await orderService.initStripePayment(req.user._id, Number(amountAED));
         return res.status(200).json(wrap(result));
@@ -109,7 +106,15 @@ exports.getAddress = async (req, res) => {
 
 exports.storeAddress = async (req, res) => {
     try {
-        const result = await orderService.storeAddress(req.user._id, req.body);
+        const b = req.body;
+        const allowed = {
+            _id: b._id, name: b.name, email: b.email, mobile: b.mobile,
+            city: b.city, area: b.area, state: b.state,
+            country: b.country, countryCode: b.countryCode,
+            floorNo: b.floorNo, apartmentNo: b.apartmentNo,
+            buildingName: b.buildingName, landmark: b.landmark,
+        };
+        const result = await orderService.storeAddress(req.user._id, allowed);
         return res.status(200).json(wrap({ addresses: result.addresses }, result.message));
     } catch (error) {
         return handleError(res, error);
@@ -139,7 +144,7 @@ exports.updateOrderStatus = async (req, res) => {
         const { orderId } = req.params;
         const { status } = req.body;
         const filePath = req.file ? req.file.path : null;
-        const order = await orderService.updateOrderStatus(orderId, status, filePath);
+        const order = await orderService.updateOrderStatus(orderId, status, filePath, req.user._id);
         return res.status(200).json(wrap({ order }, 'Order status updated successfully'));
     } catch (error) {
         return handleError(res, error);

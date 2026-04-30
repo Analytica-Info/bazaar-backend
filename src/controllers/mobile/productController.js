@@ -1,9 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const Category = require("../../models/Category");
-const Product = require("../../models/Product");
-const Review = require("../../models/Review");
-const ProductView = require("../../models/ProductView");
+const Category = require('../../repositories').categories.rawModel();
+const Product = require('../../repositories').products.rawModel();
+const Review = require('../../repositories').reviews.rawModel();
+const ProductView = require('../../repositories').productViews.rawModel();
 
 const productService = require("../../services/productService");
 

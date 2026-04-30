@@ -17,7 +17,9 @@ exports.getProfile = async (req, res) => {
 
 exports.getOrders = async (req, res) => {
     try {
-        const result = await userService.getUserOrders(req.user._id);
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+        const result = await userService.getUserOrders(req.user._id, { page, limit });
         return res.status(200).json(wrap({
             orders: result.orders,
             total_orders: result.total_orders,
