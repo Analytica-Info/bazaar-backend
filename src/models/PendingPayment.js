@@ -54,8 +54,7 @@ const pendingPaymentSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index for efficient queries
-pendingPaymentSchema.index({ payment_id: 1 });
+// Index for efficient queries — payment_id has unique:true which creates its own index.
 pendingPaymentSchema.index({ user_id: 1 });
 pendingPaymentSchema.index({ status: 1 });
 pendingPaymentSchema.index({ expires_at: 1 });

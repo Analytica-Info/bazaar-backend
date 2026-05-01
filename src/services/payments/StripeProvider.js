@@ -68,13 +68,16 @@ class StripeProvider extends PaymentProvider {
     }
 
     async refund(sessionId, { amount, reason, referenceId } = {}) {
-        try {
-            const session = await stripe.checkout.sessions.retrieve(sessionId);
-            const paymentIntentId = session.payment_intent;
+        const session = await stripe.checkout.sessions.retrieve(sessionId).catch((error) => {
+            throw { status: error.statusCode || 500, message: error.message || 'Failed to retrieve Stripe session' };
+        });
+        const paymentIntentId = session.payment_intent;
 
-            if (!paymentIntentId) {
-                throw { status: 400, message: 'No payment intent found for this session' };
-            }
+        if (!paymentIntentId) {
+            throw { status: 400, message: 'No payment intent found for this session' };
+        }
+
+        try {
 
             const refundParams = { payment_intent: paymentIntentId };
             if (amount) refundParams.amount = Math.round(Number(amount) * 100);

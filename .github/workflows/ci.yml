@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["20.x"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (repo guardrail — no direct model imports in services)
+        run: npm run lint
+
+      - name: Test with coverage
+        run: npm run test:ci
+        env:
+          NODE_ENV: test
+          # Minimal stubs so modules that read env at require-time don't crash.
+          # Real secrets must never be added here — use GitHub Secrets for staging.
+          JWT_SECRET: ci-test-jwt-secret
+          JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret
+          STRIPE_SK: sk_test_ci_fake
+          STRIPE_WEBHOOK_SECRET: whsec_ci_fake
+          MONGO_URI: mongodb://localhost/ci_test
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14

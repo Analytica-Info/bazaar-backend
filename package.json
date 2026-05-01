@@ -10,6 +10,7 @@
     "lint:repo-guardrail": "node scripts/check-no-direct-model-imports.js",
     "test": "jest --forceExit --detectOpenHandles",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
+    "test:ci": "jest --forceExit --detectOpenHandles --coverage --ci",
     "cron": "node src/scripts/cronWorker.js",
     "migrate": "node src/scripts/migrateOrderFields.js",
     "backfill:order-owner": "node src/scripts/backfillOrderOwnerFields.js",
@@ -23,6 +24,7 @@
     "sync:reset:inventory": "node src/scripts/resetSyncState.js inventory",
     "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
+    "smoke": "node scripts/smoke.js",
     "check": "npm run validate && npm run lint && npm test"
   },
   "keywords": [],
@@ -70,6 +72,7 @@
     "@jest/globals": "^30.3.0",
     "jest": "^30.3.0",
     "mongodb-memory-server": "^11.0.1",
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2"
   }
 }

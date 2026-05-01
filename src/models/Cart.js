@@ -33,10 +33,6 @@ const cartSchema = new mongoose.Schema({
 });
 
 
-// Explicit index for Cart.findOne({ user }) — hot path on every cart read/write.
-// unique:true creates a constraint index but an explicit index makes query plan stable.
-cartSchema.index({ user: 1 });
-
 const Cart = mongoose.model('Cart', cartSchema);
 
 module.exports = Cart;

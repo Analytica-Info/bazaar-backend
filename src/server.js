@@ -227,6 +227,25 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Liveness probe — always 200 if the process is up and Express is responding.
+// Load balancers use this to decide whether to route traffic to the pod.
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// Readiness probe — 200 only when the process is fully ready to serve traffic.
+// Returns 503 when MongoDB is not connected (readyState !== 1).
+app.get("/readyz", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const ready = dbState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ready" : "not ready",
+    checks: {
+      mongodb: { state: dbState, connected: ready },
+    },
+  });
+});
+
 // ==========================================
 // INLINE ROUTES FROM ECOMMERCE SERVER.JS
 // ==========================================
