@@ -26,22 +26,46 @@ module.exports = {
     // PR10 merged-total actuals: lines=81.51%, stmts=80.48%, branches=64.95%, funcs=82.99%
     // PR11 merged-total actuals: lines=85.38%, stmts=84.31%, branches=71.71%, funcs=83.90%
     // PR12 merged-total actuals: lines=87.21%, stmts=86.11%, branches=74.11%, funcs=85.27%
+    // PR13 merged-total actuals: lines=89.16%, stmts=88.06%, branches=75.40%, funcs=87.79%
     // Jest threshold check uses single-project (unit) actuals (lower) — ratcheted to actual − 1pp.
     global: {
-      lines: 81,
-      statements: 80,
-      branches: 58,
-      functions: 77,
+      lines: 88,
+      statements: 87,
+      branches: 74,
+      functions: 86,
     },
     // --- PR7: services directory threshold (excl. payments/) ---
     // PR11 actuals: authService 94.98%, checkoutService 84.73%, orderService 80.26%
     // PR12 actuals: productSyncService 93.6%, adminService 82.73%, productService 80.14%
+    // PR13 actuals: couponService 91.4%, smartCategories 92.5%, contactService 100%
     // Directory actuals improved significantly; thresholds raised at actual − 2pp for lagging files.
     './src/services/': {
-      lines: 54,
-      statements: 53,
-      branches: 40,
-      functions: 56,
+      lines: 62,
+      statements: 61,
+      branches: 48,
+      functions: 64,
+    },
+    // --- PR13: per-file thresholds for 8 target files ---
+    // couponService: lines=91.4%, branches=88.4%
+    './src/services/couponService.js': {
+      lines: 89,
+      statements: 87,
+      branches: 86,
+      functions: 93,
+    },
+    // smartCategoriesService: lines=92.5%, branches=74.3%, funcs=83.7%
+    './src/services/smartCategoriesService.js': {
+      lines: 90,
+      statements: 89,
+      branches: 72,
+      functions: 81,
+    },
+    // contactService: lines=100%, branches=100%
+    './src/services/contactService.js': {
+      lines: 98,
+      statements: 98,
+      branches: 98,
+      functions: 98,
     },
     // --- PR12: per-file thresholds for 3 target services ---
     // productSyncService: lines=93.6%, branches=72.98%
@@ -119,11 +143,43 @@ module.exports = {
       functions: 95,
     },
     // PR10 actuals: v2 controllers lines~95%, stmts~94%, branches~80%, funcs~95%
+    // PR13 actuals: all v2 controllers ≥90% lines; mobile/cart=100%, order=100%, user=95.6%, web/user=100%, shared/product=90.9%
     './src/controllers/v2/': {
-      lines: 78,
-      statements: 78,
-      branches: 60,
-      functions: 78,
+      lines: 88,
+      statements: 87,
+      branches: 68,
+      functions: 88,
+    },
+    // PR13 per-file thresholds for v2 controllers (actual − 2pp)
+    './src/controllers/v2/mobile/cartController.js': {
+      lines: 98,
+      statements: 98,
+      branches: 48,
+      functions: 98,
+    },
+    './src/controllers/v2/mobile/orderController.js': {
+      lines: 98,
+      statements: 98,
+      branches: 83,
+      functions: 98,
+    },
+    './src/controllers/v2/mobile/userController.js': {
+      lines: 93,
+      statements: 93,
+      branches: 98,
+      functions: 93,
+    },
+    './src/controllers/v2/shared/productController.js': {
+      lines: 88,
+      statements: 88,
+      branches: 48,
+      functions: 80,
+    },
+    './src/controllers/v2/web/userController.js': {
+      lines: 98,
+      statements: 98,
+      branches: 81,
+      functions: 98,
     },
     // --- New per-directory thresholds for PR6 surface ---
     // Actuals: middleware stmts=97.1%, branches=87.4%, funcs=90.9%, lines=97.1%

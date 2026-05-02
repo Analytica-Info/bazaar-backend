@@ -300,6 +300,263 @@ describe("couponService", () => {
     });
   });
 
+  // ── checkCouponCode — UAE10 path ──────────────────────────────
+  describe("checkCouponCode — UAE10 external promo", () => {
+    afterEach(() => clock.resetClock());
+
+    it("throws 404 when fetchCouponDetails returns null (API failure)", async () => {
+      const axios = require("axios");
+      axios.get.mockRejectedValueOnce(new Error("network error"));
+
+      try {
+        await couponService.checkCouponCode("UAE10", null, null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+        expect(err.message).toMatch(/not found/i);
+      }
+    });
+
+    it("throws 400 when UAE10 promo status is not active", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: {
+          data: {
+            start_time: "2020-01-01T00:00:00Z",
+            end_time: "2030-01-01T00:00:00Z",
+            status: "inactive",
+          },
+        },
+      });
+
+      try {
+        await couponService.checkCouponCode("UAE10", null, null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not active/i);
+      }
+    });
+
+    it("throws 400 when UAE10 promo has not started yet", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: {
+          data: {
+            start_time: "2999-01-01T00:00:00Z",
+            end_time: "2999-12-31T00:00:00Z",
+            status: "active",
+          },
+        },
+      });
+
+      try {
+        await couponService.checkCouponCode("UAE10", null, null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not started/i);
+      }
+    });
+
+    it("throws 400 when UAE10 promo has expired", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: {
+          data: {
+            start_time: "2020-01-01T00:00:00Z",
+            end_time: "2020-12-31T00:00:00Z",
+            status: "active",
+          },
+        },
+      });
+
+      try {
+        await couponService.checkCouponCode("UAE10", null, null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/expired/i);
+      }
+    });
+
+    it("returns valid when UAE10 is active and within window", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: {
+          data: {
+            start_time: "2020-01-01T00:00:00Z",
+            end_time: "2999-12-31T00:00:00Z",
+            status: "active",
+          },
+        },
+      });
+
+      const result = await couponService.checkCouponCode("UAE10", null, null);
+      expect(result.type).toBe("coupon");
+      expect(result.discountPercent).toBe(10);
+    });
+  });
+
+  // ── fetchCouponDetails — null data.data response ─────────────
+  describe("checkCouponCode — UAE10 invalid response format", () => {
+    it("throws 404 when API returns a response without data.data", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({ data: { someOtherField: "value" } });
+
+      try {
+        await couponService.checkCouponCode("UAE10", null, null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ── redeemCoupon — missing phone ──────────────────────────────
+  describe("redeemCoupon — missing phone (non-UAE10)", () => {
+    it("throws 400 when coupon is provided but phone is missing", async () => {
+      try {
+        await couponService.redeemCoupon(null, "SOMECODE", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/required/i);
+      }
+    });
+  });
+
+  // ── generateCouponCode — with existing DH coupon ──────────────
+  describe("createCoupon — next coupon number increments", () => {
+    it("generates next sequential coupon when prior DH coupons exist", async () => {
+      await Coupon.create({ coupon: "DH5YHZXB", phone: "55555", name: "Prior", id: 5 });
+      await CouponsCount.create({ count: 100 });
+
+      const result = await couponService.createCoupon(
+        new mongoose.Types.ObjectId(),
+        { name: "Sequential", phone: "+971500000099" }
+      );
+
+      expect(result.success).toBe(true);
+      // DH6YHZXB or higher
+      expect(result.coupon.coupon).toMatch(/^DH\d+YHZXB$/);
+      const num = parseInt(result.coupon.coupon.match(/DH(\d+)YHZXB/)[1]);
+      expect(num).toBeGreaterThanOrEqual(6);
+    });
+  });
+
+  // ── redeemCoupon — UAE10 path ─────────────────────────────────
+  describe("redeemCoupon — UAE10 external promo", () => {
+    it("throws 404 when fetchCouponDetails returns null", async () => {
+      const axios = require("axios");
+      axios.get.mockRejectedValueOnce(new Error("network error"));
+
+      try {
+        await couponService.redeemCoupon(null, "UAE10", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+        expect(err.message).toMatch(/not found/i);
+      }
+    });
+
+    it("throws 400 when UAE10 is not active during redeem", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: { data: { start_time: "2020-01-01T00:00:00Z", end_time: "2030-01-01T00:00:00Z", status: "disabled" } },
+      });
+
+      try {
+        await couponService.redeemCoupon(null, "UAE10", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not active/i);
+      }
+    });
+
+    it("throws 400 when UAE10 has not started yet during redeem", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: { data: { start_time: "2999-01-01T00:00:00Z", end_time: "2999-12-31T00:00:00Z", status: "active" } },
+      });
+
+      try {
+        await couponService.redeemCoupon(null, "UAE10", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not started/i);
+      }
+    });
+
+    it("throws 400 when UAE10 has expired during redeem", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: { data: { start_time: "2020-01-01T00:00:00Z", end_time: "2020-12-31T00:00:00Z", status: "active" } },
+      });
+
+      try {
+        await couponService.redeemCoupon(null, "UAE10", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/expired/i);
+      }
+    });
+
+    it("returns valid when UAE10 is active and within window during redeem", async () => {
+      const axios = require("axios");
+      axios.get.mockResolvedValueOnce({
+        data: { data: { start_time: "2020-01-01T00:00:00Z", end_time: "2999-12-31T00:00:00Z", status: "active" } },
+      });
+
+      const result = await couponService.redeemCoupon(null, "UAE10", null);
+      expect(result.message).toMatch(/valid/i);
+    });
+  });
+
+  // ── createCoupon — no coupons remaining ───────────────────────
+  describe("createCoupon — exhausted coupon pool", () => {
+    it("throws 400 when all coupons have been claimed (remaining <= 0)", async () => {
+      // Set count to 1, create 1 coupon so remaining = 0
+      await CouponsCount.create({ count: 1 });
+      await Coupon.create({ coupon: "DH1YHZXB", phone: "11111", name: "Taken", id: 1 });
+
+      try {
+        await couponService.createCoupon(new mongoose.Types.ObjectId(), { name: "New", phone: "+971500000001" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/all coupons have been claimed/i);
+      }
+    });
+
+    it("sends low-stock email alert when remaining coupons <= 10", async () => {
+      const { sendEmail } = require("../../src/mail/emailService");
+      const { getAdminEmail } = require("../../src/utilities/emailHelper");
+      getAdminEmail.mockResolvedValue("admin@test.com");
+
+      // count = 11, 1 existing coupon → remaining = 10 → triggers alert
+      await CouponsCount.create({ count: 11 });
+      await Coupon.create({ coupon: "DH1YHZXB", phone: "22222", name: "Existing", id: 1 });
+
+      const result = await couponService.createCoupon(
+        new mongoose.Types.ObjectId(),
+        { name: "Alert Test", phone: "+971500000099" }
+      );
+
+      expect(result.success).toBe(true);
+      // sendEmail should have been called at least twice (alert + admin notification)
+      expect(sendEmail).toHaveBeenCalledWith(
+        "admin@test.com",
+        expect.stringMatching(/alert/i),
+        expect.any(String),
+        expect.anything()
+      );
+    });
+  });
+
   describe("redeemCoupon", () => {
     it("should throw 400 when coupon code is missing", async () => {
       try {

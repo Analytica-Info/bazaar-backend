@@ -110,6 +110,22 @@ Living tracker of production bugs discovered while writing tests across PR1–PR
 - **Recommended fix:** Remove unused branches, or add a caller that exercises those shapes.
 - **Source:** PR12 finding.
 
+### BUG-014 — shared/productController.js: /v2/products/similar masked by /v2/products/:id route
+- **File:** `src/routes/v2/shared/index.js` (line 23) and `src/controllers/v2/shared/productController.js` (lines 73-80)
+- **Status:** **OPEN**
+- **Symptom:** `router.get('/products/similar', ...)` is registered AFTER `router.get('/products/:id', ...)`. Express matches `/products/similar` to the `:id` route first, so `similarProducts` handler is never reached. Any request to `GET /v2/products/similar` calls `getProductDetails("similar")` instead of `getSimilarProducts(...)`.
+- **Impact:** The similar-products endpoint silently calls the wrong handler. If a product with id="similar" doesn't exist, the caller receives a 404 from `getProductDetails` rather than similar-product data.
+- **Recommended fix:** Move the `/products/similar` route registration before `/products/:id` in the shared router.
+- **Source:** PR13 coverage work — `similarProducts` function (lines 73-80) cannot be covered because the route is unreachable.
+
+### BUG-015 — couponService.fetchCouponDetails uses console.error instead of logger
+- **File:** `src/services/couponService.js` (lines 59-62)
+- **Status:** **OPEN** (low severity)
+- **Symptom:** The catch block in `fetchCouponDetails` uses `console.error(...)` instead of the `logger` utility used elsewhere in the file (lines 56, 242, etc.). This bypasses the structured logging pipeline.
+- **Impact:** Lightspeed API failures for UAE10 coupon lookups won't appear in the structured log stream. Ops teams monitoring the logger won't see these errors.
+- **Recommended fix:** Replace `console.error(...)` with `logger.error({ err: error, id }, 'Error fetching coupon details:')`.
+- **Source:** PR13 — observed during couponService test coverage pass.
+
 ### BUG-011 — verifyTabbyPayment in orderService calls axios.post for capture but no post mock guard
 - **File:** `src/services/orderService.js` (line 1540)
 - **Status:** **OPEN** (test isolation only)

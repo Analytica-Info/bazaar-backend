@@ -169,3 +169,76 @@ describe("GET /v2/user/tabby-buyer-history (mobile)", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// Error path matrix for mobile user controller
+describe.each([
+  {
+    label: "getProfile",
+    method: "get", path: "/v2/user/profile",
+    mockFn: "getProfile",
+    body: null,
+  },
+  {
+    label: "getOrders",
+    method: "get", path: "/v2/user/orders",
+    mockFn: "getUserOrders",
+    body: null,
+  },
+  {
+    label: "getPaymentHistory",
+    method: "get", path: "/v2/user/payment-history",
+    mockFn: "getPaymentHistory",
+    body: null,
+  },
+  {
+    label: "getDashboard",
+    method: "get", path: "/v2/user/dashboard",
+    mockFn: "getDashboard",
+    body: null,
+  },
+  {
+    label: "getReviews",
+    method: "get", path: "/v2/user/reviews",
+    mockFn: "getUserReviews",
+    body: null,
+  },
+  {
+    label: "getTabbyBuyerHistory",
+    method: "get", path: "/v2/user/tabby-buyer-history",
+    mockFn: "getTabbyBuyerHistory",
+    body: null,
+  },
+])("error path: $label (mobile)", ({ method, path, mockFn, body }) => {
+  test("500 — service throws returns error envelope", async () => {
+    userService[mockFn].mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const req = request(app)[method](path).set(MOBILE);
+    const res = body ? await req.send(body) : await req;
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBeDefined();
+  });
+});
+
+describe("GET /v2/user/orders/:id — error path (mobile)", () => {
+  test("404 — order not found returns error envelope", async () => {
+    userService.getOrder.mockRejectedValueOnce({ status: 404, message: "Order not found" });
+
+    const res = await request(app).get("/v2/user/orders/bad").set(MOBILE);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("GET /v2/user/payment-history/:id — error path (mobile)", () => {
+  test("404 — not found returns error envelope", async () => {
+    userService.getSinglePaymentHistory.mockRejectedValueOnce({ status: 404, message: "Not found" });
+
+    const res = await request(app).get("/v2/user/payment-history/bad").set(MOBILE);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+});

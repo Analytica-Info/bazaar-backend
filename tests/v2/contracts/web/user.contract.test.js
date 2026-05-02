@@ -204,3 +204,66 @@ describe("GET /v2/user/current-month-categories (web)", () => {
     expect(res.body.message).toBe("Categories retrieved");
   });
 });
+
+// Error path matrix for web user controller
+describe.each([
+  { label: "getProfile",                method: "get",  path: "/v2/user/profile",                    mockFn: "getProfile",                     body: null },
+  { label: "getOrders",                 method: "get",  path: "/v2/user/orders",                     mockFn: "getUserOrders",                  body: null },
+  { label: "getPaymentHistory",         method: "get",  path: "/v2/user/payment-history",            mockFn: "getPaymentHistory",              body: null },
+  { label: "getDashboard",              method: "get",  path: "/v2/user/dashboard",                  mockFn: "getDashboard",                   body: null },
+  { label: "getReviews",                method: "get",  path: "/v2/user/reviews",                    mockFn: "getUserReviews",                 body: null },
+  { label: "getCurrentMonthCategories", method: "get",  path: "/v2/user/current-month-categories",   mockFn: "getCurrentMonthOrderCategories", body: null },
+])("error path: $label (web)", ({ method, path, mockFn, body }) => {
+  test("500 — service throws returns error envelope", async () => {
+    userService[mockFn].mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const req = request(app)[method](path).set(WEB);
+    const res = body ? await req.send(body) : await req;
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBeDefined();
+  });
+});
+
+describe("POST /v2/user/reviews (web)", () => {
+  test("200 — adds review successfully", async () => {
+    userService.addReview.mockResolvedValueOnce({ reviews: [], message: "Review added" });
+
+    const res = await request(app).post("/v2/user/reviews").set(WEB)
+      .send({
+        product_id: "prod1",
+        name: "Test User",
+        title: "Great product",
+        description: "Loved it",
+        quality_rating: 5,
+        value_rating: 4,
+        price_rating: 4,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("reviews");
+    expect(res.body.message).toBe("Review added");
+  });
+
+  test("500 — service error propagates", async () => {
+    userService.addReview.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).post("/v2/user/reviews").set(WEB)
+      .send({ product_id: "prod1", name: "Test" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/user/payment-history/:id — error path (web)", () => {
+  test("404 — not found returns error envelope", async () => {
+    userService.getSinglePaymentHistory.mockRejectedValueOnce({ status: 404, message: "Not found" });
+
+    const res = await request(app).get("/v2/user/payment-history/bad").set(WEB);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+});

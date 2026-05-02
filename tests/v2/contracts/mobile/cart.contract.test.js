@@ -118,3 +118,85 @@ describe("DELETE /v2/cart (mobile)", () => {
     expect(res.body.data.items).toHaveLength(0);
   });
 });
+
+describe("GET /v2/cart — error path (mobile)", () => {
+  test("500 — service throws propagates to error envelope", async () => {
+    cartService.getCart.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/cart").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBeDefined();
+  });
+});
+
+describe("POST /v2/cart — error path (mobile)", () => {
+  test("500 — service throws propagates to error envelope", async () => {
+    cartService.addToCart.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).post("/v2/cart").set(MOBILE)
+      .send({ product_id: "p2", qty: 1 });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("DELETE /v2/cart — error path (mobile)", () => {
+  test("404 — service throws 404 returns error envelope", async () => {
+    cartService.removeFromCart.mockRejectedValueOnce({ status: 404, message: "Item not found" });
+
+    const res = await request(app).delete("/v2/cart").set(MOBILE)
+      .send({ product_id: "p999" });
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("POST /v2/cart/increase (mobile)", () => {
+  test("200 — increases item qty", async () => {
+    cartService.increaseQty.mockResolvedValueOnce({ items: [{ product_id: "p1", qty: 2 }], total: 100 });
+
+    const res = await request(app).post("/v2/cart/increase").set(MOBILE)
+      .send({ product_id: "p1", qty: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.total).toBe(100);
+  });
+
+  test("500 — error path returns error envelope", async () => {
+    cartService.increaseQty.mockRejectedValueOnce({ status: 500, message: "Internal error" });
+
+    const res = await request(app).post("/v2/cart/increase").set(MOBILE)
+      .send({ product_id: "p1", qty: 1 });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/cart/decrease (mobile)", () => {
+  test("200 — decreases item qty", async () => {
+    cartService.decreaseQty.mockResolvedValueOnce({ items: [{ product_id: "p1", qty: 1 }], total: 50 });
+
+    const res = await request(app).post("/v2/cart/decrease").set(MOBILE)
+      .send({ product_id: "p1", qty: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  test("500 — error path returns error envelope", async () => {
+    cartService.decreaseQty.mockRejectedValueOnce({ status: 500, message: "Internal error" });
+
+    const res = await request(app).post("/v2/cart/decrease").set(MOBILE)
+      .send({ product_id: "p1", qty: 1 });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});

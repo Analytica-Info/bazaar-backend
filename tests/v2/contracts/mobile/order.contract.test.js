@@ -226,3 +226,244 @@ describe("GET /v2/orders/address (mobile)", () => {
     expect(res.body.data).toHaveProperty("flag");
   });
 });
+
+describe("GET /v2/orders — error paths (mobile)", () => {
+  test("500 — getOrders throws returns error envelope", async () => {
+    orderService.getOrders.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/orders").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBeDefined();
+  });
+});
+
+describe("GET /v2/orders/address — error path (mobile)", () => {
+  test("500 — getAddresses throws returns error envelope", async () => {
+    orderService.getAddresses.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/orders/address").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/orders/validate-inventory — error path (mobile)", () => {
+  test("500 — service error propagates", async () => {
+    orderService.validateInventoryBeforeCheckout.mockRejectedValueOnce({ status: 500, message: "Internal" });
+
+    const res = await request(app).post("/v2/orders/validate-inventory").set(MOBILE)
+      .send({ products: [] });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/orders/checkout/tabby — error path (mobile)", () => {
+  test("500 — service error propagates", async () => {
+    orderService.createTabbyCheckoutSession.mockRejectedValueOnce({ status: 500, message: "Tabby error" });
+
+    const res = await request(app).post("/v2/orders/checkout/tabby").set(MOBILE)
+      .send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/orders/verify/tabby (mobile)", () => {
+  test("200 — returns finalStatus", async () => {
+    orderService.verifyTabbyPayment.mockResolvedValueOnce({
+      finalStatus: "authorized",
+      message: "Payment verified",
+    });
+
+    const res = await request(app).get("/v2/orders/verify/tabby?paymentId=tab123").set(MOBILE);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("finalStatus");
+  });
+
+  test("500 — service error propagates", async () => {
+    orderService.verifyTabbyPayment.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).get("/v2/orders/verify/tabby?paymentId=bad").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/orders/checkout/nomod (mobile)", () => {
+  test("200 — returns paymentId and status", async () => {
+    orderService.createNomodCheckoutSession.mockResolvedValueOnce({
+      paymentId: "nom123",
+      status: "pending",
+      message: "Nomod checkout created",
+    });
+
+    const res = await request(app).post("/v2/orders/checkout/nomod").set(MOBILE)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("paymentId");
+    expect(res.body.data).toHaveProperty("status");
+  });
+
+  test("500 — service error propagates", async () => {
+    orderService.createNomodCheckoutSession.mockRejectedValueOnce({ status: 500, message: "Nomod error" });
+
+    const res = await request(app).post("/v2/orders/checkout/nomod").set(MOBILE)
+      .send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/orders/verify/nomod (mobile)", () => {
+  test("200 — returns finalStatus", async () => {
+    orderService.verifyNomodPayment.mockResolvedValueOnce({
+      finalStatus: "captured",
+      message: "Nomod verified",
+    });
+
+    const res = await request(app).get("/v2/orders/verify/nomod?paymentId=nom123").set(MOBILE);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("finalStatus");
+  });
+
+  test("500 — service error propagates", async () => {
+    orderService.verifyNomodPayment.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).get("/v2/orders/verify/nomod?paymentId=bad").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/orders/stripe/init — validation matrix (mobile)", () => {
+  test.each([
+    ["zero amountAED", { amountAED: 0 }],
+    ["string amountAED", { amountAED: "abc" }],
+    ["null body", {}],
+  ])("400 — %s returns BAD_REQUEST", async (_label, body) => {
+    const res = await request(app).post("/v2/orders/stripe/init").set(MOBILE).send(body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("BAD_REQUEST");
+  });
+
+  test("500 — service error propagates", async () => {
+    orderService.initStripePayment.mockRejectedValueOnce({ status: 500, message: "Stripe failure" });
+
+    const res = await request(app).post("/v2/orders/stripe/init").set(MOBILE)
+      .send({ amountAED: 100 });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/orders/payment-methods — error path (mobile)", () => {
+  test("500 — service throws returns error envelope", async () => {
+    orderService.getPaymentMethods.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/orders/payment-methods").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("POST /v2/orders/address (mobile)", () => {
+  test("200 — stores address and returns addresses", async () => {
+    orderService.storeAddress.mockResolvedValueOnce({
+      addresses: [{ name: "Home", city: "Dubai" }],
+      message: "Address saved",
+    });
+
+    const res = await request(app).post("/v2/orders/address").set(MOBILE)
+      .send({ name: "Home", city: "Dubai", country: "AE" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("addresses");
+  });
+
+  test("500 — error path", async () => {
+    orderService.storeAddress.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).post("/v2/orders/address").set(MOBILE)
+      .send({ name: "Home" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("DELETE /v2/orders/address/:addressId (mobile)", () => {
+  test("200 — deletes address", async () => {
+    orderService.deleteAddress.mockResolvedValueOnce({ addresses: [] });
+
+    const res = await request(app).delete("/v2/orders/address/addr1").set(MOBILE);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("addresses");
+  });
+
+  test("500 — error path", async () => {
+    orderService.deleteAddress.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).delete("/v2/orders/address/bad").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("PATCH /v2/orders/address/:addressId/set-primary (mobile)", () => {
+  test("200 — sets primary address", async () => {
+    orderService.setPrimaryAddress.mockResolvedValueOnce({ addresses: [{ isPrimary: true }] });
+
+    const res = await request(app).patch("/v2/orders/address/addr1/set-primary").set(MOBILE);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("addresses");
+  });
+
+  test("500 — error path", async () => {
+    orderService.setPrimaryAddress.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).patch("/v2/orders/address/bad/set-primary").set(MOBILE);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("PATCH /v2/orders/:orderId/status (mobile)", () => {
+  test("200 — updates order status", async () => {
+    orderService.updateOrderStatus.mockResolvedValueOnce({ order: { _id: "o1", status: "delivered" } });
+
+    const res = await request(app).patch("/v2/orders/o1/status").set(MOBILE)
+      .send({ status: "delivered" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty("order");
+  });
+
+  test("500 — error path", async () => {
+    orderService.updateOrderStatus.mockRejectedValueOnce({ status: 500, message: "Error" });
+
+    const res = await request(app).patch("/v2/orders/bad/status").set(MOBILE)
+      .send({ status: "delivered" });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});

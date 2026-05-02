@@ -150,3 +150,81 @@ describe("GET /v2/products/similar", () => {
     expect(res.body.success).toBe(true);
   });
 });
+
+// Error path matrix for shared product controller
+describe.each([
+  { label: "getCategories",   method: "get",  path: "/v2/products/categories", mockFn: "getCategories",  body: null },
+  { label: "getProducts",     method: "get",  path: "/v2/products",             mockFn: "getProducts",    body: null },
+  { label: "search",          method: "post", path: "/v2/products/search",      mockFn: "searchProducts", body: { query: "x" } },
+])("error path: $label (shared products)", ({ method, path, mockFn, body }) => {
+  test("500 — service throws returns error envelope", async () => {
+    productService[mockFn].mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const req = request(app)[method](path).set(WEB);
+    const res = body ? await req.send(body) : await req;
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toBeDefined();
+  });
+});
+
+describe("GET /v2/products/category/:id — error paths (shared)", () => {
+  test("200 — returns categories product", async () => {
+    productService.getCategoriesProduct.mockResolvedValueOnce({ products: [] });
+
+    const res = await request(app).get("/v2/products/category/cat1").set(WEB);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  test("500 — service throws returns error envelope", async () => {
+    productService.getCategoriesProduct.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/products/category/cat1").set(WEB);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/products/sub-category/:id — error paths (shared)", () => {
+  test("200 — returns sub-categories product", async () => {
+    productService.getSubCategoriesProduct.mockResolvedValueOnce({ products: [] });
+
+    const res = await request(app).get("/v2/products/sub-category/sc1").set(WEB);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  test("500 — service throws returns error envelope", async () => {
+    productService.getSubCategoriesProduct.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/products/sub-category/sc1").set(WEB);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("GET /v2/products/sub-sub-category/:id — error paths (shared)", () => {
+  test("200 — returns sub-sub-categories product", async () => {
+    productService.getSubSubCategoriesProduct.mockResolvedValueOnce({ products: [] });
+
+    const res = await request(app).get("/v2/products/sub-sub-category/ssc1").set(WEB);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  test("500 — service throws returns error envelope", async () => {
+    productService.getSubSubCategoriesProduct.mockRejectedValueOnce({ status: 500, message: "DB error" });
+
+    const res = await request(app).get("/v2/products/sub-sub-category/ssc1").set(WEB);
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+});

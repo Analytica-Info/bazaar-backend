@@ -778,3 +778,85 @@ Tests: 2533 total (2530 pass, 3 skip) — was 2391
 
 - productService hits exactly 80.14% lines. The remaining ~114 missed lines are: (a) dead code — `checkSpelling` (28 lines, never called), (b) `logStatusFalseItems` dead branches (7 lines, no caller uses those shapes), (c) deeply nested category-path building in getCategoriesProduct/getSubCategoryProducts/getSubSubCategoriesProduct (require Lightspeed API data with specific category_path structures).
 - V8 instrumentation note: no V8 under-instrumentation issues observed in these files.
+
+---
+
+# Coverage Baseline — PR13 (Final Coverage Push: Sub-80% File Elimination)
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR12 Baseline | PR13 Result | Delta   |
+|-------------|--------------|-------------|---------|
+| Statements  | 86.11%       | 88.06%      | +1.95pp |
+| Branches    | 74.11%       | 75.40%      | +1.29pp |
+| Functions   | 85.27%       | 87.79%      | +2.52pp |
+| Lines       | 87.21%       | 89.16%      | +1.95pp |
+
+All coverage thresholds in jest.config.js **pass**.
+
+## Per-File Coverage — 8 Target Files
+
+| File                                       | Lines Before | Lines After | Branches Before | Branches After | Hit 80%? |
+|--------------------------------------------|-------------|-------------|-----------------|----------------|----------|
+| controllers/v2/mobile/cartController.js    | 58.1%        | 100.0%      | 0%              | 50%            | YES      |
+| controllers/v2/mobile/orderController.js   | 54.7%        | 100.0%      | 61.9%           | 85.7%          | YES      |
+| controllers/v2/mobile/userController.js    | 68.9%        | 95.6%       | 100%            | 100%           | YES      |
+| controllers/v2/shared/productController.js | 56.8%        | 90.9%       | 50%             | 50%            | YES      |
+| controllers/v2/web/userController.js       | 75.9%        | 100.0%      | 66.7%           | 83.3%          | YES      |
+| services/contactService.js                 | 77.8%        | 100.0%      | 85.7%           | 100%           | YES      |
+| services/couponService.js                  | 63.0%        | 91.4%       | 54.7%           | 88.4%          | YES      |
+| services/smartCategoriesService.js         | 72.0%        | 92.5%       | 49.6%           | 74.3%          | YES      |
+
+**All 8 target files reached ≥80% lines.**
+
+## Remaining Coverage Gaps (explained, not fixable without production code changes)
+
+| File                                       | Uncovered Lines | Root Cause |
+|--------------------------------------------|----------------|------------|
+| controllers/v2/shared/productController.js | 74-78          | BUG-014: `/products/similar` masked by `/products/:id` route order — wrong handler is called |
+| services/couponService.js                  | 83-84, 103-104, 130-131, 242-243, 324-325, 551-552 | DB-level error catch blocks — require triggering Mongoose write failures not achievable with in-memory MongoDB |
+| services/smartCategoriesService.js         | 122, 144, 284, 290, 369, 418-422, 445, 628, 786-790, 818 | Mixed: photo-slice path requires 5+ images from real image URLs, getTopRatedProducts aggregation join impedance, flash sale/trending sold-products branches need OrderDetail fixtures with matching product IDs |
+
+## Test Count
+
+| PR    | Suites | Tests | Skipped |
+|-------|--------|-------|---------|
+| PR12  | 121    | 2530  | 3       |
+| PR13  | 121    | 2615  | 3       |
+
+## New Tests Added in PR13
+
+| File                                                       | Tests Added | Surface |
+|------------------------------------------------------------|-------------|---------|
+| tests/v2/contracts/mobile/cart.contract.test.js            | +7          | increaseQty, decreaseQty, all error paths |
+| tests/v2/contracts/mobile/order.contract.test.js           | +27         | verifyTabby, verifyNomod, nomod checkout, address CRUD, set-primary, updateOrderStatus, amountAED matrix, all error paths |
+| tests/v2/contracts/mobile/user.contract.test.js            | +9          | error path matrix for all 6 user endpoints, getOrder/getSinglePaymentHistory 404 |
+| tests/v2/contracts/shared/product.contract.test.js         | +10         | error path matrix, category/sub-category/sub-sub-category error paths |
+| tests/v2/contracts/web/user.contract.test.js               | +11         | error path matrix, addReview 200/500, getSinglePaymentHistory 404 |
+| tests/services/contactService.test.js                      | +8          | submitFeedback (validation + success), validateEmail API failure |
+| tests/services/couponService.test.js                       | +21         | UAE10 all 5 branches (check + redeem), invalid API response format, missing phone, sequential coupon code, coupon-pool exhausted, low-stock email alert |
+| tests/services/smartCategoriesService.test.js              | +14         | getTrendingProducts with OrderDetail, todayDeal with OrderDetail, favouritesOfWeek with OrderDetail, getFlashSales active window (non-paginated + paginated), getHotOffers many-images, getTopRatedProducts with reviews, storeFlashSales validation |
+
+## Bugs Found (PR13)
+
+- **BUG-014** (HIGH): `/v2/products/similar` masked by `/v2/products/:id` — route registration order in `src/routes/v2/shared/index.js` causes `similarProducts` handler to be permanently unreachable. The endpoint silently calls `getProductDetails("similar")` instead.
+- **BUG-015** (LOW): `couponService.fetchCouponDetails` uses `console.error` instead of `logger` for API failure logging — bypasses structured log pipeline.
+
+## New jest.config.js Thresholds (PR13, at actual − 2pp)
+
+| Scope                                              | Stmts | Branches | Funcs | Lines |
+|----------------------------------------------------|-------|----------|-------|-------|
+| global                                             | 87    | 74       | 86    | 88    |
+| src/services/ (directory)                          | 61    | 48       | 64    | 62    |
+| src/services/couponService.js                      | 87    | 86       | 93    | 89    |
+| src/services/smartCategoriesService.js             | 89    | 72       | 81    | 90    |
+| src/services/contactService.js                     | 98    | 98       | 98    | 98    |
+| src/controllers/v2/ (directory)                    | 87    | 68       | 88    | 88    |
+| src/controllers/v2/mobile/cartController.js        | 98    | 48       | 98    | 98    |
+| src/controllers/v2/mobile/orderController.js       | 98    | 83       | 98    | 98    |
+| src/controllers/v2/mobile/userController.js        | 93    | 98       | 93    | 93    |
+| src/controllers/v2/shared/productController.js     | 88    | 48       | 80    | 88    |
+| src/controllers/v2/web/userController.js           | 98    | 81       | 98    | 98    |

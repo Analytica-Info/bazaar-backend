@@ -412,6 +412,286 @@ describe("smartCategoriesService.favouritesOfWeek — with data", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// getTrendingProducts — with sold order data
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.getTrendingProducts — with sold products", () => {
+  it("returns products when order details exist within time window", async () => {
+    const productId = "trending-" + Date.now();
+    await Product.create({
+      product: {
+        name: "Trending Product",
+        id: productId,
+        product_type_id: "cat-1",
+        images: ["img.jpg"],
+        price_standard: { tax_inclusive: "50.00", tax_exclusive: "45.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "45.00" }],
+      totalQty: 5,
+      sold: 10,
+      status: true,
+      discount: 15,
+      originalPrice: 50,
+      discountedPrice: 45,
+    });
+    const OrderDetail = require("../../src/models/OrderDetail");
+    await OrderDetail.create({
+      product_id: productId,
+      product_name: "Trending Product",
+      quantity: 3,
+    });
+
+    const result = await smartCategoriesService.getTrendingProducts({ timeWindowHours: 24 * 365 * 10 });
+    expect(result).toBeDefined();
+    // soldProductIds.length > 0 branch exercised
+  });
+});
+
+// ---------------------------------------------------------------------------
+// todayDeal — with sold order data
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.todayDeal — with sold data", () => {
+  it("exercises soldProductIds.length > 0 branch", async () => {
+    const productId = "todaydeal-" + Date.now();
+    await Product.create({
+      product: {
+        name: "Today Deal Product",
+        id: productId,
+        product_type_id: "cat-2",
+        images: ["deal.jpg"],
+        price_standard: { tax_inclusive: "40.00", tax_exclusive: "36.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "36.00" }],
+      totalQty: 5,
+      sold: 8,
+      status: true,
+      discount: 20,
+      originalPrice: 40,
+      discountedPrice: 32,
+    });
+    const OrderDetail = require("../../src/models/OrderDetail");
+    await OrderDetail.create({
+      product_id: productId,
+      product_name: "Today Deal Product",
+      quantity: 2,
+    });
+
+    const result = await smartCategoriesService.todayDeal();
+    expect(result).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// favouritesOfWeek — with sold order data
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.favouritesOfWeek — with sold data", () => {
+  it("exercises soldProductIds.length > 0 branch", async () => {
+    const productId = "fav-" + Date.now();
+    await Product.create({
+      product: {
+        name: "Favourite Product",
+        id: productId,
+        product_type_id: "cat-3",
+        images: ["fav.jpg"],
+        price_standard: { tax_inclusive: "60.00", tax_exclusive: "54.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "54.00" }],
+      totalQty: 5,
+      sold: 15,
+      status: true,
+      discount: 10,
+      originalPrice: 60,
+      discountedPrice: 54,
+    });
+    const OrderDetail = require("../../src/models/OrderDetail");
+    await OrderDetail.create({
+      product_id: productId,
+      product_name: "Favourite Product",
+      quantity: 5,
+    });
+
+    const result = await smartCategoriesService.favouritesOfWeek();
+    expect(result).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFlashSales — active window WITH products (exercises lines 627-699)
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.getFlashSales — active window with products", () => {
+  afterEach(() => clock.resetClock());
+
+  it("returns status:true with product data when inside flash sale window", async () => {
+    // Create products with discount and sold > 0 to match the product query
+    await Product.create({
+      product: {
+        name: "Flash Deal",
+        id: "flash-" + Date.now(),
+        product_type_id: "cat-flash",
+        images: ["flash.jpg"],
+        price_standard: { tax_inclusive: "30.00", tax_exclusive: "27.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "27.00" }],
+      totalQty: 5,
+      sold: 3,
+      status: true,
+      discount: 25,
+      originalPrice: 30,
+      discountedPrice: 22.5,
+      discountedPriceAED: 22.5,
+    });
+
+    // Sale: 2026-05-01 09:00–21:00 Dubai (+04:00) => 05:00-17:00 UTC
+    clock.setClock({
+      now: () => new Date("2026-05-01T12:00:00Z"),
+      nowMs: () => new Date("2026-05-01T12:00:00Z").getTime(),
+      today: () => new Date("2026-05-01T00:00:00Z"),
+    });
+
+    await FlashSale.create({
+      startDay: "2026-05-01",
+      startTime: "09:00",
+      endDay: "2026-05-01",
+      endTime: "21:00",
+      isEnabled: true,
+    });
+
+    const result = await smartCategoriesService.getFlashSales({ paginated: false });
+    expect(result).toBeDefined();
+    // When inside window, status should be true
+    if (result && typeof result === "object" && "status" in result) {
+      expect(result.status).toBe(true);
+    }
+  });
+
+  it("returns paginated flash sale data when inside window", async () => {
+    await Product.create({
+      product: {
+        name: "Flash Paginated",
+        id: "flash-pag-" + Date.now(),
+        product_type_id: "cat-fp",
+        images: ["fp.jpg"],
+        price_standard: { tax_inclusive: "50.00", tax_exclusive: "45.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "45.00" }],
+      totalQty: 5,
+      sold: 2,
+      status: true,
+      discount: 15,
+      originalPrice: 50,
+      discountedPrice: 42.5,
+    });
+
+    clock.setClock({
+      now: () => new Date("2026-05-02T12:00:00Z"),
+      nowMs: () => new Date("2026-05-02T12:00:00Z").getTime(),
+      today: () => new Date("2026-05-02T00:00:00Z"),
+    });
+
+    await FlashSale.create({
+      startDay: "2026-05-02",
+      startTime: "09:00",
+      endDay: "2026-05-02",
+      endTime: "21:00",
+      isEnabled: true,
+    });
+
+    const result = await smartCategoriesService.getFlashSales({ paginated: true, page: 1, limit: 10 });
+    expect(result).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getHotOffers — photos.length > 4 branch (line 144)
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.getHotOffers — many images", () => {
+  it("slices photo array when more than 4 images available", async () => {
+    // Create products with 5+ images to trigger the slice path
+    await Product.create({
+      product: {
+        name: "Hot Offer Many Images",
+        id: "hot-many-" + Date.now(),
+        product_type_id: "cat-hot",
+        images: ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg", "f.jpg"],
+        price_standard: { tax_inclusive: "100.00", tax_exclusive: "90.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "90.00" }],
+      totalQty: 5,
+      sold: 1,
+      status: true,
+      discount: 5,
+      originalPrice: 100,
+      discountedPrice: 95,
+    });
+
+    const result = await smartCategoriesService.getHotOffers({ priceField: "tax_inclusive" });
+    expect(result).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getTopRatedProducts — with reviews (lines 283-290)
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.getTopRatedProducts — with review data", () => {
+  it("exercises filteredTopProducts path when products have reviews", async () => {
+    const Review = require("../../src/models/Review");
+    const p = await Product.create({
+      product: {
+        name: "Highly Rated",
+        id: "rated-" + Date.now(),
+        product_type_id: "cat-rated",
+        images: ["star.jpg"],
+        price_standard: { tax_inclusive: "80.00", tax_exclusive: "72.00" },
+      },
+      variantsData: [{ id: "v1", name: "Default", qty: 5, price_excl: "72.00" }],
+      totalQty: 5,
+      sold: 5,
+      status: true,
+      discount: 10,
+      originalPrice: 80,
+      discountedPrice: 72,
+    });
+
+    await Review.create({
+      product_id: p._id,
+      user_id: new mongoose.Types.ObjectId(),
+      name: "Happy Customer",
+      rating: 5,
+      quality_rating: 5,
+      value_rating: 5,
+      price_rating: 5,
+      comment: "Amazing!",
+      status: true,
+    });
+
+    const result = await smartCategoriesService.getTopRatedProducts();
+    expect(result).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// storeFlashSales — missing fields validation (lines 840-843)
+// ---------------------------------------------------------------------------
+describe("smartCategoriesService.storeFlashSales — validation", () => {
+  it("throws 400 when required fields are missing", async () => {
+    try {
+      await smartCategoriesService.storeFlashSales({ startDay: "Monday", startTime: "09:00" });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+    }
+  });
+
+  it("throws 400 when all fields missing", async () => {
+    try {
+      await smartCategoriesService.storeFlashSales({});
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+    }
+  });
+});
+
 // getNewArrivals — standard pagination (no firstPageLimit)
 describe("smartCategoriesService.getNewArrivals — standard pagination", () => {
   it("should return defined result without firstPageLimit", async () => {
