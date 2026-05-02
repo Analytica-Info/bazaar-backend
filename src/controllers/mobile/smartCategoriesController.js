@@ -3,7 +3,7 @@ const Product = require('../../repositories').products.rawModel();
 const mongoose = require('mongoose');
 const fs = require("fs");
 const path = require("path");
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
 const logStatusFalseItems = (endpoint, req, res, responseData) => {
     try {
@@ -64,7 +64,7 @@ const logStatusFalseItems = (endpoint, req, res, responseData) => {
     }
 };
 
-exports.hotOffers = async (req, res) => {
+exports.hotOffers = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.getHotOffers({ priceField: "tax_exclusive" });
         res.status(200).json(result);
@@ -72,9 +72,9 @@ exports.hotOffers = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.productsByPrice = async (req, res) => {
+exports.productsByPrice = asyncHandler(async (req, res) => {
     const startPrice = parseFloat(req.query.start);
     const endPrice = parseFloat(req.query.end);
     const page = parseInt(req.query.page) || 1;
@@ -96,9 +96,9 @@ exports.productsByPrice = async (req, res) => {
             message: "An error occurred while fetching products by price"
         });
     }
-};
+});
 
-exports.getTopRatedProducts = async (req, res) => {
+exports.getTopRatedProducts = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.getTopRatedProducts();
 
@@ -109,9 +109,9 @@ exports.getTopRatedProducts = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.trendingProducts = async (req, res) => {
+exports.trendingProducts = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.getTrendingProducts({ timeWindowHours: 100 });
 
@@ -122,9 +122,9 @@ exports.trendingProducts = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.todayDeal = async (req, res) => {
+exports.todayDeal = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.todayDeal();
 
@@ -135,9 +135,9 @@ exports.todayDeal = async (req, res) => {
         logger.error({ err: error }, "Error in todayDeal:");
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.getNewArrivals = async (req, res) => {
+exports.getNewArrivals = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 54;
 
@@ -156,9 +156,9 @@ exports.getNewArrivals = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.getFlashSales = async (req, res) => {
+exports.getFlashSales = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
 
@@ -172,9 +172,9 @@ exports.getFlashSales = async (req, res) => {
         logger.error({ err: err }, "Error in getFlashSales:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
-};
+});
 
-exports.favouritesOfWeek = async (req, res) => {
+exports.favouritesOfWeek = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.favouritesOfWeek();
 
@@ -185,9 +185,9 @@ exports.favouritesOfWeek = async (req, res) => {
         logger.error({ err: error }, "Error in favouritesOfWeek:");
         res.status(500).json({ message: "Internal Server Error" });
     }
-};
+});
 
-exports.storeFlashSales = async (req, res) => {
+exports.storeFlashSales = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.storeFlashSales(req.body);
         res.json(result);
@@ -197,9 +197,9 @@ exports.storeFlashSales = async (req, res) => {
         }
         res.status(500).json({ success: false, message: err.message });
     }
-};
+});
 
-exports.getSuperSaverProducts = async (req, res) => {
+exports.getSuperSaverProducts = asyncHandler(async (req, res) => {
     try {
         const result = await smartCategoriesService.getSuperSaverProducts({ minItems: 8 });
 
@@ -210,7 +210,7 @@ exports.getSuperSaverProducts = async (req, res) => {
         logger.error({ err: err }, "Error in getSuperSaverProducts:");
         return res.status(500).json({ status: false, message: "Server error" });
     }
-};
+});
 
 // SKU values that map to each color badge.
 // Inverted mapping of getColorFromSku so we can query Mongo with $in.
@@ -234,7 +234,7 @@ const LIST_EXCLUDE_PROJECTION = {
 const cache = require("../../utilities/cache");
 const PRODUCTS_BY_VARIANT_TTL = 300; // 5 min
 
-exports.getProductByVariant = async (req, res) => {
+exports.getProductByVariant = asyncHandler(async (req, res) => {
     try {
         const color = req.query.color;
         const page = parseInt(req.query.page) || 1;
@@ -294,7 +294,7 @@ exports.getProductByVariant = async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
-};
+});
 
 // Kept for any remaining internal callers — maps SKU string to colour name.
 function getColorFromSku(sku) {

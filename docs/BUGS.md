@@ -297,3 +297,23 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** Coverage debt; dead-code surface area; security review burden.
 - **Recommended fix:** Audit `docs/api-map/MAP.md` UNUSED list. For each, classify: keep (admin tool), deprecate (warn for one release), or delete. Land in a follow-up "v1 dead route reaper" PR.
 - **Source:** PR14 audit summary.
+
+---
+
+### BUG-031 — Global errorHandler case #8 maps err.status to code `'ERROR'` instead of semantic codes
+- **Severity:** MEDIUM (observability, client code correctness)
+- **File:** `src/middleware/errorHandler.js` line 108–115 (case #8: legacy plain-object throws)
+- **Status:** OPEN
+- **Symptom:** When a service layer throws `{ status: 404, message: '...' }` and the error reaches the global `errorHandler` without being converted to a `DomainError`, case #8 emits `{ error: { code: 'ERROR', ... } }` instead of `{ error: { code: 'NOT_FOUND', ... } }`. The v2 `_shared/errors.js::handleError` helper and the new `toDomainError` function both do the correct HTTP→code mapping; the global handler does not.
+- **Impact:** Any future controller that lets a plain-object service error reach `next(err)` (e.g. via `asyncHandler` without a `toDomainError` bridge) will emit `code: 'ERROR'` for 4xx errors instead of the semantic code clients expect. The current migration works around this with `toDomainError`, but the root cause in errorHandler remains.
+- **Recommended fix:** In errorHandler case #8, apply the same `HTTP_CODE_MAP` lookup that `handleError` uses: `code = HTTP_CODE_MAP[err.status] || 'ERROR'`. One-line change, low risk.
+- **Source:** PR15 asyncHandler migration — discovered while ensuring contract test error codes matched after migrating v2 controllers.
+
+### BUG-032 — `mobile/productController.js::addReview` uses `console.error` instead of logger
+- **Severity:** LOW (observability)
+- **File:** `src/controllers/mobile/productController.js` (addReview and categoryImages handlers)
+- **Status:** OPEN
+- **Symptom:** Two catch blocks call `console.error(error)` instead of `logger.error(...)`. In production, this bypasses the structured JSON logging pipeline.
+- **Impact:** Errors in review submission and category image upload are invisible in log aggregators.
+- **Recommended fix:** Replace `console.error(error)` with `logger.error({ err: error }, 'Error in addReview:')` (and similarly for `categoryImages`).
+- **Source:** PR15 code audit during asyncHandler migration.

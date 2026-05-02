@@ -5,10 +5,11 @@
 const authService = require('../../../services/authService');
 const { wrap, wrapError } = require('../_shared/responseEnvelope');
 const { handleError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 const logger = require('../../../utilities/logger');
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 
-exports.register = async (req, res) => {
+exports.register = asyncHandler(async (req, res) => {
     try {
         const { name, email, phone, password } = req.body;
         const result = await authService.register({ name, email, phone, password, platform: 'mobile' });
@@ -18,9 +19,9 @@ exports.register = async (req, res) => {
         logger.error({ err: error }, 'v2 register error');
         return handleError(res, error);
     }
-};
+});
 
-exports.login = async (req, res) => {
+exports.login = asyncHandler(async (req, res) => {
     try {
         const { email, password, fcmToken } = req.body;
         const deviceInfo = {
@@ -42,9 +43,9 @@ exports.login = async (req, res) => {
         logger.error({ err: error }, 'v2 login error');
         return handleError(res, error);
     }
-};
+});
 
-exports.googleLogin = async (req, res) => {
+exports.googleLogin = asyncHandler(async (req, res) => {
     try {
         const { tokenId, accessToken, fcmToken } = req.body;
         const deviceInfo = {
@@ -66,9 +67,9 @@ exports.googleLogin = async (req, res) => {
         logger.error({ err: error }, 'v2 google login error');
         return handleError(res, error);
     }
-};
+});
 
-exports.appleLogin = async (req, res) => {
+exports.appleLogin = asyncHandler(async (req, res) => {
     try {
         const { idToken, name, fcmToken } = req.body;
         const deviceInfo = {
@@ -90,9 +91,9 @@ exports.appleLogin = async (req, res) => {
         logger.error({ err: error }, 'v2 apple login error');
         return handleError(res, error);
     }
-};
+});
 
-exports.getUserData = async (req, res) => {
+exports.getUserData = asyncHandler(async (req, res) => {
     try {
         const result = await authService.getUserData(req.user._id, 'mobile');
         return res.status(200).json(wrap({
@@ -105,27 +106,27 @@ exports.getUserData = async (req, res) => {
         logger.error({ err: error }, 'v2 getUserData error');
         return handleError(res, error);
     }
-};
+});
 
-exports.forgotPassword = async (req, res) => {
+exports.forgotPassword = asyncHandler(async (req, res) => {
     try {
         await authService.forgotPassword(req.body.email);
         return res.status(200).json(wrap(null, 'Verification code sent to email'));
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.verifyCode = async (req, res) => {
+exports.verifyCode = asyncHandler(async (req, res) => {
     try {
         await authService.verifyCode(req.body.email, req.body.code);
         return res.status(200).json(wrap(null, 'Code verified successfully'));
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = asyncHandler(async (req, res) => {
     try {
         const { email, code, new_password } = req.body;
         await authService.resetPassword(email, code, new_password, 'mobile');
@@ -133,9 +134,9 @@ exports.resetPassword = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.refreshToken = async (req, res) => {
+exports.refreshToken = asyncHandler(async (req, res) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
@@ -147,9 +148,9 @@ exports.refreshToken = async (req, res) => {
         logger.error({ err: error }, 'v2 refreshToken error');
         return handleError(res, { status: 403, code: 'INVALID_TOKEN', message: error.message || 'Invalid or expired refresh token' });
     }
-};
+});
 
-exports.checkAccessToken = async (req, res) => {
+exports.checkAccessToken = asyncHandler(async (req, res) => {
     try {
         const accessToken = req.header('Authorization')?.replace('Bearer ', '');
         const refreshToken = req.header('Authorization-Refresh')?.replace('Bearer ', '');
@@ -161,9 +162,9 @@ exports.checkAccessToken = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.updateProfile = async (req, res) => {
+exports.updateProfile = asyncHandler(async (req, res) => {
     try {
         const { name, email, phone } = req.body;
         const filePath = req.file ? `${FRONTEND_BASE_URL}/${req.file.path.replace(/\\/g, '/')}` : undefined;
@@ -172,9 +173,9 @@ exports.updateProfile = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.deleteAccount = async (req, res) => {
+exports.deleteAccount = asyncHandler(async (req, res) => {
     try {
         await authService.deleteAccount(req.user._id, 'mobile');
         return res.status(200).json(wrap(null, 'Account deleted successfully'));
@@ -182,9 +183,9 @@ exports.deleteAccount = async (req, res) => {
         logger.error({ err: error }, 'v2 deleteAccount error');
         return handleError(res, error);
     }
-};
+});
 
-exports.verifyRecoveryCode = async (req, res) => {
+exports.verifyRecoveryCode = asyncHandler(async (req, res) => {
     try {
         const { email, recoveryCode, newPassword } = req.body;
         await authService.verifyRecoveryCode(email, recoveryCode, newPassword, 'mobile');
@@ -192,9 +193,9 @@ exports.verifyRecoveryCode = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.resendRecoveryCode = async (req, res) => {
+exports.resendRecoveryCode = asyncHandler(async (req, res) => {
     try {
         const { email } = req.body;
         const result = await authService.resendRecoveryCode(email);
@@ -202,9 +203,9 @@ exports.resendRecoveryCode = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});
 
-exports.updatePassword = async (req, res) => {
+exports.updatePassword = asyncHandler(async (req, res) => {
     try {
         const { old_password, new_password } = req.body;
         await authService.updatePassword(req.user._id, old_password, new_password);
@@ -212,4 +213,4 @@ exports.updatePassword = async (req, res) => {
     } catch (error) {
         return handleError(res, error);
     }
-};
+});

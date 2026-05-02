@@ -3,31 +3,26 @@
  */
 const wishlistService = require('../../../services/wishlistService');
 const { wrap } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 
-exports.getWishlist = async (req, res) => {
+exports.getWishlist = asyncHandler(async (req, res) => {
     try {
         const result = await wishlistService.getWishlist(req.user._id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.addToWishlist = async (req, res) => {
+exports.addToWishlist = asyncHandler(async (req, res) => {
     try {
         const result = await wishlistService.addToWishlist(req.user._id, req.body.productId || req.body.product_id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.removeFromWishlist = async (req, res) => {
+exports.removeFromWishlist = asyncHandler(async (req, res) => {
     try {
         const result = await wishlistService.removeFromWishlist(req.user._id, req.body.productId || req.body.product_id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

@@ -3,18 +3,17 @@
  */
 const orderService = require('../../../services/orderService');
 const { wrap } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 
-exports.getAddress = async (req, res) => {
+exports.getAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.getAddresses(req.user._id);
         return res.status(200).json(wrap({ address: result.address, flag: result.flag }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.storeAddress = async (req, res) => {
+exports.storeAddress = asyncHandler(async (req, res) => {
     try {
         const b = req.body;
         const allowed = {
@@ -26,35 +25,27 @@ exports.storeAddress = async (req, res) => {
         };
         const result = await orderService.storeAddress(req.user._id, allowed);
         return res.status(200).json(wrap({ addresses: result.addresses }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.deleteAddress = async (req, res) => {
+exports.deleteAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.deleteAddress(req.user._id, req.params.addressId);
         return res.status(200).json(wrap({ addresses: result.addresses }, 'Address deleted successfully'));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.setPrimaryAddress = async (req, res) => {
+exports.setPrimaryAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.setPrimaryAddress(req.user._id, req.params.addressId);
         return res.status(200).json(wrap({ addresses: result.addresses }, 'Primary address set successfully'));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.validateInventory = async (req, res) => {
+exports.validateInventory = asyncHandler(async (req, res) => {
     try {
         const { products } = req.body;
         const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Web');
         return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

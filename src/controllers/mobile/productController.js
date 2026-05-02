@@ -6,7 +6,7 @@ const Review = require('../../repositories').reviews.rawModel();
 const ProductView = require('../../repositories').productViews.rawModel();
 
 const productService = require("../../services/productService");
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 
@@ -23,34 +23,34 @@ function handleServiceError(res, error) {
 
 // ─── Product wrappers (delegated to productService) ──────────────
 
-exports.getCategories = async (req, res) => {
+exports.getCategories = asyncHandler(async (req, res) => {
     try {
         const result = await productService.getCategories();
         return res.status(200).json(result);
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.getSearchCategories = async (req, res) => {
+exports.getSearchCategories = asyncHandler(async (req, res) => {
     try {
         const result = await productService.getSearchCategories(req.body);
         return res.status(200).json(result);
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.products = async (req, res) => {
+exports.products = asyncHandler(async (req, res) => {
     try {
         const result = await productService.getProducts(req.query);
         return res.status(200).json(result);
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.productsDetails = async (req, res) => {
+exports.productsDetails = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const userId = req.user?._id || null;
     try {
@@ -59,9 +59,9 @@ exports.productsDetails = async (req, res) => {
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.searchProduct = async (req, res) => {
+exports.searchProduct = asyncHandler(async (req, res) => {
     try {
         const result = await productService.searchProducts(req.body);
         return res.json(result);
@@ -74,9 +74,9 @@ exports.searchProduct = async (req, res) => {
         }
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.search = async (req, res) => {
+exports.search = asyncHandler(async (req, res) => {
     try {
         const result = await productService.searchProducts(req.body);
         return res.json(result);
@@ -89,9 +89,9 @@ exports.search = async (req, res) => {
         }
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.categoriesProduct = async (req, res) => {
+exports.categoriesProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
     try {
         const result = await productService.getCategoriesProduct(id, req.query);
@@ -99,9 +99,9 @@ exports.categoriesProduct = async (req, res) => {
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.subCategoriesProduct = async (req, res) => {
+exports.subCategoriesProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
     try {
         const result = await productService.getSubCategoriesProduct(id, req.query);
@@ -109,9 +109,9 @@ exports.subCategoriesProduct = async (req, res) => {
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.subSubCategoriesProduct = async (req, res) => {
+exports.subSubCategoriesProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
     try {
         const result = await productService.getSubSubCategoriesProduct(id, req.query);
@@ -119,9 +119,9 @@ exports.subSubCategoriesProduct = async (req, res) => {
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
-exports.similarProducts = async (req, res) => {
+exports.similarProducts = asyncHandler(async (req, res) => {
     const { product_type_id, id } = req.query;
     try {
         const result = await productService.getSimilarProducts(product_type_id, id);
@@ -129,11 +129,11 @@ exports.similarProducts = async (req, res) => {
     } catch (error) {
         return handleServiceError(res, error);
     }
-};
+});
 
 // ─── Review functions (kept inline — small, no dedicated service) ─
 
-exports.addReview = async (req, res) => {
+exports.addReview = asyncHandler(async (req, res) => {
     try {
         const {
             name,
@@ -196,9 +196,9 @@ exports.addReview = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.categoryImages = async (req, res) => {
+exports.categoryImages = asyncHandler(async (req, res) => {
     try {
         const { id, type } = req.body;
 
@@ -239,9 +239,9 @@ exports.categoryImages = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.review = async (req, res) => {
+exports.review = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -279,9 +279,9 @@ exports.review = async (req, res) => {
         logger.error({ err: error }, "Error fetching reviews:");
         res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.UserReview = async (req, res) => {
+exports.UserReview = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const user_id = req.user._id;
 
@@ -323,4 +323,4 @@ exports.UserReview = async (req, res) => {
         logger.error({ err: error }, "Error fetching reviews:");
         res.status(500).json({ error: error.message });
     }
-};
+});

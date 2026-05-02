@@ -3,19 +3,18 @@
  * Handles user profile, orders, payment history, reviews.
  */
 const userService = require('../../../services/userService');
-const { wrap, paginated } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { wrap } = require('../_shared/responseEnvelope');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 
-exports.getProfile = async (req, res) => {
+exports.getProfile = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getProfile(req.user._id);
         return res.status(200).json(wrap(result.user));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getOrders = async (req, res) => {
+exports.getOrders = asyncHandler(async (req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
@@ -27,61 +26,47 @@ exports.getOrders = async (req, res) => {
             delivered_orders: result.delivered_orders,
             canceled_orders: result.canceled_orders,
         }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getOrder = async (req, res) => {
+exports.getOrder = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getOrder(req.user._id, req.params.id);
         return res.status(200).json(wrap({ orders: result.orders }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getPaymentHistory = async (req, res) => {
+exports.getPaymentHistory = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getPaymentHistory(req.user._id);
         return res.status(200).json(wrap({ history: result.history }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getSinglePaymentHistory = async (req, res) => {
+exports.getSinglePaymentHistory = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getSinglePaymentHistory(req.user._id, req.params.id);
         return res.status(200).json(wrap({ history: result.history }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getDashboard = async (req, res) => {
+exports.getDashboard = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getDashboard(req.user._id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getReviews = async (req, res) => {
+exports.getReviews = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getUserReviews(req.user._id);
         return res.status(200).json(wrap({ products: result.products }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getTabbyBuyerHistory = async (req, res) => {
+exports.getTabbyBuyerHistory = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getTabbyBuyerHistory(req.user._id, req.user.createdAt);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

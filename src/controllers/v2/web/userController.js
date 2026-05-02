@@ -3,10 +3,11 @@
  */
 const userService = require('../../../services/userService');
 const { wrap } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 
-exports.getProfile = async (req, res) => {
+exports.getProfile = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getProfile(req.user._id);
         const u = result.user;
@@ -20,12 +21,10 @@ exports.getProfile = async (req, res) => {
             provider: u.authProvider,
             coupon: result.coupon,
         }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getOrders = async (req, res) => {
+exports.getOrders = asyncHandler(async (req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
@@ -37,66 +36,52 @@ exports.getOrders = async (req, res) => {
             delivered_orders: result.delivered_orders,
             canceled_orders: result.canceled_orders,
         }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getOrder = async (req, res) => {
+exports.getOrder = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getOrder(req.user._id, req.params.id);
         return res.status(200).json(wrap({ orders: result.orders }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getPaymentHistory = async (req, res) => {
+exports.getPaymentHistory = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getPaymentHistory(req.user._id);
         return res.status(200).json(wrap({ history: result.history }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getSinglePaymentHistory = async (req, res) => {
+exports.getSinglePaymentHistory = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getSinglePaymentHistory(req.user._id, req.params.id);
         return res.status(200).json(wrap({ history: result.history }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getDashboard = async (req, res) => {
+exports.getDashboard = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getDashboard(req.user._id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getReviews = async (req, res) => {
+exports.getReviews = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getUserReviews(req.user._id);
         return res.status(200).json(wrap({ products: result.products }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getCurrentMonthCategories = async (req, res) => {
+exports.getCurrentMonthCategories = asyncHandler(async (req, res) => {
     try {
         const result = await userService.getCurrentMonthOrderCategories();
         return res.status(200).json(wrap(result.data, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.addReview = async (req, res) => {
+exports.addReview = asyncHandler(async (req, res) => {
     try {
         const { name, description, title, product_id, quality_rating, value_rating, price_rating } = req.body;
         const filePath = req.file ? `${FRONTEND_BASE_URL}/${req.file.path.replace(/\\/g, '/')}` : undefined;
@@ -108,7 +93,5 @@ exports.addReview = async (req, res) => {
             priceRating: price_rating,
         }, filePath);
         return res.status(200).json(wrap({ reviews: result.reviews }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

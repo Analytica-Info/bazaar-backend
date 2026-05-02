@@ -10,8 +10,9 @@ const axios = require('axios');
 const logger = require("../../utilities/logger");
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
 const API_KEY = process.env.API_KEY;
+const { asyncHandler } = require('../../middleware');
 
-exports.appleCallback = async (req, res) => {
+exports.appleCallback = asyncHandler(async (req, res) => {
     try {
         const user_id = req.user._id;
 
@@ -24,9 +25,9 @@ exports.appleCallback = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
-};
+});
 
-exports.appleLogin = async (req, res) => {
+exports.appleLogin = asyncHandler(async (req, res) => {
     try {
         const { idToken, name, fcmToken } = req.body;
         const deviceInfo = {
@@ -58,9 +59,9 @@ exports.appleLogin = async (req, res) => {
         const status = error.status || 500;
         return res.status(status).json({ message: error.message || 'Apple login failed' });
     }
-};
+});
 
-exports.googleLogin = async (req, res) => {
+exports.googleLogin = asyncHandler(async (req, res) => {
     try {
         const { tokenId, accessToken, fcmToken } = req.body;
         const userAgent = req.headers['user-agent'] || '';
@@ -93,9 +94,9 @@ exports.googleLogin = async (req, res) => {
         const status = error.status || 500;
         return res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.register = async (req, res) => {
+exports.register = asyncHandler(async (req, res) => {
     try {
         const { name, email, phone, password } = req.body;
 
@@ -117,9 +118,9 @@ exports.register = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error', existingUser: error.existingUser });
     }
-};
+});
 
-exports.login = async (req, res) => {
+exports.login = asyncHandler(async (req, res) => {
     try {
         const { email, password, fcmToken } = req.body;
         const deviceInfo = {
@@ -151,9 +152,9 @@ exports.login = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.getUserData = async (req, res) => {
+exports.getUserData = asyncHandler(async (req, res) => {
     try {
         const result = await authService.getUserData(req.user._id, 'mobile');
 
@@ -168,9 +169,9 @@ exports.getUserData = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.forgotPassword = async (req, res) => {
+exports.forgotPassword = asyncHandler(async (req, res) => {
     try {
         const { email } = req.body;
         await authService.forgotPassword(email);
@@ -180,9 +181,9 @@ exports.forgotPassword = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.verifyCode = async (req, res) => {
+exports.verifyCode = asyncHandler(async (req, res) => {
     try {
         const { email, code } = req.body;
         await authService.verifyCode(email, code);
@@ -192,9 +193,9 @@ exports.verifyCode = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = asyncHandler(async (req, res) => {
     try {
         const { email, code, new_password } = req.body;
         await authService.resetPassword(email, code, new_password, 'mobile');
@@ -204,9 +205,9 @@ exports.resetPassword = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.updatePassword = async (req, res) => {
+exports.updatePassword = asyncHandler(async (req, res) => {
     try {
         const { old_password, new_password } = req.body;
 
@@ -236,9 +237,9 @@ exports.updatePassword = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || "Server error" });
     }
-};
+});
 
-exports.refreshToken = async (req, res) => {
+exports.refreshToken = asyncHandler(async (req, res) => {
     try {
         const token = req.header("Authorization")?.replace("Bearer ", "");
         if (!token) {
@@ -252,9 +253,9 @@ exports.refreshToken = async (req, res) => {
         logger.error({ err: error }, 'Refresh Token Error:');
         return res.status(403).json({ message: error.message || 'Invalid or expired refresh token' });
     }
-};
+});
 
-exports.checkAccessToken = async (req, res) => {
+exports.checkAccessToken = asyncHandler(async (req, res) => {
     const accessToken = req.header("Authorization")?.replace("Bearer ", "");
     const refreshToken = req.header("Authorization-Refresh")?.replace("Bearer ", "");
 
@@ -270,9 +271,9 @@ exports.checkAccessToken = async (req, res) => {
         const status = error.status || 401;
         return res.status(status).json({ message: error.message || "Invalid access token" });
     }
-};
+});
 
-exports.userUpdate = async (req, res) => {
+exports.userUpdate = asyncHandler(async (req, res) => {
     try {
         const { name, email, phone } = req.body;
         const user_id = req.user._id;
@@ -285,9 +286,9 @@ exports.userUpdate = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.customerID = async (req, res) => {
+exports.customerID = asyncHandler(async (req, res) => {
     try {
         const { customerID } = req.body;
         const user_id = req.user._id;
@@ -309,9 +310,9 @@ exports.customerID = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
-};
+});
 
-exports.getCustomerID = async (req, res) => {
+exports.getCustomerID = asyncHandler(async (req, res) => {
     try {
         const user_id = req.user._id;
 
@@ -324,9 +325,9 @@ exports.getCustomerID = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
-};
+});
 
-exports.coupons = async (req, res) => {
+exports.coupons = asyncHandler(async (req, res) => {
     try {
         const couponCount = await CouponMobile.countDocuments();
         const newCouponCount = await CouponsCount.findOne();
@@ -342,9 +343,9 @@ exports.coupons = async (req, res) => {
             message: "An error occurred while fetching coupon count.",
         });
     }
-};
+});
 
-exports.createCoupon = async (req, res) => {
+exports.createCoupon = asyncHandler(async (req, res) => {
     try {
         const { name, phone } = req.body;
         const user_id = req.user._id;
@@ -489,7 +490,7 @@ exports.createCoupon = async (req, res) => {
             message: "Error creating coupon.",
         });
     }
-};
+});
 
 const generateCouponCode = async () => {
     try {
@@ -515,7 +516,7 @@ const generateCouponCode = async () => {
     }
 };
 
-exports.checkCouponCode = async (req, res) => {
+exports.checkCouponCode = asyncHandler(async (req, res) => {
     const { couponCode, phone } = req.body;
 
     if (!couponCode) {
@@ -619,9 +620,9 @@ exports.checkCouponCode = async (req, res) => {
         logger.error({ err: error }, "Error checking coupon code:");
         return res.status(500).json({ message: "Internal server error." });
     }
-};
+});
 
-exports.deleteAccount = async (req, res) => {
+exports.deleteAccount = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         await authService.deleteAccount(userId, 'mobile');
@@ -632,9 +633,9 @@ exports.deleteAccount = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.verifyRecoveryCode = async (req, res) => {
+exports.verifyRecoveryCode = asyncHandler(async (req, res) => {
     try {
         const { email, recoveryCode, newPassword } = req.body;
         await authService.verifyRecoveryCode(email, recoveryCode, newPassword, 'mobile');
@@ -645,9 +646,9 @@ exports.verifyRecoveryCode = async (req, res) => {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Server error' });
     }
-};
+});
 
-exports.resendRecoveryCode = async (req, res) => {
+exports.resendRecoveryCode = asyncHandler(async (req, res) => {
     try {
         const { email } = req.body;
         const result = await authService.resendRecoveryCode(email);
@@ -665,9 +666,9 @@ exports.resendRecoveryCode = async (req, res) => {
             attemptsLeft: error.attemptsLeft,
         });
     }
-};
+});
 
-exports.getPaymentHistory = async (req, res) => {
+exports.getPaymentHistory = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const userCreatedAt = req.user.createdAt;
@@ -685,7 +686,7 @@ exports.getPaymentHistory = async (req, res) => {
             error: error.message,
         });
     }
-};
+});
 
 const fetchCouponDetails = async (id) => {
     try {

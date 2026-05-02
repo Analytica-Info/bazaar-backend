@@ -2,109 +2,91 @@
  * V2 Mobile Order Controller (BFF layer)
  */
 const orderService = require('../../../services/orderService');
-const { wrap, paginated, wrapError } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { wrap, paginated } = require('../_shared/responseEnvelope');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
+const { BadRequestError } = require('../../../services/_kernel/errors');
 const logger = require('../../../utilities/logger');
 
-exports.getOrders = async (req, res) => {
+exports.getOrders = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
         const result = await orderService.getOrders(userId, { page, limit });
         return res.status(200).json(paginated(result.orders, result.total, result.page, result.limit));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.validateInventory = async (req, res) => {
+exports.validateInventory = asyncHandler(async (req, res) => {
     try {
         const { products } = req.body;
         const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Mobile App Backend');
         return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.checkoutStripe = async (req, res) => {
+exports.checkoutStripe = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.createStripeCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
         return res.status(200).json(wrap({ orderId: result.orderId }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.checkoutTabby = async (req, res) => {
+exports.checkoutTabby = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.createTabbyCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
         return res.status(200).json(wrap({ paymentId: result.paymentId, status: result.status }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.verifyTabby = async (req, res) => {
+exports.verifyTabby = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.verifyTabbyPayment(req.query.paymentId, req.user._id);
         return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.checkoutNomod = async (req, res) => {
+exports.checkoutNomod = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.createNomodCheckoutSession(req.user._id, req.body, { fcmToken: req.user?.fcmToken || null });
         return res.status(200).json(wrap({ paymentId: result.paymentId, status: result.status }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.verifyNomod = async (req, res) => {
+exports.verifyNomod = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.verifyNomodPayment(req.query.paymentId, req.user._id);
         return res.status(200).json(wrap({ finalStatus: result.finalStatus || null }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.initStripePayment = async (req, res) => {
+exports.initStripePayment = asyncHandler(async (req, res) => {
+    const { amountAED } = req.body;
+    if (!amountAED || isNaN(amountAED) || Number(amountAED) <= 0) {
+        throw new BadRequestError('amountAED is required and must be a positive number');
+    }
     try {
-        const { amountAED } = req.body;
-        if (!amountAED || isNaN(amountAED) || Number(amountAED) <= 0) {
-            return res.status(400).json(wrapError('BAD_REQUEST', 'amountAED is required and must be a positive number'));
-        }
         const result = await orderService.initStripePayment(req.user._id, Number(amountAED));
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getPaymentMethods = async (req, res) => {
+exports.getPaymentMethods = asyncHandler(async (req, res) => {
     try {
         const methods = await orderService.getPaymentMethods();
         return res.status(200).json(wrap({ methods }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.getAddress = async (req, res) => {
+exports.getAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.getAddresses(req.user._id);
         return res.status(200).json(wrap({ address: result.address, flag: result.flag }));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.storeAddress = async (req, res) => {
+exports.storeAddress = asyncHandler(async (req, res) => {
     try {
         const b = req.body;
         const allowed = {
@@ -116,37 +98,29 @@ exports.storeAddress = async (req, res) => {
         };
         const result = await orderService.storeAddress(req.user._id, allowed);
         return res.status(200).json(wrap({ addresses: result.addresses }, result.message));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.deleteAddress = async (req, res) => {
+exports.deleteAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.deleteAddress(req.user._id, req.params.addressId);
         return res.status(200).json(wrap({ addresses: result.addresses }, 'Address deleted successfully'));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.setPrimaryAddress = async (req, res) => {
+exports.setPrimaryAddress = asyncHandler(async (req, res) => {
     try {
         const result = await orderService.setPrimaryAddress(req.user._id, req.params.addressId);
         return res.status(200).json(wrap({ addresses: result.addresses }, 'Primary address set successfully'));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.updateOrderStatus = async (req, res) => {
+exports.updateOrderStatus = asyncHandler(async (req, res) => {
     try {
         const { orderId } = req.params;
         const { status } = req.body;
         const filePath = req.file ? req.file.path : null;
         const order = await orderService.updateOrderStatus(orderId, status, filePath, req.user._id);
         return res.status(200).json(wrap({ order }, 'Order status updated successfully'));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

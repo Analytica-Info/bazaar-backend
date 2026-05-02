@@ -13,10 +13,13 @@ const cookieParser = require("cookie-parser");
 function buildApp() {
   // Auth middleware is mocked globally in each contract test file.
   const v2Router = require("../../../../src/routes/v2");
+  const { errorHandler } = require("../../../../src/middleware");
   const app = express();
   app.use(cookieParser());
   app.use(express.json());
   app.use("/v2", v2Router);
+  // Global error handler — required for asyncHandler-migrated controllers.
+  app.use(errorHandler);
   return app;
 }
 

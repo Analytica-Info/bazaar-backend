@@ -3,7 +3,8 @@
  */
 const cartService = require('../../../services/cartService');
 const { wrap } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
+const { asyncHandler } = require('../../../middleware');
 
 const pickItemFields = (b) => ({
     product_id: b.product_id,
@@ -19,49 +20,39 @@ const pickItemFields = (b) => ({
     variantPrice: b.variantPrice,
 });
 
-exports.getCart = async (req, res) => {
+exports.getCart = asyncHandler(async (req, res) => {
     try {
         const result = await cartService.getCart(req.user._id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.addToCart = async (req, res) => {
+exports.addToCart = asyncHandler(async (req, res) => {
     try {
         const result = await cartService.addToCart(req.user._id, pickItemFields(req.body));
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.removeFromCart = async (req, res) => {
+exports.removeFromCart = asyncHandler(async (req, res) => {
     try {
         const result = await cartService.removeFromCart(req.user._id, req.body.product_id);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.increaseQty = async (req, res) => {
+exports.increaseQty = asyncHandler(async (req, res) => {
     try {
         const qty = Number(req.body.qty) || 1;
         const result = await cartService.increaseQty(req.user._id, req.body.product_id, qty);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});
 
-exports.decreaseQty = async (req, res) => {
+exports.decreaseQty = asyncHandler(async (req, res) => {
     try {
         const qty = Number(req.body.qty) || 1;
         const result = await cartService.decreaseQty(req.user._id, req.body.product_id, qty);
         return res.status(200).json(wrap(result));
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
+    } catch (e) { throw toDomainError(e); }
+});

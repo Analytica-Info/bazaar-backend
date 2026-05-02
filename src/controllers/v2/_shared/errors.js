@@ -4,6 +4,7 @@
  * using the standard v2 response envelope.
  */
 const { wrapError } = require('./responseEnvelope');
+const { DomainError, isDomainError } = require('../../../services/_kernel/errors');
 
 const HTTP_CODE_MAP = {
     400: 'BAD_REQUEST',
@@ -31,4 +32,30 @@ exports.handleError = (res, error) => {
         : (error.message || 'Internal server error');
     const details = isServerError && isProd ? undefined : error.data;
     return res.status(status).json(wrapError(code, message, details));
+};
+
+/**
+ * Convert a service-layer plain-object error or any Error into a DomainError
+ * so it flows correctly through the global errorHandler.
+ *
+ * Service layer throws: { status, message, code?, data? }
+ * This bridges those into typed DomainErrors that errorHandler recognises.
+ *
+ * Usage (in asyncHandler-wrapped controllers):
+ *   } catch (err) { throw toDomainError(err); }
+ *
+ * @param {unknown} err
+ * @returns {DomainError}
+ */
+exports.toDomainError = (err) => {
+    if (isDomainError(err)) return err;
+    const status = (err && err.status) || 500;
+    const code = (err && err.code) || HTTP_CODE_MAP[status] || 'INTERNAL_ERROR';
+    const isProd = process.env.NODE_ENV === 'production';
+    const isServerError = status >= 500;
+    const message = (isServerError && isProd)
+        ? 'Internal server error'
+        : ((err && err.message) || 'Internal server error');
+    const details = (isServerError && isProd) ? undefined : (err && err.data);
+    return new DomainError(message, status, code, details || null);
 };
