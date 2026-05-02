@@ -155,14 +155,14 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 `scripts/api-map/` for the extraction code.
 
 ### BUG-016 — bazaar-web calls /v2/recommendations/* but no backend routes exist (ORPHAN)
-- **Severity:** HIGH
+- **Severity:** HIGH (web side)
 - **Backend file:** n/a (no route registered under `/v2/recommendations`)
 - **Client(s) affected:** web (`bazaar-web/src/services/recommendations.js`)
-- **Status:** OPEN
-- **Symptom:** `recommendationsApi` calls five endpoints — `GET /v2/recommendations/trending`, `/for-you`, `/similar/:id`, `/frequently-bought/:id`, and `POST /v2/recommendations/events`. None are registered in `src/routes/v2/{web,shared,mobile}/index.js` or anywhere else.
-- **Impact:** Every recommendation widget on the storefront issues a 404. If the client swallows the error (likely from the surrounding try/catch in the service), users get an empty recommendations list; otherwise the page logs an error every time it mounts.
-- **Recommended fix:** Either (a) ship the recommendations BFF routes under `/v2/recommendations/*` (read endpoints + an events ingestion endpoint), or (b) feature-flag the client off until the backend exists.
-- **Source:** PR14 audit, `docs/api-map/MAP.md` ORPHAN row.
+- **Status:** OPEN — **client side, not backend.** Per project policy v2 is dev-only and clients should NOT be calling v2 yet. This file in `bazaar-web` is shipping prematurely (or is dead code that still imports). Either remove it from web, feature-flag it off, or confirm it's unreferenced.
+- **Symptom:** `recommendationsApi` calls five endpoints under `/v2/recommendations/*`. None are registered anywhere in the backend. v2 is intentionally dev-only (see BUG-026), so this client code shouldn't be live.
+- **Impact:** If any web page mounts these widgets in production, every recommendation request 404s. If the file is unreferenced, no runtime impact — just dead code carrying a false "uses v2" signal.
+- **Recommended action:** Web team — verify whether `recommendations.js` is imported by any rendered component. If yes, gate behind a feature flag and disable until v2 ships. If no, delete the file. Backend should NOT add these routes ahead of the broader v2 rollout.
+- **Source:** PR14 audit, `docs/api-map/MAP.md` ORPHAN row; reclassified per project owner.
 
 ### BUG-017 — bazaar-web calls POST /redeem-coupon without leading slash (works, but fragile)
 - **Severity:** LOW
@@ -254,15 +254,15 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Recommended fix:** Confirm and align.
 - **Source:** PR14 audit.
 
-### BUG-026 — All v2 routes are UNUSED by every shipping client (DRIFT debt)
-- **Severity:** MEDIUM (process), HIGH (long-term)
+### BUG-026 — All v2 routes are UNUSED by every shipping client (expected during dev)
+- **Severity:** N/A (intended state)
 - **Backend file:** `src/routes/v2/**`
 - **Client(s) affected:** web, admin, mobile
-- **Status:** OPEN (planned migration)
-- **Symptom:** PR14 cross-reference confirms 0 calls from `bazaar-web`, `Bazaar-Admin-Dashboard`, or `Bazaar-Mobile-App` to any `/v2/*` route. The entire BFF v2 surface (60 routes) currently exists only for the contract test suite.
-- **Impact:** v1 ecommerce + v1 mobile remain the production surfaces. The dual-stack burden grows every PR. The v2 contract tests do not protect any real user.
-- **Recommended fix:** Schedule client migration sprints — start with web (auth + cart + orders + user) and mobile auth. Track per-resource cutover in the V2 unification plan. Burn down v1 routes only after each client is confirmed off them.
-- **Source:** PR14 audit summary.
+- **Status:** **WONTFIX-FOR-NOW** — v2 is in active development. Client integration is intentionally deferred until backend modularization, scalability, and performance work is complete.
+- **Symptom:** PR14 cross-reference confirms 0 calls from `bazaar-web`, `Bazaar-Admin-Dashboard`, or `Bazaar-Mobile-App` to any `/v2/*` route. The 60 v2 routes exist only for the contract test suite.
+- **Impact:** None today — this is the planned phase. v1 remains the production surface during v2 hardening. The contract test suite locks the v2 shape so it doesn't drift while awaiting integration.
+- **Recommended action:** Do NOT route real client traffic to v2 yet. When backend modernization is complete, schedule client migration sprints — web (auth + cart + orders + user) and mobile auth first — and burn down v1 only after each client is confirmed off it.
+- **Source:** PR14 audit summary; reclassified per project owner.
 
 ### BUG-027 — 150+ v1 backend routes have no client caller (UNUSED)
 - **Severity:** MEDIUM (cleanup)
