@@ -6,25 +6,30 @@ module.exports = {
   collectCoverageFrom: [
     "src/services/**/*.js",
     "src/repositories/**/*.js",
-    "src/controllers/v2/**/*.js",
+    "src/controllers/**/*.js",
     "src/middleware/**/*.js",
     "src/helpers/**/*.js",
     "src/utilities/**/*.js",
     "src/utils/**/*.js",
     "!src/repositories/index.js",
+    "!src/controllers/ecommerce/seedController.js",
   ],
 
   coverageThreshold: {
-    // Global actuals after PR7 (coverage-summary): stmts=74.96%, branches=61.6%, funcs=77.78%, lines=75.86%
-    // New service coverage tests added for orderService, checkoutService, productService.
-    // Note: Node.js 24 V8 coverage does not instrument some long async function bodies
-    // (a known limitation). Code is exercised and assertions prove correctness.
-    // Thresholds set at PR7 actuals − 1pp to ratchet progress without false-failing CI.
+    // Global actuals after PR8 (jest threshold check): stmts=66.94%, branches=47.3%, funcs=66.48%, lines=67.71%
+    // Note: jest threshold check values differ from coverage-summary.json (72.6%/58.78%/74.67%/73.41%)
+    // because jest multi-project mode computes per-project coverage independently and the threshold
+    // "global" check uses the lower single-project (unit) result, not the merged total.
+    // PR8 adds v1 controller tests (18 ecommerce + 7 mobile + 2 shared controllers).
+    // Thresholds set at PR8 jest-check actuals − 1pp to ratchet progress without false-failing CI.
+    // PR9 merged-total actuals: lines=77.82%, stmts=76.88%, branches=61.55%, funcs=79.71%
+    // Jest threshold check uses single-project (unit) actuals (lower): lines=72.4%, stmts=71.95%, branches=54.31%, funcs=75%
+    // Thresholds ratcheted to jest-check actuals − 1pp.
     global: {
-      lines: 74,
-      statements: 73,
-      branches: 60,
-      functions: 76,
+      lines: 71,
+      statements: 70,
+      branches: 53,
+      functions: 74,
     },
     // --- PR7: services directory threshold (excl. payments/) ---
     // Actuals: lines=53.5%, branches=40.3%, funcs=56%, stmts=52.7%
@@ -35,6 +40,24 @@ module.exports = {
       statements: 51,
       branches: 38,
       functions: 54,
+    },
+    // --- PR9: publicController.js per-file threshold ---
+    // Actuals: lines=80.24%, stmts=79.17%, branches=58.95%, funcs=76.85%
+    // Thresholds at actual − 2pp.
+    './src/controllers/ecommerce/publicController.js': {
+      lines: 78,
+      statements: 77,
+      branches: 56,
+      functions: 74,
+    },
+    // --- PR9: controllers/ecommerce/ directory threshold ---
+    // Actuals: lines=86.65%, stmts=85.44%, branches=65.18%, funcs=86.50%
+    // Thresholds at actual − 2pp.
+    './src/controllers/ecommerce/': {
+      lines: 84,
+      statements: 83,
+      branches: 63,
+      functions: 84,
     },
     // --- Existing per-directory thresholds (unchanged from PR3/PR5) ---
     './src/services/payments/': {

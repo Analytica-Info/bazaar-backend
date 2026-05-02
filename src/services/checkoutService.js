@@ -1561,6 +1561,12 @@ exports.processCheckout = async (orderData, userId) => {
       payment_status: "pending",
       stripe_checkout_session_id: paymentIntent.id,
       orderfrom: 'Website',
+      txn_id: paymentIntent.id,
+      status: "pending",
+      amount_subtotal: (amount - shippingCost).toFixed(2),
+      amount_total: amount.toFixed(2),
+      discount_amount: "0",
+      payment_method: "stripe",
     });
 
     const orderDetails = cartData.map((item) => ({
