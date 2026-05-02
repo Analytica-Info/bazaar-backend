@@ -19,6 +19,7 @@ const fs = require("fs");
 const path = require("path");
 
 const logger = require("../utilities/logger");
+const clock = require("../utilities/clock");
 const API_KEY = process.env.API_KEY;
 const CATEGORIES_URL = process.env.CATEGORIES_URL;
 const BRANDS_URL = process.env.BRANDS_URL;
@@ -168,12 +169,12 @@ async function trackProductView(productId, userId = null) {
         product_id: productId,
         user_id: userId,
         views: 1,
-        lastViewedAt: new Date(),
+        lastViewedAt: clock.now(),
       });
     } else {
       await ProductView.updateOne(filter, {
         $inc: { views: 1 },
-        $set: { lastViewedAt: new Date() },
+        $set: { lastViewedAt: clock.now() },
       });
     }
   } catch (error) {

@@ -970,3 +970,95 @@ describe("orderService", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// getPaymentMethods — branch coverage
+// ---------------------------------------------------------------------------
+
+describe("orderService.getPaymentMethods", () => {
+  it("should always include stripe", async () => {
+    delete process.env.TABBY_AUTH_KEY;
+    delete process.env.NOMOD_ENABLED;
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "stripe")).toBe(true);
+  });
+
+  it("should include tabby when TABBY_AUTH_KEY is set", async () => {
+    process.env.TABBY_AUTH_KEY = "fake-key";
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "tabby")).toBe(true);
+  });
+
+  it("should include nomod when NOMOD_ENABLED=true and NOMOD_API_KEY set", async () => {
+    process.env.NOMOD_ENABLED = "true";
+    process.env.NOMOD_API_KEY = "fake-nomod-key";
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "nomod")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// storeAddress / deleteAddress / setPrimaryAddress edge cases
+// ---------------------------------------------------------------------------
+
+describe("orderService.storeAddress — not found", () => {
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new (require("mongoose")).Types.ObjectId().toString();
+    try {
+      await orderService.storeAddress(fakeId, {
+        address: "123",
+        city: "Dubai",
+        area: "Marina",
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+});
+
+describe("orderService.deleteAddress — edge cases", () => {
+  const User = require("../../src/models/User");
+
+  const makeUser2 = async (overrides = {}) =>
+    User.create({
+      name: "Del Addr",
+      email: `del-addr-${Date.now()}@test.com`,
+      phone: `0509${Date.now()}`.slice(0, 10),
+      password: "hashed",
+      ...overrides,
+    });
+
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.deleteAddress(fakeId, new mongoose.Types.ObjectId().toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+
+  it("should throw 404 when address not found on user", async () => {
+    const user = await makeUser2();
+    const fakeAddrId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.deleteAddress(user._id.toString(), fakeAddrId);
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+});
+
+describe("orderService.setPrimaryAddress — not found", () => {
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.setPrimaryAddress(fakeId, new mongoose.Types.ObjectId().toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+});

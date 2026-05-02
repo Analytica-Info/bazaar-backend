@@ -23,6 +23,7 @@ const { mapLimit } = require('async');
 const INVENTORY_CONCURRENCY = 5;
 const cache = require('../utilities/cache');
 const logger = require('../utilities/logger');
+const clock = require('../utilities/clock');
 const PendingPayment = require('../repositories').pendingPayments.rawModel();
 const PaymentProviderFactory = require('./payments/PaymentProviderFactory');
 const WEBURL = process.env.URL;
@@ -600,7 +601,7 @@ exports.updateOrderStatus = async (orderId, status, filePath, requestingUserId =
 
     order.orderTracks.push({
         status,
-        dateTime: new Date(),
+        dateTime: clock.now(),
         image: imagePath
     });
 
@@ -915,7 +916,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
 
     order.orderTracks.push({
         status: "Confirmed",
-        dateTime: new Date(),
+        dateTime: clock.now(),
         image: null,
     });
 
@@ -1035,7 +1036,7 @@ exports.createStripeCheckoutSession = async (userId, bodyData, metadata) => {
         }
     }
 
-    const currentDate = new Date();
+    const currentDate = clock.now();
     const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
     const day = deliveryDate.getDate();
     const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });
@@ -1700,7 +1701,7 @@ async function processPendingPayment(paymentId, payment) {
 
         order.orderTracks.push({
             status: "Confirmed",
-            dateTime: new Date(),
+            dateTime: clock.now(),
             image: null,
         });
 

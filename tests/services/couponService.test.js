@@ -2,6 +2,8 @@ require("../setup");
 const mongoose = require("mongoose");
 const Coupon = require("../../src/models/Coupon");
 const CouponsCount = require("../../src/models/CouponsCount");
+const BankPromoCode = require("../../src/models/BankPromoCode");
+const BankPromoCodeUsage = require("../../src/models/BankPromoCodeUsage");
 const User = require("../../src/models/User");
 
 // Mock external dependencies
@@ -14,7 +16,18 @@ jest.mock("../../src/utilities/emailHelper", () => ({
   getCcEmails: jest.fn().mockResolvedValue([]),
 }));
 
+const clock = require("../../src/utilities/clock");
 const couponService = require("../../src/services/couponService");
+
+const FROZEN = new Date('2026-05-01T00:00:00Z');
+
+function freezeClock(date = FROZEN) {
+  clock.setClock({
+    now:   () => new Date(date),
+    nowMs: () => new Date(date).getTime(),
+    today: () => new Date(date),
+  });
+}
 
 describe("couponService", () => {
   // ── getCouponCount ────────────────────────────────────────────
@@ -179,6 +192,144 @@ describe("couponService", () => {
       expect(result.success).toBe(true);
       expect(result.coupon).toBeDefined();
       expect(result.coupon.coupon).toMatch(/^DH\d+YHZXB$/);
+    });
+
+    it("creates coupon successfully when clock is frozen", async () => {
+      freezeClock();
+      await CouponsCount.create({ count: 100 });
+
+      const result = await couponService.createCoupon(
+        new mongoose.Types.ObjectId(),
+        { name: "Jane", phone: "+971509999999" }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.coupon.coupon).toMatch(/^DH\d+YHZXB$/);
+    });
+
+    afterEach(() => clock.resetClock());
+  });
+
+  // ── checkCouponCode — bank promo expiry matrix ─────────────────
+
+  describe("checkCouponCode — bank promo expiry", () => {
+    afterEach(() => clock.resetClock());
+
+    describe.each([
+      {
+        label: "expired yesterday",
+        expiryDaysOffset: -1,
+        expectedStatus: 400,
+        expectedMsg: /expired/i,
+      },
+    ])(
+      "when promo $label",
+      ({ expiryDaysOffset, expectedStatus, expectedMsg }) => {
+        it(`throws ${expectedStatus}`, async () => {
+          freezeClock();
+
+          const expiry = new Date(FROZEN);
+          expiry.setDate(expiry.getDate() + expiryDaysOffset);
+
+          await BankPromoCode.create({
+            code: "TESTBANK1",
+            discountPercent: 15,
+            capAED: 100,
+            expiryDate: expiry,
+            allowedBank: "TestBank",
+            active: true,
+          });
+
+          try {
+            await couponService.checkCouponCode("TESTBANK1", null, null);
+            fail("Expected error to be thrown");
+          } catch (err) {
+            expect(err.status).toBe(expectedStatus);
+            expect(err.message).toMatch(expectedMsg);
+          }
+        });
+      }
+    );
+
+    it("returns valid promo when expiry is in the future", async () => {
+      freezeClock();
+
+      const expiry = new Date(FROZEN);
+      expiry.setDate(expiry.getDate() + 1); // expires tomorrow
+
+      await BankPromoCode.create({
+        code: "FUTURE10",
+        discountPercent: 10,
+        capAED: 50,
+        expiryDate: expiry,
+        allowedBank: "AnyBank",
+        active: true,
+      });
+
+      const result = await couponService.checkCouponCode("FUTURE10", null, null);
+
+      expect(result.type).toBe("promo");
+      expect(result.discountPercent).toBe(10);
+    });
+
+    it("throws 400 when singleUsePerCustomer and user already used promo", async () => {
+      freezeClock();
+      const expiry = new Date(FROZEN);
+      expiry.setDate(expiry.getDate() + 1);
+
+      const promo = await BankPromoCode.create({
+        code: "SINGLEUSE",
+        discountPercent: 5,
+        capAED: 30,
+        expiryDate: expiry,
+        allowedBank: "ADCB",
+        active: true,
+        singleUsePerCustomer: true,
+      });
+
+      const userId = new mongoose.Types.ObjectId();
+      await BankPromoCodeUsage.create({ bankPromoCodeId: promo._id, userId });
+
+      try {
+        await couponService.checkCouponCode("SINGLEUSE", userId.toString(), null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already used/i);
+      }
+    });
+  });
+
+  describe("redeemCoupon", () => {
+    it("should throw 400 when coupon code is missing", async () => {
+      try {
+        await couponService.redeemCoupon(null, null, "0501234567");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should return valid when coupon matches phone", async () => {
+      await Coupon.create({
+        name: "Test User",
+        phone: "0501234567",
+        coupon: "MYCOUPON",
+        status: "unused",
+        userId: new mongoose.Types.ObjectId(),
+      });
+
+      const result = await couponService.redeemCoupon(null, "MYCOUPON", "0501234567");
+      expect(result.message).toMatch(/valid/i);
+    });
+
+    it("should throw 404 when coupon/phone mismatch", async () => {
+      try {
+        await couponService.redeemCoupon(null, "BADCODE", "0509999999");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
     });
   });
 });

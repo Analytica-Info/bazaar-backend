@@ -4,6 +4,7 @@ const OrderDetail = require('../repositories').orderDetails.rawModel();
 const FlashSale = require('../repositories').flashSales.rawModel();
 const mongoose = require('mongoose');
 const cache = require('../utilities/cache');
+const clock = require('../utilities/clock');
 
 // Shared TTL for smart-category reads — 5 minutes.
 // Short enough to feel fresh, long enough to absorb the per-minute request
@@ -65,7 +66,7 @@ const LIST_EXCLUDE_SELECT = [
     .join(" ");
 
 const getDubaiDateUTC = () => {
-    return new Date();
+    return clock.now();
 };
 
 /**
@@ -566,7 +567,7 @@ exports.getFlashSales = async ({ paginated, page, limit }) => {
         };
     }
 
-    const now = new Date();
+    const now = clock.now();
     const startDateTime = new Date(`${flashSale.startDay}T${flashSale.startTime}:00+04:00`);
     const endDateTime = new Date(`${flashSale.endDay}T${flashSale.endTime}:00+04:00`);
 

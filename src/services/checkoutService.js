@@ -19,6 +19,7 @@ const { logActivity } = require("../utilities/activityLogger");
 const { logBackendActivity } = require("../utilities/backendLogger");
 
 const logger = require("../utilities/logger");
+const clock = require("../utilities/clock");
 const year = new Date().getFullYear();
 const API_KEY = process.env.API_KEY;
 const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
@@ -56,7 +57,7 @@ async function resolveCheckoutDiscountAED({
   if (bankPromoId) {
     try {
       const promo = await BankPromoCode.findById(bankPromoId).lean();
-      if (promo && promo.active && new Date(promo.expiryDate) >= new Date()) {
+      if (promo && promo.active && new Date(promo.expiryDate) >= clock.now()) {
         return {
           discountAED: computeCartDiscountAED(
             subtotalBefore,
@@ -97,7 +98,7 @@ async function clearUserCart(user_id) {
 }
 
 function getUaeDateTime() {
-  const now = new Date();
+  const now = clock.now();
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Dubai",
@@ -1664,7 +1665,7 @@ exports.createNomodCheckout = async (req) => {
 
     const provider = PaymentProviderFactory.create('nomod');
     const checkout = await provider.createCheckout({
-      referenceId: `${userId}-${Date.now()}`,
+      referenceId: `${userId}-${clock.nowMs()}`,
       amount: totalAmount,
       currency,
       discount: discountAED,

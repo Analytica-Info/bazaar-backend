@@ -188,3 +188,323 @@ Thresholds set in jest.config.js:
 1. **Non-transactional writes**: MongoMemoryServer does not support replica sets; UnitOfWork falls back to no-transaction mode in CI. Real production deployments with a replica set ARE transactional, but this divergence means integration tests do not fully validate rollback atomicity. Consider adding a replica-set MongoMemoryServer instance for a dedicated transaction-safety test suite.
 2. **services (excl. payments) at 48% stmts**: The bulk of remaining gap is in email, CMS sync, and external-API-dependent services. These require heavier mocking and are deferred to a subsequent PR.
 3. **Duplicate `{"id":1}` index warning**: Unrelated to Cart/PendingPayment — originates from another model. Not yet identified or fixed.
+
+---
+
+# Coverage Baseline — PR4 (Clock Seam + Service Migrations)
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR3 Baseline | PR4 Result | Delta   |
+|-------------|-------------|------------|---------|
+| Statements  | 53.34%      | 55.65%     | +2.31%  |
+| Branches    | 40.39%      | 42.08%     | +1.69%  |
+| Functions   | 59.64%      | 63.05%     | +3.41%  |
+| Lines       | 54.30%      | 56.30%     | +2.00%  |
+
+All coverage thresholds in jest.config.js **pass** (unchanged from PR3).
+
+## Migrated Services — Individual Coverage
+
+| Service                  | Stmts  | Branches | Funcs  | Lines  |
+|--------------------------|--------|----------|--------|--------|
+| metricsService.js        | 89.87% | 88.13%   | 100%   | 89.60% |
+| couponService.js         | 57.48% | 44.18%   | 75%    | 56.79% |
+| smartCategoriesService.js| 54.58% | 38.93%   | 46.93% | 59.00% |
+| userService.js           | 73.78% | 52.32%   | 75.55% | 73.71% |
+| cartService.js           | 80.23% | 60.73%   | 81.81% | 83.33% |
+| checkoutService.js       | 23.67% | 21.12%   | 26%    | 24.18% |
+| orderService.js          | 32.17% | 24.48%   | 44.04% | 31.30% |
+| productService.js        | 35.03% | 27.92%   | 23.37% | 35.84% |
+| bankPromoCodeService.js  | 46.37% | 30%      | 63.63% | 53.33% |
+
+## Test Count
+
+| PR    | Suites | Tests | Skipped |
+|-------|--------|-------|---------|
+| PR1   | 52     | 731   | 3       |
+| PR2   | 63     | 850   | 3       |
+| PR3   | 66     | 882   | 3       |
+| PR4   | 68     | 921   | 3       |
+
+## New Files in PR4
+
+### Production
+- `src/utilities/clock.js` — Clock seam: `now()`, `nowMs()`, `today()`, `setClock()`, `resetClock()`
+
+### Tests
+- `tests/utilities/clock.test.js` — 16 tests: default/real behavior, setClock/resetClock, partial override, edge cases
+- `tests/services/metricsService.test.js` — 26 tests: all record* and get* functions with frozen clock and in-memory Redis stub
+
+### Scripts
+- `scripts/check-no-direct-time.js` — Lint script that flags `new Date()`, `Date.now(`, `setTimeout(`, `setInterval(` outside the allowlist
+
+### package.json script
+- `lint:no-direct-time` — `node scripts/check-no-direct-time.js`
+
+## Production Code Migrated
+
+Services where `new Date()` / `Date.now()` replaced with `clock.now()` / `clock.nowMs()`:
+
+| Service                | Sites migrated | Notes |
+|------------------------|---------------|-------|
+| metricsService.js      | 6             | currentMinute(), 4x timeline windows |
+| couponService.js       | 2             | promo expiry check, createCoupon validFrom |
+| userService.js         | 1             | getCurrentMonthOrderCategories window |
+| productService.js      | 2             | trackProductView lastViewedAt (create + update) |
+| checkoutService.js     | 3             | promo expiry guard, getUaeDateTime(), referenceId nowMs |
+| smartCategoriesService.js | 2          | getDubaiDateUTC(), flash sale active window |
+| orderService.js        | 4             | orderTracks dateTime (3 sites), currentDate delivery calc (2 sites — replace_all) |
+
+Deliberately NOT migrated (kept on real time per constraints):
+- Logging timestamps (`t: new Date()` in error log entries)
+- `year = new Date().getFullYear()` at module load (checkoutService.js, orderService.js)
+- `toLocaleString()` / `toLocaleDateString()` email template formatting (dozens of sites in orderService — visual, not test-critical)
+
+## lint:no-direct-time Stats
+
+- Total violations before PR4 migrations: ~144 call sites across src/
+- Violations remaining outside allowlist after PR4: 0 (allowlist covers non-migrated files)
+- Allowlist entries: 34 patterns (migrations, logging utilities, non-migrated controllers/helpers/models/middleware)
+
+## Production Bugs Found During PR4
+
+### MEDIUM: couponService expiry check uses strict `<` not `<=`
+**File**: `src/services/couponService.js`, `checkCouponCode()`
+**Symptom**: `if (expiry < now)` means a promo code that expires at exactly `now` is considered VALID (not expired). This is a subtle off-by-one. Discovered while writing `describe.each` expiry matrix.
+**Impact**: A promo code technically expired at the current millisecond is still accepted. Low real-world impact (millisecond window) but may surprise ops teams expecting strict expiry.
+**Status**: Documented, not fixed (behavior change requires product decision).
+
+## Handoff for PR5
+
+Services remaining to migrate (non-trivial call sites):
+
+| Service                  | Estimated sites | Notes |
+|--------------------------|----------------|-------|
+| orderService.js          | ~12             | locale-format email templates (many), dateTime already migrated |
+| checkoutService.js       | ~8              | year const (module-load, skip), locale email templates |
+| authService.js           | ~5              | token issuedAt, refresh windows |
+| adminService.js          | ~4              | report date ranges |
+| notificationService.js   | ~3              | scheduled delivery time |
+| productSyncService.js    | ~2              | sync timestamps |
+
+Also for PR5:
+- Controllers: adminController (Date.now filter window), authController (validFrom), userController (JWT iat/exp)
+- Helpers: sendPushNotification.js (6 sites, setTimeout delay)
+- Middleware: authMiddleware, authV2 (lastSeen updates)
+- Models: EmailConfig, Permission, Role (pre-save hooks)
+
+PR6: Wire `lint:no-direct-time` into `lint` script once all migrations are complete and allowlist trimmed to zero.
+
+---
+
+# Coverage Baseline — PR5 (Service Migrations + Coverage Gap-Fill)
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR4 Baseline | PR5 Result | Delta   |
+|-------------|-------------|------------|---------|
+| Statements  | 55.65%      | 63.7%      | +8.05%  |
+| Branches    | 42.08%      | 50.6%      | +8.52%  |
+| Functions   | 63.05%      | 69.2%      | +6.15%  |
+| Lines       | 56.30%      | 64.4%      | +8.10%  |
+
+All coverage thresholds in jest.config.js **pass**.
+
+## Per-Service Line Coverage
+
+| Service                    | PR4    | PR5    | Delta   |
+|----------------------------|--------|--------|---------|
+| checkoutService.js         | 24.2%  | 24.2%  | —       |
+| orderService.js            | 31.3%  | 32.6%  | +1.3%   |
+| productService.js          | 35.8%  | 43.9%  | +8.1%   |
+| authService.js             | ~50%   | 58.7%  | +8.7%   |
+| couponService.js           | 56.8%  | 63.0%  | +6.2%   |
+| smartCategoriesService.js  | 59.0%  | 72.0%  | +13.0%  |
+| productSyncService.js      | ~70%   | 72.1%  | +2.1%   |
+| adminService.js            | ~52%   | 75.1%  | +23.1%  |
+| contactService.js          | 77.8%  | 77.8%  | —       |
+| userService.js             | 73.7%  | 82.0%  | +8.3%   |
+| cartService.js             | 83.3%  | 83.3%  | —       |
+| newsletterService.js       | 84.6%  | 84.6%  | —       |
+| cmsService.js              | 87.3%  | 87.3%  | —       |
+| metricsService.js          | 89.6%  | 89.6%  | —       |
+| giftProductService.js      | 92.8%  | 92.8%  | —       |
+| shippingService.js         | 92.8%  | 92.8%  | —       |
+| bannerService.js           | ~39%   | 94.4%  | +55.4%  |
+| notificationService.js     | 94.9%  | 94.9%  | —       |
+| wishlistService.js         | 95.8%  | 95.8%  | —       |
+| bankPromoCodeService.js    | 53.3%  | 96.7%  | +43.4%  |
+| emailConfigService.js      | ~40%   | 100%   | +60%    |
+| permissionService.js       | ~48%   | 100%   | +52%    |
+| roleService.js             | ~54%   | 100%   | +46%    |
+
+## Test Count
+
+| PR    | Suites | Tests | Skipped |
+|-------|--------|-------|---------|
+| PR1   | 52     | 731   | 3       |
+| PR2   | 63     | 850   | 3       |
+| PR3   | 66     | 882   | 3       |
+| PR4   | 68     | 921   | 3       |
+| PR5   | 68     | 1094  | 3       |
+
+## Production Code Migrated in PR5
+
+Services where `new Date()` / `Date.now()` replaced with clock seam:
+
+| Service                | Sites migrated | Notes |
+|------------------------|---------------|-------|
+| authService.js         | ~12           | token expiry, session lastUsed, password reset expires, deletedAt |
+| adminService.js        | 6             | resetPasswordExpires (set + check), updatedAt, blockedAt, deletedAt, getUaeDateTime |
+| notificationService.js | 1             | getUaeDateTime |
+| contactService.js      | 2             | timestamp: clock.now(), toLocaleString |
+| productSyncService.js  | 2             | date = clock.now(), toLocaleString |
+| cmsService.js          | 11            | all ?v=Date.now() cache-busting URLs |
+
+## Allowlist Changes
+
+Removed 17 service patterns from `scripts/check-no-direct-time.js` allowlist after migration.
+Remaining allowlist: 20 patterns (payments/, clock.js, loggers, server.js, config/, scripts/, workers/, cache.js, orderService, checkoutService, controllers/, helpers/, middleware/, models/, fileUpload.js).
+
+## Services at ≥80% Lines in PR5
+
+roleService (100%), permissionService (100%), emailConfigService (100%), bankPromoCodeService (96.7%), wishlistService (95.8%), notificationService (94.9%), bannerService (94.4%), shippingService (92.8%), giftProductService (92.8%), metricsService (89.6%), cmsService (87.3%), newsletterService (84.6%), cartService (83.3%), userService (82.0%)
+
+## Services Still Below 80% (targets for PR6)
+
+| Service            | PR5 Lines | Gap to 80% | Notes |
+|--------------------|-----------|------------|-------|
+| checkoutService    | 24.2%     | 55.8%      | Large external API dependencies (Stripe, Tabby, Nomod, order creation pipeline) |
+| orderService       | 32.6%     | 47.4%      | Complex locale-format email templates, external APIs |
+| productService     | 43.9%     | 36.1%      | Lightspeed API calls; getRandomProducts/getCategoriesProduct untestable without mock |
+| authService        | 58.7%     | 21.3%      | googleLogin/appleLogin need OAuth mock setup |
+| couponService      | 63.0%     | 17.0%      | UAE10 special code path calls external Lightspeed API |
+| smartCategoriesService | 72.0% | 8.0%      | getHotOffers branches, large DB-query-heavy paths |
+| productSyncService | 72.1%     | 7.9%       | Lightspeed webhook processing paths |
+| adminService       | 75.1%     | 4.9%       | getBackendLogs, getBackendLogByDate, exportProductAnalytics remaining |
+
+## lint:no-direct-time
+
+`node scripts/check-no-direct-time.js` → clean (0 violations, 20 allowlisted patterns).
+
+---
+
+# Coverage Baseline — PR6 (Middleware/Helpers/Utilities + Threshold Ratchet)
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR5 Baseline | PR6 Result | Delta   |
+|-------------|-------------|------------|---------|
+| Statements  | 63.7%       | 65.4%      | +1.7%   |
+| Branches    | 50.6%       | 52.2%      | +1.6%   |
+| Functions   | 69.2%       | 70.5%      | +1.3%   |
+| Lines       | 64.4%       | 66.1%      | +1.7%   |
+
+> **Note on 80% gap**: Global coverage landed at 65.4% rather than 80%.
+> The gap is real and documented below. It was not inflated with no-op tests.
+
+All coverage thresholds in jest.config.js **pass**.
+
+## Per-Directory Coverage (PR6)
+
+| Directory           | Stmts  | Branches | Funcs  | Lines  | Notes |
+|---------------------|--------|----------|--------|--------|-------|
+| controllers/v2      | 63.9%  | 54.2%    | 64.6%  | 63.7%  | Mobile still below 80% |
+| helpers             | 67.2%  | 44.6%    | 63.9%  | 67.2%  | sendPushNotification partial (Firebase) |
+| middleware          | 97.1%  | 87.4%    | 90.9%  | 97.1%  | NEW — 6 test files |
+| repositories        | 92.8%  | 81.1%    | 97.8%  | 95.6%  | Unchanged |
+| services            | 61.9%  | 49.3%    | 65.9%  | 62.7%  | orderService/checkoutService drag |
+| utilities           | 96.6%  | 89.2%    | 96.9%  | 98.7%  | NEW — cache/activityLogger/backendLogger/emailHelper/stringUtils/fileUpload/excelParser |
+| utils               | 100%   | 100%     | 100%   | 100%   | NEW — deleteOldFile |
+
+## Thresholds Set in jest.config.js
+
+| Scope                  | Stmts | Branches | Funcs | Lines |
+|------------------------|-------|----------|-------|-------|
+| global                 | 60    | 48       | 64    | 61    |
+| src/services/payments/ | 94    | 59       | 94    | 97    |
+| src/repositories/      | 90    | 79       | 95    | 93    |
+| src/controllers/v2/    | 62    | 46       | 62    | 62    |
+| src/middleware/        | 95    | 82       | 88    | 95    |
+| src/utilities/         | 94    | 84       | 94    | 96    |
+| src/utils/             | 98    | 80       | 98    | 98    |
+| src/helpers/           | 65    | 39       | 61    | 65    |
+
+## Test Count
+
+| PR    | Suites | Tests | Skipped |
+|-------|--------|-------|---------|
+| PR1   | 52     | 731   | 3       |
+| PR2   | 63     | 850   | 3       |
+| PR3   | 66     | 882   | 3       |
+| PR4   | 68     | 921   | 3       |
+| PR5   | 68     | 1094  | 3       |
+| PR6   | 84     | 1257  | 3       |
+
+## New Test Files Added in PR6
+
+| File                                              | Tests | Surface |
+|---------------------------------------------------|-------|---------|
+| tests/middleware/_helpers/mocks.js                | —     | Shared req/res/next factory |
+| tests/middleware/platform.test.js                 | 11    | Platform middleware |
+| tests/middleware/requestMetricsMiddleware.test.js | 4     | Metrics middleware |
+| tests/middleware/authV2.test.js                   | 13    | V2 auth (required + optional) |
+| tests/middleware/adminMiddleware.test.js           | 6     | Admin auth |
+| tests/middleware/permissionMiddleware.test.js      | 13    | checkPermission + checkAnyPermission |
+| tests/utilities/cache.test.js                     | 33    | All cache ops (get/set/del/delPattern/getOrSet) |
+| tests/utilities/stringUtils.test.js               | 21    | escapeRegex table-driven |
+| tests/utilities/activityLogger.test.js            | 7     | logActivity |
+| tests/utilities/backendLogger.test.js             | 6     | logBackendActivity |
+| tests/utilities/emailHelper.test.js               | 10    | getAdminEmail + getCcEmails |
+| tests/utilities/fileUpload.test.js                | 7     | fileFilter + storage destination |
+| tests/utilities/excelParser.test.js               | 4     | parseExcelFile (xlsx mocked) |
+| tests/helpers/validator.test.js                   | 14    | isValidPassword table-driven |
+| tests/helpers/verifyEmail.test.js                 | 4     | verifyEmailWithVeriEmail |
+| tests/helpers/sendPushNotification.test.js        | 7     | sendNotificationToUsers + checkAndSendScheduled |
+| tests/utils/deleteOldFile.test.js                 | 7     | deleteOldFile |
+
+## Infrastructure Changes in PR6
+
+- **jest.config.js**: Added `src/middleware/**`, `src/helpers/**`, `src/utilities/**`, `src/utils/**` to `collectCoverageFrom`; added `tests/middleware/**` and `tests/utils/**` to unit project `testMatch`; ratcheted global and per-directory thresholds
+- **package.json**: `"lint"` now chains `check-no-direct-model-imports.js && check-no-direct-time.js`
+
+## Gap Analysis — Why 80% Global Was Not Reached
+
+The 14.6pp gap to 80% is entirely concentrated in services and controllers:
+
+| Directory        | Lines  | Missed stmts | Notes |
+|------------------|--------|-------------|-------|
+| services/orderService.js    | 32.6%  | 573 | Complex email templates, Lightspeed API, multi-step order pipeline |
+| services/checkoutService.js | 24.2%  | 474 | Full Stripe/Tabby/Nomod checkout flows; external API-heavy |
+| services/productService.js  | 43.9%  | 321 | Lightspeed sync, getRandomProducts, catalog update paths |
+| services/authService.js     | 58.7%  | 234 | googleLogin/appleLogin require OAuth mock infra |
+| helpers/sendPushNotification.js | 67%  | 164 | Firebase initialization requires service account file; retry loop with real setTimeout |
+
+These files require either:
+1. Heavy external API mocking (Lightspeed, OAuth, Firebase) — doable but scope-creep
+2. Refactoring to make units more testable (extracting email rendering, separating I/O from logic)
+
+## Production Bugs Found During PR6
+
+None — the new surface (middleware, utilities, helpers) tests confirmed behavior matches expectations. The `sendPushNotification` retry logic was verified to behave correctly when the lock is not acquired.
+
+## lint:no-direct-time
+
+`npm run lint` → clean (0 violations). Allowlist: 20 patterns.
+
+## Future PRs
+
+1. **Lightspeed API mock harness** — Mock the Lightspeed webhook/sync calls to cover productSyncService (72%) and productService (44%). Estimated +5pp global.
+2. **OAuth mock infra** — Mock google-auth-library and apple-signin-auth to cover authService social login paths (currently at 58%). Estimated +2pp global.
+3. **checkoutService + orderService deep coverage** — These two files alone account for 1,047 missed statements. Covering them to 80% would add +14pp global. Requires mocking the full payment pipeline per provider.
+4. **Replica-set integration tests** — Validate UnitOfWork transaction rollback atomicity in a real replica-set MongoMemoryServer instance.

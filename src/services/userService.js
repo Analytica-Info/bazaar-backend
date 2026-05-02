@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const repos = require('../repositories');
 const cache = require('../utilities/cache');
+const clock = require('../utilities/clock');
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -260,7 +261,7 @@ exports.getDashboard = async (userId) => {
  * Get current month's top 5 order categories.
  */
 exports.getCurrentMonthOrderCategories = async () => {
-    const now = new Date();
+    const now = clock.now();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 

@@ -8,6 +8,7 @@ const { sendEmail } = require("../mail/emailService");
 const { getAdminEmail, getCcEmails } = require("../utilities/emailHelper");
 
 const logger = require("../utilities/logger");
+const clock = require("../utilities/clock");
 const API_KEY = process.env.API_KEY;
 const WEBURL = process.env.URL;
 
@@ -197,7 +198,7 @@ exports.checkCouponCode = async (code, userId, cartData) => {
       active: true,
     }).lean();
     if (promoCode) {
-      const now = new Date();
+      const now = clock.now();
       const expiry = new Date(promoCode.expiryDate);
       if (expiry < now) {
         throw {
@@ -374,7 +375,7 @@ exports.createCoupon = async (userId, data) => {
     const couponCode = await generateCouponCode();
 
     const discount = 10;
-    const validFrom = new Date();
+    const validFrom = clock.now();
     const validUntil = new Date(validFrom);
     validUntil.setMonth(validFrom.getMonth() + 1);
 

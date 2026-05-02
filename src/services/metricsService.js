@@ -19,6 +19,7 @@
 
 const { getClient, isEnabled } = require('../config/redis');
 const logger = require('../utilities/logger');
+const clock = require('../utilities/clock');
 
 const NAMESPACE = 'bazaar:';
 const COUNTER_TTL = 60 * 60 * 3; // 3 hours
@@ -26,8 +27,7 @@ const ERROR_LOG_KEY = `${NAMESPACE}metrics:error-log`;
 const ERROR_LOG_CAP = 200;
 
 function currentMinute() {
-    const now = new Date();
-    return now.toISOString().slice(0, 16); // e.g. "2026-04-27T15:42"
+    return clock.now().toISOString().slice(0, 16); // e.g. "2026-04-27T15:42"
 }
 
 async function incr(key) {
@@ -87,7 +87,7 @@ async function getWebhookTimeline(windowMinutes = 120) {
     if (!client || !isEnabled()) return { minutes: [], series: {}, dedup: {} };
 
     try {
-        const now = new Date();
+        const now = clock.now();
         const minutes = [];
         for (let i = windowMinutes - 1; i >= 0; i--) {
             const d = new Date(now - i * 60 * 1000);
@@ -126,7 +126,7 @@ async function getErrorTimeline(windowMinutes = 120) {
     if (!client || !isEnabled()) return { minutes: [], counts: [] };
 
     try {
-        const now = new Date();
+        const now = clock.now();
         const minutes = [];
         for (let i = windowMinutes - 1; i >= 0; i--) {
             const d = new Date(now - i * 60 * 1000);
@@ -202,7 +202,7 @@ async function getRequestTimeline(windowMinutes = 120) {
     if (!client || !isEnabled()) return { minutes: [], series: {} };
 
     try {
-        const now = new Date();
+        const now = clock.now();
         const minutes = [];
         for (let i = windowMinutes - 1; i >= 0; i--) {
             const d = new Date(now - i * 60 * 1000);
@@ -249,7 +249,7 @@ async function getDiscountSyncTimeline(windowMinutes = 120) {
     if (!client || !isEnabled()) return { minutes: [], syncs: [], docs: [] };
 
     try {
-        const now = new Date();
+        const now = clock.now();
         const minutes = [];
         for (let i = windowMinutes - 1; i >= 0; i--) {
             const d = new Date(now - i * 60 * 1000);

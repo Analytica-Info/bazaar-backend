@@ -6,13 +6,14 @@ const { logBackendActivity } = require('../utilities/backendLogger');
 
 const logger = require("../utilities/logger");
 const { escapeRegex } = require("../utilities/stringUtils");
+const clock = require('../utilities/clock');
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function getUaeDateTime() {
-    const now = new Date();
+    const now = clock.now();
     const formatter = new Intl.DateTimeFormat("en-US", {
         timeZone: "Asia/Dubai",
         year: "numeric",

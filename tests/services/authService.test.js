@@ -922,3 +922,142 @@ describe('authService.checkAccessToken', () => {
         expect(result.refreshToken).toBeDefined();
     });
 });
+
+// ---------------------------------------------------------------------------
+// Clock-frozen tests — token expiry windows
+// ---------------------------------------------------------------------------
+const clock = require('../../src/utilities/clock');
+
+describe('authService — frozen clock: reset password expiry', () => {
+    const FROZEN_MS = new Date('2026-05-01T12:00:00.000Z').getTime();
+    const FROZEN = new Date(FROZEN_MS);
+
+    beforeEach(() => {
+        clock.setClock({
+            now: () => new Date(FROZEN_MS),
+            nowMs: () => FROZEN_MS,
+        });
+    });
+    afterEach(() => {
+        clock.resetClock();
+    });
+
+    it('sets resetPasswordExpires to exactly now + 10 min when forgotPassword is called', async () => {
+        await makeUser({ email: 'frozen-forgot@example.com' });
+
+        await authService.forgotPassword('frozen-forgot@example.com');
+
+        const updated = await User.findOne({ email: 'frozen-forgot@example.com' });
+        const expectedExpiry = FROZEN_MS + 10 * 60 * 1000;
+        expect(new Date(updated.resetPasswordExpires).getTime()).toBe(expectedExpiry);
+    });
+
+    it('verifyCode throws 400 when clock is past resetPasswordExpires', async () => {
+        const jwt = require('jsonwebtoken');
+        const code = '123456';
+        const token = jwt.sign({ code }, process.env.JWT_SECRET, { expiresIn: '10m' });
+
+        const user = await makeUser({ email: 'frozen-verify@example.com' });
+        // Set expiry 1ms before the frozen clock
+        user.resetPasswordToken = token;
+        user.resetPasswordExpires = FROZEN_MS - 1;
+        await user.save();
+
+        await expect(
+            authService.verifyCode('frozen-verify@example.com', code)
+        ).rejects.toEqual(expect.objectContaining({ status: 400, message: expect.stringMatching(/expired/i) }));
+    });
+
+    it('verifyCode succeeds when clock is before resetPasswordExpires', async () => {
+        const jwt = require('jsonwebtoken');
+        const code = '654321';
+        const token = jwt.sign({ code }, process.env.JWT_SECRET, { expiresIn: '10m' });
+
+        const user = await makeUser({ email: 'frozen-verify-ok@example.com' });
+        user.resetPasswordToken = token;
+        user.resetPasswordExpires = FROZEN_MS + 60 * 1000; // 1 min future
+        await user.save();
+
+        await expect(
+            authService.verifyCode('frozen-verify-ok@example.com', code)
+        ).resolves.toEqual({});
+    });
+});
+
+describe('authService — frozen clock: recovery code expiry', () => {
+    const FROZEN_MS = new Date('2026-05-01T12:00:00.000Z').getTime();
+
+    beforeEach(() => {
+        clock.setClock({
+            now: () => new Date(FROZEN_MS),
+            nowMs: () => FROZEN_MS,
+        });
+    });
+    afterEach(() => {
+        clock.resetClock();
+    });
+
+    it('verifyRecoveryCode throws 400 when recovery code is expired', async () => {
+        const user = await makeUser({ email: 'frozen-recovery@example.com' });
+        user.recoveryCode = '999888';
+        user.recoveryCodeExpires = FROZEN_MS - 1; // 1ms before frozen clock
+        user.isDeleted = true;
+        await user.save();
+
+        await expect(
+            authService.verifyRecoveryCode('frozen-recovery@example.com', '999888', VALID_PASSWORD)
+        ).rejects.toEqual(expect.objectContaining({ status: 400, message: expect.stringMatching(/expired/i) }));
+    });
+
+    it('resendRecoveryCode sets recoveryCodeExpires to now + 15 min', async () => {
+        const user = await makeUser({ email: 'frozen-resend@example.com' });
+        user.isDeleted = true;
+        user.recoveryCode = '111222';
+        user.recoveryCodeExpires = FROZEN_MS + 60 * 1000;
+        user.recoveryAttempts = 0;
+        await user.save();
+
+        await authService.resendRecoveryCode('frozen-resend@example.com');
+
+        const updated = await User.findOne({ email: 'frozen-resend@example.com' });
+        const expectedExpiry = FROZEN_MS + 15 * 60 * 1000;
+        expect(new Date(updated.recoveryCodeExpires).getTime()).toBe(expectedExpiry);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// deleteAccount (platform-specific)
+// ---------------------------------------------------------------------------
+describe('authService.deleteAccount', () => {
+    it('should set deletedAt and return empty object for web platform', async () => {
+        const user = await makeUser({ email: 'del-web@example.com' });
+
+        await authService.deleteAccount(user._id.toString(), 'web');
+
+        const updated = await User.findById(user._id);
+        expect(updated.isDeleted).toBe(true);
+        expect(updated.deletedAt).toBeDefined();
+        expect(updated.deletedBy).toBe('user');
+    });
+
+    it('should set deletedAt for mobile platform without deletedBy=user', async () => {
+        const user = await makeUser({ email: 'del-mob@example.com' });
+
+        await authService.deleteAccount(user._id.toString(), 'mobile');
+
+        const updated = await User.findById(user._id);
+        expect(updated.isDeleted).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// deleteAccountPublic — additional edge cases
+// ---------------------------------------------------------------------------
+describe('authService.deleteAccountPublic — edge cases', () => {
+    it('throws when user is already deleted', async () => {
+        const user = await makeUser({ email: 'already-del-pub@example.com', isDeleted: true });
+        await expect(
+            authService.deleteAccountPublic(user.email, VALID_PASSWORD)
+        ).rejects.toEqual(expect.objectContaining({ status: 400 }));
+    });
+});

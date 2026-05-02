@@ -3,6 +3,7 @@ const { mapLimit } = require('async');
 const Product = require('../repositories').products.rawModel();
 const ProductId = require('../repositories').productIds.rawModel();
 const logger = require("../utilities/logger");
+const clock = require('../utilities/clock');
 const cache = require('../utilities/cache');
 const metrics = require('./metricsService');
 const {
@@ -51,7 +52,7 @@ function fixZeroTaxInclusive(product, variantsData) {
 // ---------------------------------------------------------------------------
 
 async function currentTime() {
-    const date = new Date();
+    const date = clock.now();
     const formatter = new Intl.DateTimeFormat('en-AE', {
         timeZone: 'Asia/Dubai',
         hour: '2-digit',
@@ -651,7 +652,7 @@ async function syncWebhookDiscounts() {
 
     const parentIds = [...new Set(rows.map(r => r.product?.id).filter(Boolean))];
 
-    const webhookTime = new Date().toLocaleString('en-US', {
+    const webhookTime = clock.now().toLocaleString('en-US', {
         timeZone: 'Asia/Dubai',
         hour12: true,
     });

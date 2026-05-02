@@ -15,6 +15,7 @@ const JWT_SECRET = require('../config/jwtSecret');
 const JWT_REFRESH_SECRET = require('../config/refreshJwtSecret');
 const { sendEmail } = require('../mail/emailService');
 const backendLogger = require('../utilities/backendLogger');
+const clock = require('../utilities/clock');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -38,7 +39,7 @@ const upsertSession = (user, { deviceId, userAgent, ip, fcmToken }, refreshToken
         session.refreshToken = refreshToken;
         session.userAgent = userAgent;
         session.ip = ip;
-        session.lastUsed = new Date();
+        session.lastUsed = clock.now();
         session.revokedAt = null;
         if (fcmToken) session.fcmToken = fcmToken;
     } else {
@@ -48,8 +49,8 @@ const upsertSession = (user, { deviceId, userAgent, ip, fcmToken }, refreshToken
             fcmToken: fcmToken || null,
             userAgent,
             ip,
-            createdAt: new Date(),
-            lastUsed: new Date(),
+            createdAt: clock.now(),
+            lastUsed: clock.now(),
             revokedAt: null
         });
         const MAX_SESSIONS = 10;
@@ -462,7 +463,7 @@ exports.register = async ({ name, email, phone, password, platform = 'web' }) =>
     if (existingUser && existingUser.isDeleted) {
         const recoveryCode = generateVerificationCode();
         existingUser.recoveryCode = recoveryCode;
-        existingUser.recoveryCodeExpires = Date.now() + 15 * 60 * 1000;
+        existingUser.recoveryCodeExpires = clock.nowMs() + 15 * 60 * 1000;
         await existingUser.save();
 
         sendRecoveryEmail(existingUser.email, recoveryCode);
@@ -1056,7 +1057,7 @@ exports.forgotPassword = async (email) => {
     sendforgotPasswordEmail(email, verificationCode);
 
     user.resetPasswordToken = token;
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpires = clock.nowMs() + 10 * 60 * 1000;
     await user.save();
 
     return {};
@@ -1072,7 +1073,7 @@ exports.verifyCode = async (email, code) => {
         throw { status: 404, message: 'User not found' };
     }
 
-    if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now()) {
+    if (!user.resetPasswordToken || user.resetPasswordExpires < clock.nowMs()) {
         throw { status: 400, message: 'Code expired or invalid' };
     }
 
@@ -1108,7 +1109,7 @@ exports.resetPassword = async (email, code, newPassword, platform = 'web') => {
         };
     }
 
-    if (!user.resetPasswordToken || user.resetPasswordExpires < Date.now()) {
+    if (!user.resetPasswordToken || user.resetPasswordExpires < clock.nowMs()) {
         throw { status: 400, message: 'Code expired or invalid' };
     }
 
@@ -1218,7 +1219,7 @@ exports.refreshToken = async (refreshTokenValue) => {
     });
 
     user.sessions[sessionIndex].refreshToken = newRefreshToken;
-    user.sessions[sessionIndex].lastUsed = new Date();
+    user.sessions[sessionIndex].lastUsed = clock.now();
     await user.save();
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
@@ -1269,7 +1270,7 @@ exports.checkAccessToken = async (accessTokenValue, refreshTokenValue) => {
             const newRefreshToken = jwt.sign({ id: user._id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
             user.sessions[sessionIndex].refreshToken = newRefreshToken;
-            user.sessions[sessionIndex].lastUsed = new Date();
+            user.sessions[sessionIndex].lastUsed = clock.now();
             await user.save();
 
             return {
@@ -1302,7 +1303,7 @@ exports.deleteAccount = async (userId, platform = 'web') => {
     }
 
     user.isDeleted = true;
-    user.deletedAt = new Date();
+    user.deletedAt = clock.now();
     if (platform === 'web') {
         user.deletedBy = 'user';
     }
@@ -1349,7 +1350,7 @@ exports.deleteAccountPublic = async (email, password) => {
     }
 
     user.isDeleted = true;
-    user.deletedAt = new Date();
+    user.deletedAt = clock.now();
     user.deletedBy = 'user';
     await user.save();
 
@@ -1375,7 +1376,7 @@ exports.verifyRecoveryCode = async (email, recoveryCode, newPassword, platform =
         throw { status: 400, message: 'Invalid recovery code.' };
     }
 
-    if (Date.now() > user.recoveryCodeExpires) {
+    if (clock.nowMs() > user.recoveryCodeExpires) {
         throw { status: 400, message: 'Recovery code has expired. Please request a new one.' };
     }
 
@@ -1416,7 +1417,7 @@ exports.resendRecoveryCode = async (email) => {
         throw { status: 400, message: 'No deleted account found with this email.' };
     }
 
-    const now = new Date();
+    const now = clock.now();
 
     if (
         user.lastRecoveryRequest &&
@@ -1435,7 +1436,7 @@ exports.resendRecoveryCode = async (email) => {
 
     const recoveryCode = generateVerificationCode();
     user.recoveryCode = recoveryCode;
-    user.recoveryCodeExpires = Date.now() + 15 * 60 * 1000;
+    user.recoveryCodeExpires = clock.nowMs() + 15 * 60 * 1000;
     user.recoveryAttempts += 1;
     user.lastRecoveryRequest = now;
 

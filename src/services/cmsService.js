@@ -16,6 +16,7 @@ const path = require("path");
 
 const logger = require("../utilities/logger");
 const cache = require("../utilities/cache");
+const clock = require('../utilities/clock');
 const BACKEND_URL = process.env.BACKEND_URL;
 
 // CMS content changes only via admin edits.
@@ -132,13 +133,13 @@ exports.updateCouponCms = async (data, files) => {
     if (logo) {
       deleteOldFile(couponCms.logo);
       const relativePath = `/uploads/cms/CouponForm/${logo.filename}`;
-      couponCms.logo = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      couponCms.logo = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     if (mrBazaarLogo) {
       deleteOldFile(couponCms.mrBazaarLogo);
       const relativePath = `/uploads/cms/CouponForm/${mrBazaarLogo.filename}`;
-      couponCms.mrBazaarLogo = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      couponCms.mrBazaarLogo = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await couponCms.save();
@@ -194,7 +195,7 @@ exports.updateHeader = async (data, files) => {
     if (logo) {
       deleteOldFile(headerInfo.logo);
       const relativePath = `/uploads/cms/HeaderInfo/${logo.filename}`;
-      headerInfo.logo = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      headerInfo.logo = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await headerInfo.save();
@@ -225,19 +226,19 @@ exports.updateSlider = async (data, files) => {
     if (sliderImage1) {
       deleteOldFile(sliderCms.sliderImage1);
       const relativePath = `/uploads/cms/SliderImages/${sliderImage1.filename}`;
-      sliderCms.sliderImage1 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      sliderCms.sliderImage1 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     if (sliderImage2) {
       deleteOldFile(sliderCms.sliderImage2);
       const relativePath = `/uploads/cms/SliderImages/${sliderImage2.filename}`;
-      sliderCms.sliderImage2 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      sliderCms.sliderImage2 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     if (sliderImage3) {
       deleteOldFile(sliderCms.sliderImage3);
       const relativePath = `/uploads/cms/SliderImages/${sliderImage3.filename}`;
-      sliderCms.sliderImage3 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      sliderCms.sliderImage3 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await sliderCms.save();
@@ -317,7 +318,7 @@ exports.updateOffers = async (data, files) => {
       }
 
       updatedOffersData[index] = {
-        offerImage: `${BACKEND_URL}/uploads/cms/Offers/${file.filename}?v=${Date.now()}`,
+        offerImage: `${BACKEND_URL}/uploads/cms/Offers/${file.filename}?v=${clock.nowMs()}`,
         offerCategory: categoriesArray[index] || "",
       };
     });
@@ -358,7 +359,7 @@ exports.updateCategoryImages = async (data, files) => {
       if (file) {
         deleteOldFile(categoryImagesCms[category]);
         const relativePath = `/uploads/cms/CategoryImages/${file.filename}`;
-        categoryImagesCms[category] = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+        categoryImagesCms[category] = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
       }
     }
 
@@ -410,13 +411,13 @@ exports.updateOfferFilter = async (data, files) => {
     if (Image1) {
       deleteOldFile(offerFilterCms.PriceRange1?.Image1);
       const relativePath = `/uploads/cms/OfferFilter/${Image1.filename}`;
-      offerFilterCms.PriceRange1.Image1 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      offerFilterCms.PriceRange1.Image1 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     if (Image2) {
       deleteOldFile(offerFilterCms.PriceRange2?.Image2);
       const relativePath = `/uploads/cms/OfferFilter/${Image2.filename}`;
-      offerFilterCms.PriceRange2.Image2 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      offerFilterCms.PriceRange2.Image2 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await offerFilterCms.save();
@@ -467,7 +468,7 @@ exports.updateFooter = async (data, files) => {
     if (logo) {
       deleteOldFile(footerInfoCms.logo);
       const relativePath = `/uploads/cms/FooterInfo/${logo.filename}`;
-      footerInfoCms.logo = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      footerInfoCms.logo = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await footerInfoCms.save();
@@ -511,7 +512,7 @@ exports.updateAbout = async (data, files) => {
     if (backgroundImage) {
       deleteOldFile(aboutCms.backgroundImage);
       const relativePath = `/uploads/cms/About/${backgroundImage.filename}`;
-      aboutCms.backgroundImage = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      aboutCms.backgroundImage = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await aboutCms.save();
@@ -543,13 +544,13 @@ exports.updateShop = async (data, files) => {
     if (Image1) {
       deleteOldFile(shopCms.Image1);
       const relativePath = `/uploads/cms/Shop/${Image1.filename}`;
-      shopCms.Image1 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      shopCms.Image1 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     if (Image2) {
       deleteOldFile(shopCms.Image2);
       const relativePath = `/uploads/cms/Shop/${Image2.filename}`;
-      shopCms.Image2 = `${BACKEND_URL}${relativePath}?v=${Date.now()}`;
+      shopCms.Image2 = `${BACKEND_URL}${relativePath}?v=${clock.nowMs()}`;
     }
 
     await shopCms.save();
@@ -609,7 +610,7 @@ exports.updateBrandsLogo = async (data, files) => {
     for (let i = 0; i < 20; i++) {
       const file = files?.[`logo${i}`] || null;
       if (file) {
-        updatedImages[i] = `${BACKEND_URL}/uploads/cms/BrandsLogo/${file.filename}?v=${Date.now()}`;
+        updatedImages[i] = `${BACKEND_URL}/uploads/cms/BrandsLogo/${file.filename}?v=${clock.nowMs()}`;
       }
     }
 

@@ -6,7 +6,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "build": "echo 'No build step required — plain Node.js project. Add TypeScript to enable build.' && exit 0",
-    "lint": "node scripts/check-no-direct-model-imports.js",
+    "lint": "node scripts/check-no-direct-model-imports.js && node scripts/check-no-direct-time.js",
     "lint:repo-guardrail": "node scripts/check-no-direct-model-imports.js",
     "test": "jest --forceExit --detectOpenHandles",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
@@ -24,6 +24,7 @@
     "sync:reset:inventory": "node src/scripts/resetSyncState.js inventory",
     "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
+    "lint:no-direct-time": "node scripts/check-no-direct-time.js",
     "smoke": "node scripts/smoke.js",
     "check": "npm run validate && npm run lint && npm test"
   },

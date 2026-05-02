@@ -7,7 +7,7 @@ Run through this list before every production deployment.
 ## 1. CI / Test Gate
 
 - [ ] `npm test` passes (all test suites green)
-- [ ] `npm run test:coverage` passes coverage thresholds (lines ≥ 55%, statements ≥ 55%, branches ≥ 42%, functions ≥ 55%)
+- [ ] `npm run test:coverage` passes all thresholds (global: stmts ≥ 60%, branches ≥ 48%, funcs ≥ 64%, lines ≥ 61%; per-directory gates in jest.config.js)
 - [ ] No skipped tests that hide regressions
 
 ## 2. Smoke Test
@@ -110,7 +110,8 @@ Confirm **all** of the following are set in the deployment environment:
 ## 5. Code Quality
 
 - [ ] No `console.log` in `src/` (run: `grep -r "console\.log" src/ --include="*.js"`)
-- [ ] `npm run lint:repo-guardrail` exits 0 (no direct model imports in services)
+- [ ] `npm run lint` exits 0 — chains: no direct model imports + no direct time calls outside clock seam
+- [ ] `npm run lint:no-direct-time` green (also covered by `npm run lint`)
 - [ ] No hardcoded secrets in committed files (`git grep -i "sk_live\|apikey\|password ="`)
 
 ## 6. Server Health Post-Deploy

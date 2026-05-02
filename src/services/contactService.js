@@ -3,6 +3,7 @@ const ActivityLog = require('../repositories').activityLogs.rawModel();
 const { sendEmail } = require('../mail/emailService');
 const axios = require('axios');
 const fs = require('fs');
+const clock = require('../utilities/clock');
 const path = require('path');
 
 const logger = require("../utilities/logger");
@@ -418,7 +419,7 @@ async function createMobileAppLog(data) {
         throw { status: 400, message: 'Issue/Message is required' };
     }
 
-    const dubaiDate = new Date().toLocaleString('en-GB', {
+    const dubaiDate = clock.now().toLocaleString('en-GB', {
         timeZone: 'Asia/Dubai',
         year: 'numeric',
         month: '2-digit',
@@ -440,7 +441,7 @@ async function createMobileAppLog(data) {
         mobile_device,
         app_version,
         issue_message,
-        timestamp: new Date(),
+        timestamp: clock.now(),
         details: {
             mobile_device,
             app_version,

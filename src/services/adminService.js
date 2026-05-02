@@ -18,8 +18,9 @@ const { sendEmail } = require("../mail/emailService");
 
 const logger = require("../utilities/logger");
 const { escapeRegex } = require("../utilities/stringUtils");
+const clock = require("../utilities/clock");
 function getUaeDateTime() {
-  const now = new Date();
+  const now = clock.now();
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Dubai",
@@ -247,7 +248,7 @@ exports.forgotPassword = async (email) => {
     await sendEmail(email, subject, html);
 
     admin.resetPasswordToken = token;
-    admin.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    admin.resetPasswordExpires = clock.nowMs() + 10 * 60 * 1000;
     await admin.save();
 
     return {};
@@ -260,7 +261,7 @@ exports.verifyCode = async (email, code) => {
         throw { status: 404, message: "Admin not found" };
     }
 
-    if (!admin.resetPasswordToken || admin.resetPasswordExpires < Date.now()) {
+    if (!admin.resetPasswordToken || admin.resetPasswordExpires < clock.nowMs()) {
         throw { status: 400, message: "Code expired or invalid" };
     }
 
@@ -279,7 +280,7 @@ exports.resetPassword = async (email, newPassword, code) => {
         throw { status: 404, message: "Admin not found" };
     }
 
-    if (!admin.resetPasswordToken || admin.resetPasswordExpires < Date.now()) {
+    if (!admin.resetPasswordToken || admin.resetPasswordExpires < clock.nowMs()) {
         throw { status: 400, message: "Code expired or invalid" };
     }
 
@@ -497,7 +498,7 @@ exports.updateSubAdmin = async (adminId, data) => {
     if (phone !== undefined) admin.phone = phone;
     if (isActive !== undefined) admin.isActive = isActive;
 
-    admin.updatedAt = Date.now();
+    admin.updatedAt = clock.nowMs();
     await admin.save();
 
     // Must read from primary — populate immediately after save must see the write.
@@ -520,7 +521,7 @@ exports.deleteSubAdmin = async (adminId) => {
     }
 
     admin.isActive = false;
-    admin.updatedAt = Date.now();
+    admin.updatedAt = clock.nowMs();
     await admin.save();
 
     return {};
@@ -768,7 +769,7 @@ exports.blockUser = async (userId) => {
     }
 
     user.isBlocked = true;
-    user.blockedAt = new Date();
+    user.blockedAt = clock.now();
     await user.save();
 
     return {
@@ -823,7 +824,7 @@ exports.deleteUser = async (userId) => {
     }
 
     user.isDeleted = true;
-    user.deletedAt = new Date();
+    user.deletedAt = clock.now();
     user.deletedBy = 'admin';
     await user.save();
 
