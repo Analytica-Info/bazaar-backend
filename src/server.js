@@ -17,6 +17,7 @@ require("dotenv").config();
 const logger = require("./utilities/logger");
 const JWT_SECRET = require("./config/jwtSecret.js");
 const authMiddleware = require("./middleware/authMiddleware");
+const { requestContext, notFound, errorHandler } = require("./middleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const Coupon = require("./models/Coupon.js");
 const Cronjoblog = require("./models/Cronjoblog.js");
@@ -179,6 +180,9 @@ app.use(compression());
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Correlation ID + child logger — must come before any route-level logging
+app.use(requestContext);
+
 // Request logging — duration + response size
 app.use((req, res, next) => {
   const start = Date.now();
@@ -329,31 +333,10 @@ const connectAndRun = async () => {
   }
 
   // ==========================================
-  // GLOBAL ERROR HANDLER (must be after all routes)
+  // 404 + GLOBAL ERROR HANDLER (must be after all routes)
   // ==========================================
-  app.use((err, req, res, _next) => {
-    // CORS errors
-    if (err.message === "Not allowed by CORS") {
-      return res.status(403).json({ success: false, message: "CORS not allowed" });
-    }
-
-    logger.error({
-      err: err,
-      method: req.method,
-      url: req.originalUrl,
-      body: req.method === "GET" ? undefined : "[redacted]",
-    }, "Unhandled error");
-
-    res.status(err.status || 500).json({
-      success: false,
-      message: isProduction ? "Internal server error" : err.message,
-    });
-  });
-
-  // 404 handler
-  app.use((req, res) => {
-    res.status(404).json({ success: false, message: "Route not found" });
-  });
+  app.use(notFound);
+  app.use(errorHandler);
 };
 
 connectAndRun();
