@@ -144,3 +144,132 @@ When a new bug is found:
 
 When a bug is fixed:
 - Don't delete — keep it as historical record. Status field tracks current state.
+
+---
+
+## PR14 — Cross-client API map findings
+
+The bugs below were surfaced by the PR14 audit (`docs/api-map/MAP.md`,
+`docs/api-map/backend-routes.json`, and the per-client JSON files).
+All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
+`scripts/api-map/` for the extraction code.
+
+### BUG-016 — bazaar-web calls /v2/recommendations/* but no backend routes exist (ORPHAN)
+- **Severity:** HIGH
+- **Backend file:** n/a (no route registered under `/v2/recommendations`)
+- **Client(s) affected:** web (`bazaar-web/src/services/recommendations.js`)
+- **Status:** OPEN
+- **Symptom:** `recommendationsApi` calls five endpoints — `GET /v2/recommendations/trending`, `/for-you`, `/similar/:id`, `/frequently-bought/:id`, and `POST /v2/recommendations/events`. None are registered in `src/routes/v2/{web,shared,mobile}/index.js` or anywhere else.
+- **Impact:** Every recommendation widget on the storefront issues a 404. If the client swallows the error (likely from the surrounding try/catch in the service), users get an empty recommendations list; otherwise the page logs an error every time it mounts.
+- **Recommended fix:** Either (a) ship the recommendations BFF routes under `/v2/recommendations/*` (read endpoints + an events ingestion endpoint), or (b) feature-flag the client off until the backend exists.
+- **Source:** PR14 audit, `docs/api-map/MAP.md` ORPHAN row.
+
+### BUG-017 — bazaar-web calls POST /redeem-coupon without leading slash (works, but fragile)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/publicRoutes.js:109`
+- **Client(s) affected:** web (`bazaar-web/src/components/Checkout/Checkout.jsx:552`)
+- **Status:** OPEN
+- **Symptom:** `axiosInstance.post("redeem-coupon", ...)` (no leading `/`). Works because axios resolves relative to baseURL, but is inconsistent with every other call in the codebase and breaks if baseURL ever lacks a trailing slash.
+- **Impact:** Latent fragility; not a current outage.
+- **Recommended fix:** Change to `axiosInstance.post("/redeem-coupon", ...)`.
+- **Source:** PR14 audit.
+
+### BUG-018 — Web reads `flashSale` field from /flash-sale-data but backend returns differently named keys (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/controllers/ecommerce/publicController.js` (search for `flash-sale-data`)
+- **Client(s) affected:** web
+- **Status:** OPEN (extractor-suspected; confirm by reading both ends)
+- **Symptom:** Client destructures `flashSale` from `response.data`, but the v1 controller (regex-extracted) does not show that key in any `res.json({...})` literal. Likely the controller returns `data.flashSale` nested, or the field name has drifted. Needs manual confirmation.
+- **Impact:** If the field is genuinely absent, the flash-sale section renders blank.
+- **Recommended fix:** Either rename the backend response key to `flashSale` for consistency, or fix the client to read the actual returned key. Add a v1 contract test to lock the chosen shape.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-019 — Web reads `shippingCost` and `freeShippingThreshold` from /shipping-cost but those fields are not in the controller's res.json literal (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** Search `src/controllers/**/*.js` for `shipping-cost` handler
+- **Client(s) affected:** web
+- **Status:** OPEN
+- **Symptom:** Client expects `response.data.shippingCost` and `response.data.freeShippingThreshold`. The model has `freeShippingThreshold` (`src/models/ShippingCountry.js:21`), but the route's response shape (regex-extracted) does not surface those keys directly; they may be nested inside a Mongoose document spread.
+- **Impact:** Free-shipping threshold UI on storefront may not render when expected.
+- **Recommended fix:** Verify the controller, then either flatten the response or update the client. Pin with a v1 contract test.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-020 — Web reads `total_orders / shipped_orders / delivered_orders / canceled_orders` from /user/user-orders, fields not present in res.json literal (CLIENT-ONLY)
+- **Severity:** HIGH
+- **Backend file:** `src/routes/ecommerce/userRoutes.js:31` → `orders` controller
+- **Client(s) affected:** web (account dashboard summary)
+- **Status:** OPEN
+- **Symptom:** Account-page header shows order counts (total / shipped / delivered / canceled). Client destructures those four fields from `response.data`. Backend handler (`orders` in ecommerce userController/orderController) returns the orders array but does not appear to return aggregate counts in `res.json({...})`.
+- **Impact:** All four counters likely render as `undefined` (or 0 after defaulting). User-facing dashboard summary is wrong.
+- **Recommended fix:** Add aggregate counts to the backend response, or move counting to the client. There is a `/v2/user/dashboard` route (`src/controllers/v2/web/userController.js`) — migrate the client to that and pin the shape with a contract test.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-021 — Web reads `randomProducts` from /random-products/:id but field name not in extracted shape (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/controllers/ecommerce/publicController.js` (search `random-products`)
+- **Client(s) affected:** web
+- **Status:** OPEN (suspected)
+- **Symptom:** Client destructures `randomProducts` from `response.data`. Backend route returns a list of products under a different key (or directly as the `data` array).
+- **Impact:** "You may also like" sections may not populate.
+- **Recommended fix:** Confirm by reading the controller and align names.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-022 — Web /user/user-review reads `products` but route returns reviews (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/routes/ecommerce/userRoutes.js` user-review handler
+- **Client(s) affected:** web
+- **Status:** OPEN
+- **Symptom:** Client destructures `products` from response. The route serves user reviews — likely returns `reviews` or `data: [...]`. Field name drift.
+- **Impact:** "Your reviews" page on the account section may render empty.
+- **Recommended fix:** Confirm and align. v2 has `/v2/user/reviews` — migrate.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-023 — Admin /admin/coupon reads `coupons` but extracted shape lacks the key (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/routes/ecommerce/adminRoutes.js` admin coupon list handler
+- **Client(s) affected:** admin (Bazaar-Admin-Dashboard)
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin dashboard expects `response.data.coupons`. Backend response shape (regex-extracted) does not surface that key.
+- **Impact:** Coupon list page in admin may render empty until the shape mismatch is confirmed/fixed.
+- **Recommended fix:** Confirm controller. Likely the regex missed a nested ternary; or the response is `{ data: [...] }` and the admin should read `data` instead of `coupons`.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-024 — Admin /admin/email-config response shape mismatch (CLIENT-ONLY)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/emailRoutes.js`
+- **Client(s) affected:** admin
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin reads `emailConfig` field from both GET and POST sync-env responses. Backend res.json literal lacks the key.
+- **Impact:** Email-config admin page may misrender.
+- **Recommended fix:** Confirm and align.
+- **Source:** PR14 audit.
+
+### BUG-025 — Admin /admin/notifications/:id reads `notification` field; backend likely returns flat object (CLIENT-ONLY)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/adminRoutes.js` notifications detail handler
+- **Client(s) affected:** admin
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin expects `response.data.notification`. Backend likely returns the notification object directly.
+- **Impact:** Notification detail page may not render.
+- **Recommended fix:** Confirm and align.
+- **Source:** PR14 audit.
+
+### BUG-026 — All v2 routes are UNUSED by every shipping client (DRIFT debt)
+- **Severity:** MEDIUM (process), HIGH (long-term)
+- **Backend file:** `src/routes/v2/**`
+- **Client(s) affected:** web, admin, mobile
+- **Status:** OPEN (planned migration)
+- **Symptom:** PR14 cross-reference confirms 0 calls from `bazaar-web`, `Bazaar-Admin-Dashboard`, or `Bazaar-Mobile-App` to any `/v2/*` route. The entire BFF v2 surface (60 routes) currently exists only for the contract test suite.
+- **Impact:** v1 ecommerce + v1 mobile remain the production surfaces. The dual-stack burden grows every PR. The v2 contract tests do not protect any real user.
+- **Recommended fix:** Schedule client migration sprints — start with web (auth + cart + orders + user) and mobile auth. Track per-resource cutover in the V2 unification plan. Burn down v1 routes only after each client is confirmed off them.
+- **Source:** PR14 audit summary.
+
+### BUG-027 — 150+ v1 backend routes have no client caller (UNUSED)
+- **Severity:** MEDIUM (cleanup)
+- **Backend file:** various, see `docs/api-map/MAP.md` UNUSED rows
+- **Client(s) affected:** none
+- **Status:** OPEN
+- **Symptom:** 146 (method, path) backend rows have zero matching client calls. Many are admin endpoints whose dashboard counterpart was removed; some are obsolete v1 mobile endpoints; some are the v2 BFF (separately tracked in BUG-026).
+- **Impact:** Coverage debt; dead-code surface area; security review burden.
+- **Recommended fix:** Audit `docs/api-map/MAP.md` UNUSED list. For each, classify: keep (admin tool), deprecate (warn for one release), or delete. Land in a follow-up "v1 dead route reaper" PR.
+- **Source:** PR14 audit summary.
