@@ -11,9 +11,6 @@
 
 const crypto = require('crypto');
 
-// BUG-010: module-load const
-const year = new Date().getFullYear();
-
 const repositories = require('../../../repositories');
 const Order = repositories.orders.rawModel();
 const OrderDetail = repositories.orderDetails.rawModel();
@@ -26,6 +23,7 @@ const User = repositories.users.rawModel();
 
 const PaymentProviderFactory = require('../../payments/PaymentProviderFactory');
 const logger = require('../../../utilities/logger');
+const clock = require('../../../utilities/clock');
 
 /**
  * @param {object} req - Express request object
@@ -93,8 +91,8 @@ async function verifyNomodPayment(req) {
       }
     }
 
-    const formatDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
-    const formatTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai' });
+    const formatDate = clock.now().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
+    const formatTime = clock.now().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai' });
     const orderDateTime = `${formatDate} - ${formatTime}`;
 
     const lastOrder = await Order.findOne().sort({ createdAt: -1 }).select('order_no');
@@ -102,6 +100,7 @@ async function verifyNomodPayment(req) {
     if (lastOrder && lastOrder.order_no) nextOrderNo = lastOrder.order_no + 1;
 
     const uniquePart = crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3);
+    const year = clock.now().getFullYear();
     const nextOrderId = `BZ${year}${String(nextOrderNo).padStart(3, '0')}${uniquePart}`;
 
     const user = await User.findById(userId);

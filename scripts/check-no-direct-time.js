@@ -68,10 +68,6 @@ const ALLOW_PATTERNS = [
     // --- PR4 partial migrations (locale-format calls & year const remain) ---
     /\/services\/orderService\.js$/,
     /\/services\/checkoutService\.js$/,
-    // --- PR-MOD-4 inherited violations: when checkoutService.js was split into
-    // use-cases, the existing new Date() calls moved with the code. Tracked as
-    // follow-up "clock-seam-checkout" PR. ---
-    /\/services\/checkout\/use-cases\//,
     // --- PR-MOD-5 inherited: productService statusLogger has a real-time
     // log timestamp; product/sync/domain/lightspeedHelpers has a doc-comment
     // mention of new Date() (false positive — already uses clock.now()). ---

@@ -15,7 +15,6 @@ const stripe = require('stripe')(process.env.STRIPE_SK);
 // BUG-010: module-load consts
 const ENVIRONMENT = process.env.ENVIRONMENT;
 const WEBURL = process.env.URL;
-const year = new Date().getFullYear();
 
 const repositories = require('../../../repositories');
 const Order = repositories.orders.rawModel();
@@ -36,6 +35,7 @@ const logger = require('../../../utilities/logger');
 
 const { clearUserCart, getUaeDateTime } = require('../domain/cartHelpers');
 const { updateQuantities } = require('../shared/inventory');
+const clock = require('../../../utilities/clock');
 
 /**
  * @param {string} sessionId
@@ -115,10 +115,10 @@ async function verifyStripePayment(sessionId, userId) {
       const stripe_checkout_session_id = session.id;
       const userEmail = session.customer_details.email;
 
-      const formatDate = new Date().toLocaleDateString('en-GB', {
+      const formatDate = clock.now().toLocaleDateString('en-GB', {
         day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai',
       });
-      const formatTime = new Date().toLocaleTimeString('en-GB', {
+      const formatTime = clock.now().toLocaleTimeString('en-GB', {
         hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai',
       });
       const orderDateTime = `${formatDate} - ${formatTime}`;
@@ -146,6 +146,7 @@ async function verifyStripePayment(sessionId, userId) {
       if (lastOrder && lastOrder.order_no) { nextOrderNo = lastOrder.order_no + 1; }
 
       const uniquePart = crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3);
+      const year = clock.now().getFullYear();
       const nextOrderId = `BZ${year}${String(nextOrderNo).padStart(3, '0')}${uniquePart}`;
 
       const orderPayload = {
@@ -212,7 +213,7 @@ async function verifyStripePayment(sessionId, userId) {
         }
       }
 
-      const currentDate = new Date();
+      const currentDate = clock.now();
       const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
       const dayNum = deliveryDate.getDate();
       const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });

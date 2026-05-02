@@ -80,8 +80,8 @@ async function createNomodCheckout(req) {
       },
     });
 
-    const formatDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
-    const formatTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai' });
+    const formatDate = clock.now().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' });
+    const formatTime = clock.now().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai' });
     const orderTime = `${formatDate} - ${formatTime}`;
 
     await PendingPayment.create({

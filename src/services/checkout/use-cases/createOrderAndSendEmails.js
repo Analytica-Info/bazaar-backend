@@ -25,11 +25,11 @@ const logger = require('../../../utilities/logger');
 
 const { clearUserCart, getUaeDateTime } = require('../domain/cartHelpers');
 const { updateQuantities } = require('../shared/inventory');
+const clock = require('../../../utilities/clock');
 
 // BUG-010: module-load const — do NOT move into the function body
 const ENVIRONMENT = process.env.ENVIRONMENT;
 const WEBURL = process.env.URL;
-const year = new Date().getFullYear();
 
 /**
  * Create an order from a completed Tabby payment and send confirmation emails.
@@ -104,13 +104,13 @@ async function createOrderAndSendEmails(payment, user_id) {
     }
   }
 
-  const formatDate = new Date().toLocaleDateString('en-GB', {
+  const formatDate = clock.now().toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
     timeZone: 'Asia/Dubai',
   });
-  const formatTime = new Date().toLocaleTimeString('en-GB', {
+  const formatTime = clock.now().toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
@@ -131,6 +131,7 @@ async function createOrderAndSendEmails(payment, user_id) {
     .toUpperCase()
     .slice(0, 3);
 
+  const year = clock.now().getFullYear();
   const nextOrderId = `BZ${year}${String(nextOrderNo).padStart(3, '0')}${uniquePart}`;
 
   // 3. Prepare order details
@@ -220,7 +221,7 @@ async function createOrderAndSendEmails(payment, user_id) {
     }
   }
 
-  const currentDate = new Date();
+  const currentDate = clock.now();
   const deliveryDate = new Date(
     currentDate.getTime() + 3 * 24 * 60 * 60 * 1000
   );

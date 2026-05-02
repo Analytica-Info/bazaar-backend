@@ -18,6 +18,7 @@ const BankPromoCodeUsage = repositories.bankPromoCodeUsages.rawModel();
 const Notification = repositories.notifications.rawModel();
 
 const logger = require('../../../utilities/logger');
+const clock = require('../../../utilities/clock');
 const createOrderAndSendEmails = require('./createOrderAndSendEmails');
 
 /**
@@ -73,7 +74,7 @@ async function verifyTabbyPayment(paymentId, userId, bankPromoId) {
         }
       }
 
-      const currentDate = new Date();
+      const currentDate = clock.now();
       const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
       const dayNum = deliveryDate.getDate();
       const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });
