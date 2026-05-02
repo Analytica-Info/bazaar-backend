@@ -25,7 +25,9 @@ Implications for this map:
   - shared (server.js inline): 4
 - Client calls: web=83, admin=93, mobile=68
 - Unique (method, path) rows: 358
-- Verdict counts: {"ORPHAN":2,"CLIENT-ONLY":11,"UNUSED":146,"MATCH":199}
+- Verdict counts: {"MATCH":199,"V2-DEV":60,"UNUSED":86,"CLIENT-ONLY":11,"ORPHAN":2}
+  - 60 v2 routes reclassified from UNUSED → V2-DEV (intended state — see policy above).
+  - 86 v1 routes are genuinely unused and are dead-code candidates (BUG-027).
 
 ## Verdict legend
 
@@ -34,7 +36,8 @@ Implications for this map:
 - **BACKEND-ONLY**: backend returns fields no client reads (subset of UNUSED tracked by shape; not enumerated separately).
 - **DRIFT**: same logical resource, different shape across v1/v2 or platforms (manually tagged in NOTES below).
 - **ORPHAN**: client hits a path the backend does not serve.
-- **UNUSED**: backend route no client calls.
+- **UNUSED**: v1 backend route no client calls — dead-code candidate (BUG-027).
+- **V2-DEV**: v2 backend route, intentionally not yet integrated with any client (see policy above). Not a bug, not actionable cleanup.
 
 ## Cross-reference
 
@@ -136,66 +139,66 @@ Implications for this map:
 | UNUSED | GET | `/update-product-details/*` | updateProductDetails@ecommerce/publicRoutes.js | — | — | — |
 | UNUSED | POST | `/user/apple-call-back` | appleCallback@ecommerce/userRoutes.js | — | — | — |
 | UNUSED | POST | `/user/orders/proof-of-delivery` | ?@ecommerce/orderRoutes.js | — | — | — |
-| UNUSED | DELETE | `/v2/auth/account` | authCtrl.deleteAccount@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/apple-login` | authCtrl.appleLogin@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/auth/check` | authCtrl.checkAuth@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/check-access-token` | authCtrl.checkAccessToken@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/forgot-password` | authCtrl.forgotPassword@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/google-login` | authCtrl.googleLogin@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/login` | authCtrl.login@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/logout` | authCtrl.logout@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/recovery-account` | authCtrl.verifyRecoveryCode@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/refresh-token` | authCtrl.refreshToken@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/register` | authCtrl.register@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/resend-recovery-code` | authCtrl.resendRecoveryCode@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/reset-password` | authCtrl.resetPassword@web/index.js | — | — | — |
-| UNUSED | PUT | `/v2/auth/update-password` | authCtrl.updatePassword@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/update-profile` | authCtrl.updateProfile@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/auth/user-data` | authCtrl.getUserData@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/auth/verify-code` | authCtrl.verifyCode@web/index.js | — | — | — |
-| UNUSED | DELETE | `/v2/cart` | cartCtrl.removeFromCart@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/cart` | cartCtrl.getCart@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/cart` | cartCtrl.addToCart@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/cart/decrease` | cartCtrl.decreaseQty@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/cart/increase` | cartCtrl.increaseQty@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/notifications` | notifCtrl.getNotifications@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/notifications/mark-read` | notifCtrl.markRead@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/notifications/track-click` | notifCtrl.trackClick@mobile/index.js | — | — | — |
-| UNUSED | GET | `/v2/orders` | orderCtrl.getOrders@mobile/index.js | — | — | — |
-| UNUSED | PATCH | `/v2/orders/*/status` | orderCtrl.updateOrderStatus@mobile/index.js | — | — | — |
-| UNUSED | GET | `/v2/orders/address` | orderCtrl.getAddress@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/address` | orderCtrl.storeAddress@web/index.js | — | — | — |
-| UNUSED | DELETE | `/v2/orders/address/*` | orderCtrl.deleteAddress@web/index.js | — | — | — |
-| UNUSED | PATCH | `/v2/orders/address/*/set-primary` | orderCtrl.setPrimaryAddress@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/checkout/nomod` | orderCtrl.checkoutNomod@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/checkout/stripe` | orderCtrl.checkoutStripe@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/checkout/tabby` | orderCtrl.checkoutTabby@mobile/index.js | — | — | — |
-| UNUSED | GET | `/v2/orders/payment-methods` | orderCtrl.getPaymentMethods@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/stripe/init` | orderCtrl.initStripePayment@mobile/index.js | — | — | — |
-| UNUSED | POST | `/v2/orders/validate-inventory` | orderCtrl.validateInventory@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/orders/verify/nomod` | orderCtrl.verifyNomod@mobile/index.js | — | — | — |
-| UNUSED | GET | `/v2/orders/verify/tabby` | orderCtrl.verifyTabby@mobile/index.js | — | — | — |
-| UNUSED | GET | `/v2/products` | productCtrl.getProducts@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/*` | productCtrl.getProductDetails@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/categories` | productCtrl.getCategories@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/category/*` | productCtrl.categoriesProduct@shared/index.js | — | — | — |
-| UNUSED | POST | `/v2/products/search` | productCtrl.search@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/similar` | productCtrl.similarProducts@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/sub-category/*` | productCtrl.subCategoriesProduct@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/products/sub-sub-category/*` | productCtrl.subSubCategoriesProduct@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/current-month-categories` | userCtrl.getCurrentMonthCategories@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/dashboard` | userCtrl.getDashboard@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/orders` | userCtrl.getOrders@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/orders/*` | userCtrl.getOrder@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/payment-history` | userCtrl.getPaymentHistory@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/payment-history/*` | userCtrl.getSinglePaymentHistory@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/profile` | userCtrl.getProfile@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/reviews` | userCtrl.getReviews@web/index.js | — | — | — |
-| UNUSED | POST | `/v2/user/reviews` | userCtrl.addReview@web/index.js | — | — | — |
-| UNUSED | GET | `/v2/user/tabby-buyer-history` | userCtrl.getTabbyBuyerHistory@mobile/index.js | — | — | — |
-| UNUSED | DELETE | `/v2/wishlist` | wishlistCtrl.removeFromWishlist@shared/index.js | — | — | — |
-| UNUSED | GET | `/v2/wishlist` | wishlistCtrl.getWishlist@shared/index.js | — | — | — |
-| UNUSED | POST | `/v2/wishlist` | wishlistCtrl.addToWishlist@shared/index.js | — | — | — |
+| V2-DEV | DELETE | `/v2/auth/account` | authCtrl.deleteAccount@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/apple-login` | authCtrl.appleLogin@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/auth/check` | authCtrl.checkAuth@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/check-access-token` | authCtrl.checkAccessToken@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/forgot-password` | authCtrl.forgotPassword@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/google-login` | authCtrl.googleLogin@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/login` | authCtrl.login@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/logout` | authCtrl.logout@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/recovery-account` | authCtrl.verifyRecoveryCode@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/refresh-token` | authCtrl.refreshToken@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/register` | authCtrl.register@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/resend-recovery-code` | authCtrl.resendRecoveryCode@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/reset-password` | authCtrl.resetPassword@web/index.js | — | — | — |
+| V2-DEV | PUT | `/v2/auth/update-password` | authCtrl.updatePassword@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/update-profile` | authCtrl.updateProfile@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/auth/user-data` | authCtrl.getUserData@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/auth/verify-code` | authCtrl.verifyCode@web/index.js | — | — | — |
+| V2-DEV | DELETE | `/v2/cart` | cartCtrl.removeFromCart@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/cart` | cartCtrl.getCart@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/cart` | cartCtrl.addToCart@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/cart/decrease` | cartCtrl.decreaseQty@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/cart/increase` | cartCtrl.increaseQty@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/notifications` | notifCtrl.getNotifications@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/notifications/mark-read` | notifCtrl.markRead@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/notifications/track-click` | notifCtrl.trackClick@mobile/index.js | — | — | — |
+| V2-DEV | GET | `/v2/orders` | orderCtrl.getOrders@mobile/index.js | — | — | — |
+| V2-DEV | PATCH | `/v2/orders/*/status` | orderCtrl.updateOrderStatus@mobile/index.js | — | — | — |
+| V2-DEV | GET | `/v2/orders/address` | orderCtrl.getAddress@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/address` | orderCtrl.storeAddress@web/index.js | — | — | — |
+| V2-DEV | DELETE | `/v2/orders/address/*` | orderCtrl.deleteAddress@web/index.js | — | — | — |
+| V2-DEV | PATCH | `/v2/orders/address/*/set-primary` | orderCtrl.setPrimaryAddress@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/checkout/nomod` | orderCtrl.checkoutNomod@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/checkout/stripe` | orderCtrl.checkoutStripe@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/checkout/tabby` | orderCtrl.checkoutTabby@mobile/index.js | — | — | — |
+| V2-DEV | GET | `/v2/orders/payment-methods` | orderCtrl.getPaymentMethods@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/stripe/init` | orderCtrl.initStripePayment@mobile/index.js | — | — | — |
+| V2-DEV | POST | `/v2/orders/validate-inventory` | orderCtrl.validateInventory@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/orders/verify/nomod` | orderCtrl.verifyNomod@mobile/index.js | — | — | — |
+| V2-DEV | GET | `/v2/orders/verify/tabby` | orderCtrl.verifyTabby@mobile/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products` | productCtrl.getProducts@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/*` | productCtrl.getProductDetails@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/categories` | productCtrl.getCategories@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/category/*` | productCtrl.categoriesProduct@shared/index.js | — | — | — |
+| V2-DEV | POST | `/v2/products/search` | productCtrl.search@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/similar` | productCtrl.similarProducts@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/sub-category/*` | productCtrl.subCategoriesProduct@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/products/sub-sub-category/*` | productCtrl.subSubCategoriesProduct@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/current-month-categories` | userCtrl.getCurrentMonthCategories@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/dashboard` | userCtrl.getDashboard@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/orders` | userCtrl.getOrders@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/orders/*` | userCtrl.getOrder@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/payment-history` | userCtrl.getPaymentHistory@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/payment-history/*` | userCtrl.getSinglePaymentHistory@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/profile` | userCtrl.getProfile@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/reviews` | userCtrl.getReviews@web/index.js | — | — | — |
+| V2-DEV | POST | `/v2/user/reviews` | userCtrl.addReview@web/index.js | — | — | — |
+| V2-DEV | GET | `/v2/user/tabby-buyer-history` | userCtrl.getTabbyBuyerHistory@mobile/index.js | — | — | — |
+| V2-DEV | DELETE | `/v2/wishlist` | wishlistCtrl.removeFromWishlist@shared/index.js | — | — | — |
+| V2-DEV | GET | `/v2/wishlist` | wishlistCtrl.getWishlist@shared/index.js | — | — | — |
+| V2-DEV | POST | `/v2/wishlist` | wishlistCtrl.addToWishlist@shared/index.js | — | — | — |
 | UNUSED | POST | `/webhook/inventory-update` | inventoryUpdate@ecommerce/webhooksRoutes.js | — | — | — |
 | UNUSED | POST | `/webhook/product-update` | productUpdate@ecommerce/webhooksRoutes.js | — | — | — |
 | UNUSED | POST | `/webhook/sale-update` | saleUpdate@ecommerce/webhooksRoutes.js | — | — | — |
@@ -401,10 +404,10 @@ Implications for this map:
 
 ## Top mismatches
 
-Top 30 non-MATCH rows by severity:
+Actionable non-MATCH rows by severity. V2-DEV rows are intentionally excluded — those are the planned target shape, not mismatches.
 
-- **ORPHAN** GET `/`
-- **ORPHAN** POST `/v2/recommendations/events` — web fields: [n/a]
+- **ORPHAN** GET `/` — likely false positive (empty URL extraction)
+- **ORPHAN** POST `/v2/recommendations/events` — **client-side bug**: `bazaar-web/src/services/recommendations.js` is calling v2 prematurely; backend should NOT add the route ahead of the v2 rollout (see BUG-016)
 - **CLIENT-ONLY** GET `/admin/coupon`
 - **CLIENT-ONLY** GET `/admin/email-config`
 - **CLIENT-ONLY** POST `/admin/email-config/sync-env`
@@ -439,4 +442,5 @@ Top 30 non-MATCH rows by severity:
 - **DRIFT detection** is heuristic. v1 controllers commonly return raw Mongoose docs (`res.json(user)`) which the regex extractor cannot key-shape; expect false MATCH for those.
 - **Mobile method inference** falls back to GET when no nearby `http.METHOD` is present. Treat MOBILE GET orphans as suspect.
 - **Dynamic URLs** (template literals, concatenated path params) are normalized via `*` for the param token. Routes with multiple params or query strings may collapse into the same row.
-- **v1 vs v2 DRIFT** is the dominant theme: web hits both `/api/...` (v1 mobile shape) and `/v2/...` for some resources; mobile hits both `/api/...` and `/v2/...`. Most rows here flagged `UNUSED` for v2 routes are simply not yet adopted by the clients.
+- **v2 routes are dev-only by policy.** All 60 v2 rows are tagged `V2-DEV` rather than `UNUSED` to make this distinction explicit. They are not dead code — they are awaiting backend hardening before client cutover.
+- **The 86 remaining `UNUSED` rows are all v1** and are legitimate dead-code candidates tracked under BUG-027.
