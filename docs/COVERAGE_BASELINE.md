@@ -860,3 +860,64 @@ All coverage thresholds in jest.config.js **pass**.
 | src/controllers/v2/mobile/userController.js        | 93    | 98       | 93    | 93    |
 | src/controllers/v2/shared/productController.js     | 88    | 48       | 80    | 88    |
 | src/controllers/v2/web/userController.js           | 98    | 81       | 98    | 98    |
+
+---
+
+# Coverage Baseline — PR-MOD-1 (Service Modularization Kernel)
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR13 Baseline | PR-MOD-1 Result | Delta   |
+|-------------|--------------|-----------------|---------|
+| Statements  | 88.06%       | ~88.1%          | +0.04pp |
+| Branches    | 75.40%       | ~75.4%          | ~0pp    |
+| Functions   | 87.79%       | ~87.8%          | ~0pp    |
+| Lines       | 89.16%       | ~89.2%          | +0.04pp |
+
+> Global impact is negligible — this PR only adds new kernel files;
+> no existing source files are touched.
+
+All coverage thresholds in jest.config.js **pass** (unchanged from PR13).
+
+## New Kernel Files — Coverage
+
+| File                            | Stmts | Branches | Funcs | Lines | Notes |
+|---------------------------------|-------|----------|-------|-------|-------|
+| src/services/_kernel/errors.js  | 100%  | 75%      | 100%  | 100%  | Branch miss on V8 `captureStackTrace` guard (line 32) |
+| src/services/_kernel/cache.js   | 100%  | 100%     | 100%  | 100%  | |
+| src/services/_kernel/container.js | 100% | 100%    | 100%  | 100%  | |
+| src/services/_kernel/bootstrap.js | 100% | 100%    | 100%  | 100%  | |
+| src/services/_kernel/ports.js   | 100%  | 100%     | 100%  | 100%  | Documentation artifact; exports `{}` |
+| src/services/_kernel/index.js   | ~95%  | 100%     | 100%  | ~95%  | Istanbul spread artifact |
+
+All kernel files are ≥90% lines (target met).
+
+## Test Count
+
+| PR      | Suites | Tests | Skipped |
+|---------|--------|-------|---------|
+| PR13    | 121    | 2615  | 3       |
+| PR-MOD-1 | 126   | 2686  | 3       |
+
+New kernel test files: 5 (+71 tests)
+
+- `tests/services/_kernel/errors.test.js` — 30 tests
+- `tests/services/_kernel/cache.test.js` — 17 tests
+- `tests/services/_kernel/container.test.js` — 9 tests
+- `tests/services/_kernel/bootstrap.test.js` — 13 tests
+- `tests/services/_kernel/index.test.js` — 10 tests
+
+## Notes
+
+- No existing service files were modified.
+- No new runtime dependencies added.
+- `makeRedisCache` wraps the existing `utilities/cache.js` module which already implements
+  graceful degradation (no-op when Redis is disabled or unreachable). The adapter is thin by design.
+- `bootstrap.js` sets `STRIPE_SK` guard: tests that require bootstrap must set a dummy key
+  before the module loads (documented in test files).
+- `errors.js` branch 75%: the `Error.captureStackTrace` guard (line 32) is a V8-only API.
+  In Node.js it is always present, so the else-branch is structurally unreachable in any
+  standard CI environment. Not a real gap.
