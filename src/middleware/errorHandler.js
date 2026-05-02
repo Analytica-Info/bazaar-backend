@@ -106,6 +106,8 @@ function classify(err) {
 
   // 8. Legacy plain-object / express errors with .status
   if (err.status && typeof err.status === 'number') {
+    // BUG-034: path 8 lacked 500/5xx entries, causing plain-object { status: 500 }
+    // throws to emit code 'ERROR' instead of 'INTERNAL_ERROR'. Added 500 and 503.
     const HTTP_CODE_MAP = {
       400: 'BAD_REQUEST',
       401: 'UNAUTHORIZED',
@@ -114,15 +116,17 @@ function classify(err) {
       409: 'CONFLICT',
       422: 'UNPROCESSABLE',
       429: 'RATE_LIMITED',
+      500: 'INTERNAL_ERROR',
       502: 'UPSTREAM_ERROR',
+      503: 'INTERNAL_ERROR',
     };
     const code = (err.code && typeof err.code === 'string') ? err.code
-      : (HTTP_CODE_MAP[err.status] || 'ERROR');
+      : (HTTP_CODE_MAP[err.status] || (err.status >= 500 ? 'INTERNAL_ERROR' : 'ERROR'));
     return {
       status: err.status,
       code,
       message: err.message || 'An error occurred',
-      details: undefined,
+      details: err.data || err.details || undefined,
     };
   }
 
