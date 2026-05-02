@@ -517,7 +517,7 @@ exports.search = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -847,7 +847,7 @@ exports.checkout = async (req, res) => {
     const result = await checkoutService.processCheckout(req.body, user_id);
     res.json(result);
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -961,7 +961,7 @@ exports.addReview = async (req, res) => {
       reviews: reviews,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -991,7 +991,7 @@ exports.review = async (req, res) => {
       reviews: reviewsWithProductId,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -1053,10 +1053,7 @@ exports.contactUs = [
       const score = recaptchaResponse.data.riskAnalysis?.score || 0;
 
       if (!tokenValid) {
-        console.error(
-          "reCAPTCHA token is invalid:",
-          recaptchaResponse.data.tokenProperties?.invalidReason
-        );
+        logger.error({ reason: recaptchaResponse.data.tokenProperties?.invalidReason }, 'reCAPTCHA token is invalid:');
         return res
           .status(403)
           .json({ message: "Security verification failed. Please try again." });
@@ -2173,10 +2170,7 @@ const fetchProductDetails = async (id) => {
     }
     return { product, variantsData, totalQty };
   } catch (error) {
-    console.error(
-      `Error fetching product details for ID: ${id}`,
-      error.message
-    );
+    logger.error({ err: error, id }, 'Error fetching product details:');
     throw error;
   }
 };
@@ -2201,10 +2195,7 @@ const fetchCouponDetails = async (id) => {
     return null;
 
   } catch (error) {
-    console.error(
-      `Error fetching coupon details for ID: ${id} ->`,
-      error.response?.data || error.message
-    );
+    logger.error({ err: error, id }, 'Error fetching coupon details:');
     return null;
   }
 };

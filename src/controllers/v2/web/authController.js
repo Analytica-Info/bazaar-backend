@@ -4,7 +4,7 @@
  */
 const authService = require('../../../services/authService');
 const { wrap } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
 const { asyncHandler } = require('../../../middleware');
 const logger = require('../../../utilities/logger');
 const JWT_SECRET = require('../../../config/jwtSecret');
@@ -20,7 +20,7 @@ exports.register = asyncHandler(async (req, res) => {
         return res.status(status).json(wrap(null, result.restored ? 'Account restored successfully' : 'User registered successfully'));
     } catch (error) {
         logger.error({ err: error }, 'v2 web register error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -51,7 +51,7 @@ exports.login = asyncHandler(async (req, res) => {
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 web login error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -75,7 +75,7 @@ exports.googleLogin = asyncHandler(async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon ?? null,
         }));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -99,7 +99,7 @@ exports.appleLogin = asyncHandler(async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon ?? null,
         }));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -122,7 +122,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
         await authService.forgotPassword(req.body.email);
         return res.status(200).json(wrap(null, 'Verification code sent to email'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -131,7 +131,7 @@ exports.verifyCode = asyncHandler(async (req, res) => {
         await authService.verifyCode(req.body.email, req.body.code);
         return res.status(200).json(wrap(null, 'Code verified successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -141,7 +141,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
         await authService.resetPassword(email, code, new_password, 'web');
         return res.status(200).json(wrap(null, 'Password reset successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -151,7 +151,7 @@ exports.updatePassword = asyncHandler(async (req, res) => {
         await authService.updatePassword(req.user._id, old_password, new_password);
         return res.status(200).json(wrap(null, 'Password updated successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -165,7 +165,7 @@ exports.getUserData = asyncHandler(async (req, res) => {
             usedFirst15Coupon: result.usedFirst15Coupon ?? null,
         }));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -177,7 +177,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
         const result = await authService.updateProfile(req.user._id, { name, email, phone }, filePath);
         return res.status(200).json(wrap({ user: result.user }, 'Profile updated successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -187,7 +187,7 @@ exports.deleteAccount = asyncHandler(async (req, res) => {
         res.clearCookie('user_token', { domain: domain || undefined, path: '/', secure: true, sameSite: 'none' });
         return res.status(200).json(wrap(null, 'Account deleted successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -197,7 +197,7 @@ exports.verifyRecoveryCode = asyncHandler(async (req, res) => {
         await authService.verifyRecoveryCode(email, recoveryCode, newPassword, 'web');
         return res.status(200).json(wrap(null, 'Account recovered successfully.'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -207,6 +207,6 @@ exports.resendRecoveryCode = asyncHandler(async (req, res) => {
         const result = await authService.resendRecoveryCode(email);
         return res.status(200).json(wrap({ attemptsUsed: result.attemptsUsed, attemptsLeft: result.attemptsLeft }, 'Recovery code resent'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });

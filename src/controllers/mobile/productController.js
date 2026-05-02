@@ -193,7 +193,7 @@ exports.addReview = asyncHandler(async (req, res) => {
             reviews: mappedReviews,
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Error in addReview:');
         res.status(500).json({ error: error.message });
     }
 });
@@ -236,7 +236,7 @@ exports.categoryImages = asyncHandler(async (req, res) => {
             category: updatedCategory,
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Error in categoryImages:');
         res.status(500).json({ error: error.message });
     }
 });

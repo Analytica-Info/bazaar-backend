@@ -69,7 +69,7 @@ exports.hotOffers = asyncHandler(async (req, res) => {
         const result = await smartCategoriesService.getHotOffers({ priceField: "tax_exclusive" });
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
@@ -106,7 +106,7 @@ exports.getTopRatedProducts = asyncHandler(async (req, res) => {
 
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
@@ -119,7 +119,7 @@ exports.trendingProducts = asyncHandler(async (req, res) => {
 
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
@@ -153,7 +153,7 @@ exports.getNewArrivals = asyncHandler(async (req, res) => {
 
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 });

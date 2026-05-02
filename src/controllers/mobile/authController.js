@@ -337,7 +337,7 @@ exports.coupons = asyncHandler(async (req, res) => {
             available_coupons: newCouponCount,
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Error fetching coupon count:');
         return res.status(500).json({
             success: false,
             message: "An error occurred while fetching coupon count.",
@@ -484,7 +484,7 @@ exports.createCoupon = asyncHandler(async (req, res) => {
             coupon: newCoupon,
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Error creating coupon:');
         return res.status(500).json({
             success: false,
             message: "Error creating coupon.",
@@ -708,10 +708,7 @@ const fetchCouponDetails = async (id) => {
         return null;
 
     } catch (error) {
-        console.error(
-            `Error fetching coupon details for ID: ${id} ->`,
-            error.response?.data || error.message
-        );
+        logger.error({ err: error, id }, 'Error fetching coupon details:');
         return null;
     }
 };

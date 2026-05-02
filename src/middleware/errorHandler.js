@@ -106,9 +106,21 @@ function classify(err) {
 
   // 8. Legacy plain-object / express errors with .status
   if (err.status && typeof err.status === 'number') {
+    const HTTP_CODE_MAP = {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHORIZED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'CONFLICT',
+      422: 'UNPROCESSABLE',
+      429: 'RATE_LIMITED',
+      502: 'UPSTREAM_ERROR',
+    };
+    const code = (err.code && typeof err.code === 'string') ? err.code
+      : (HTTP_CODE_MAP[err.status] || 'ERROR');
     return {
       status: err.status,
-      code: 'ERROR',
+      code,
       message: err.message || 'An error occurred',
       details: undefined,
     };

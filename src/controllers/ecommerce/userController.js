@@ -461,7 +461,7 @@ exports.review = async (req, res) => {
       products: result.products,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -505,7 +505,7 @@ exports.addReview = async (req, res) => {
       reviews: result.reviews,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -524,7 +524,7 @@ exports.orders = async (req, res) => {
       canceled_orders: result.canceled_orders,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -544,7 +544,7 @@ exports.order = async (req, res) => {
       orders: result.orders,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -563,7 +563,7 @@ exports.paymentHistory = async (req, res) => {
       history: result.history,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -583,7 +583,7 @@ exports.singlePaymentHistory = async (req, res) => {
       history: result.history,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -606,7 +606,7 @@ exports.dashboard = async (req, res) => {
       wishlist_item: result.wishlist_item,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,

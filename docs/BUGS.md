@@ -303,7 +303,7 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 ### BUG-031 — Global errorHandler case #8 maps err.status to code `'ERROR'` instead of semantic codes
 - **Severity:** MEDIUM (observability, client code correctness)
 - **File:** `src/middleware/errorHandler.js` line 108–115 (case #8: legacy plain-object throws)
-- **Status:** OPEN
+- **Status:** **FIXED** (feat/v2-api-unification)
 - **Symptom:** When a service layer throws `{ status: 404, message: '...' }` and the error reaches the global `errorHandler` without being converted to a `DomainError`, case #8 emits `{ error: { code: 'ERROR', ... } }` instead of `{ error: { code: 'NOT_FOUND', ... } }`. The v2 `_shared/errors.js::handleError` helper and the new `toDomainError` function both do the correct HTTP→code mapping; the global handler does not.
 - **Impact:** Any future controller that lets a plain-object service error reach `next(err)` (e.g. via `asyncHandler` without a `toDomainError` bridge) will emit `code: 'ERROR'` for 4xx errors instead of the semantic code clients expect. The current migration works around this with `toDomainError`, but the root cause in errorHandler remains.
 - **Recommended fix:** In errorHandler case #8, apply the same `HTTP_CODE_MAP` lookup that `handleError` uses: `code = HTTP_CODE_MAP[err.status] || 'ERROR'`. One-line change, low risk.
@@ -312,8 +312,16 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 ### BUG-032 — `mobile/productController.js::addReview` uses `console.error` instead of logger
 - **Severity:** LOW (observability)
 - **File:** `src/controllers/mobile/productController.js` (addReview and categoryImages handlers)
-- **Status:** OPEN
+- **Status:** **FIXED** (feat/v2-api-unification)
 - **Symptom:** Two catch blocks call `console.error(error)` instead of `logger.error(...)`. In production, this bypasses the structured JSON logging pipeline.
 - **Impact:** Errors in review submission and category image upload are invisible in log aggregators.
 - **Recommended fix:** Replace `console.error(error)` with `logger.error({ err: error }, 'Error in addReview:')` (and similarly for `categoryImages`).
 - **Source:** PR15 code audit during asyncHandler migration.
+
+### BUG-033 — Widespread `console.error` usage in mobile and ecommerce controllers bypasses structured logging
+- **Severity:** LOW (observability)
+- **Files:** `src/controllers/mobile/authController.js` (3 calls), `src/controllers/mobile/orderController.js` (3 calls), `src/controllers/mobile/smartCategoriesController.js` (4 calls), `src/controllers/ecommerce/adminController.js` (2 calls), `src/controllers/ecommerce/publicController.js` (7 calls), `src/controllers/ecommerce/smartCategoriesController.js` (4 calls), `src/controllers/ecommerce/userController.js` (7 calls)
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** 30 `console.error(...)` calls scattered across mobile and ecommerce controllers bypassed the structured pino logger. Errors were invisible in log aggregators and structured log streams.
+- **Fix applied:** All 30 occurrences replaced with `logger.error({ err: error }, 'descriptive message:')` matching the project-standard pino structured logging style.
+- **Source:** PR15 sweep during errorHandler migration workstream.

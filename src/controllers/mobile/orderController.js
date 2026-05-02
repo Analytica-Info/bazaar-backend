@@ -16,7 +16,7 @@ exports.checkoutSession = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         logger.info('sendPushNotification Error' || 'fcmToken not available');
-        console.error(error);
+        logger.error({ err: error }, 'checkoutSession error:');
 
         if (error.status) {
             return res.status(error.status).json({ error: error.message });
@@ -178,7 +178,7 @@ exports.initStripePayment = asyncHandler(async (req, res) => {
         return res.status(200).json(result);
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
-        console.error('initStripePayment error:', error);
+        logger.error({ err: error }, 'initStripePayment error:');
         return res.status(500).json({ error: error.message });
     }
 });
@@ -202,7 +202,7 @@ exports.paymentIntent = asyncHandler(async (req, res) => {
             data: data,
         });
     } catch (error) {
-        console.error('Error fetching payment intent:', error.response?.data || error.message);
+        logger.error({ err: error }, 'Error fetching payment intent:');
         res.status(500).json({
             success: false,
             message: 'Failed to retrieve payment intent',

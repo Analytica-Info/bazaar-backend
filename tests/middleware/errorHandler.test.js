@@ -98,6 +98,79 @@ describe('errorHandler — v1 paths', () => {
       const res = await request(app).get('/test');
       expect(res.status).toBe(500);
     });
+
+    it('maps status 400 to BAD_REQUEST code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('bad input'); e.status = 400; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toHaveProperty('code', 'BAD_REQUEST');
+    });
+
+    it('maps status 401 to UNAUTHORIZED code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('unauth'); e.status = 401; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
+
+    it('maps status 403 to FORBIDDEN code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('forbidden'); e.status = 403; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'FORBIDDEN');
+    });
+
+    it('maps status 404 to NOT_FOUND code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('not found'); e.status = 404; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'NOT_FOUND');
+    });
+
+    it('maps status 409 to CONFLICT code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('conflict'); e.status = 409; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'CONFLICT');
+    });
+
+    it('maps status 502 to UPSTREAM_ERROR code (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('gateway'); e.status = 502; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'UPSTREAM_ERROR');
+    });
+
+    it('uses existing code field on legacy error if present (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('custom'); e.status = 400; e.code = 'CUSTOM_CODE'; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'CUSTOM_CODE');
+    });
+
+    it('falls back to ERROR for unmapped status codes (v2 path)', async () => {
+      const app = buildApp({
+        throwFn: () => { const e = new Error('teapot'); e.status = 418; throw e; },
+        isV2: true,
+      });
+      const res = await request(app).get('/v2/test');
+      expect(res.body.error).toHaveProperty('code', 'ERROR');
+    });
   });
 
   describe('Mongoose ValidationError', () => {

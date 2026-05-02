@@ -24,6 +24,7 @@ jest.mock("jsonwebtoken");
 const authService = require("../../../../src/services/authService");
 const jwt = require("jsonwebtoken");
 const ctrl = require("../../../../src/controllers/v2/web/authController");
+const { runHandler } = require('../../../_helpers/handlerExec');
 
 const makeReq = (opts = {}) => ({
   user: opts.user || { _id: "u1" },
@@ -67,9 +68,8 @@ describe("register", () => {
   });
   it("passes error", async () => {
     authService.register.mockRejectedValue({ status: 409, message: "exists" });
-    const res = makeRes();
-    await ctrl.register(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(409);
+    const { statusCode } = await runHandler(ctrl.register, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(409);
   });
 });
 
@@ -91,9 +91,8 @@ describe("login", () => {
   });
   it("passes error", async () => {
     authService.loginWithCredentials.mockRejectedValue({ status: 401, message: "wrong" });
-    const res = makeRes();
-    await ctrl.login(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(401);
+    const { statusCode } = await runHandler(ctrl.login, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(401);
   });
 });
 
@@ -107,9 +106,8 @@ describe("googleLogin", () => {
   });
   it("passes error", async () => {
     authService.googleLogin.mockRejectedValue({ status: 401, message: "bad" });
-    const res = makeRes();
-    await ctrl.googleLogin(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(401);
+    const { statusCode } = await runHandler(ctrl.googleLogin, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(401);
   });
 });
 
@@ -123,9 +121,8 @@ describe("appleLogin", () => {
   });
   it("passes error", async () => {
     authService.appleLogin.mockRejectedValue({ status: 401, message: "bad" });
-    const res = makeRes();
-    await ctrl.appleLogin(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(401);
+    const { statusCode } = await runHandler(ctrl.appleLogin, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(401);
   });
 });
 
@@ -170,9 +167,8 @@ describe("forgotPassword", () => {
   });
   it("passes error", async () => {
     authService.forgotPassword.mockRejectedValue({ status: 404, message: "no user" });
-    const res = makeRes();
-    await ctrl.forgotPassword(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(404);
+    const { statusCode } = await runHandler(ctrl.forgotPassword, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(404);
   });
 });
 
@@ -185,9 +181,8 @@ describe("verifyCode", () => {
   });
   it("passes error", async () => {
     authService.verifyCode.mockRejectedValue({ status: 400, message: "bad" });
-    const res = makeRes();
-    await ctrl.verifyCode(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    const { statusCode } = await runHandler(ctrl.verifyCode, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -200,9 +195,8 @@ describe("resetPassword", () => {
   });
   it("passes error", async () => {
     authService.resetPassword.mockRejectedValue({ status: 400, message: "bad" });
-    const res = makeRes();
-    await ctrl.resetPassword(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    const { statusCode } = await runHandler(ctrl.resetPassword, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -215,9 +209,8 @@ describe("updatePassword", () => {
   });
   it("passes error", async () => {
     authService.updatePassword.mockRejectedValue({ status: 400, message: "wrong" });
-    const res = makeRes();
-    await ctrl.updatePassword(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    const { statusCode } = await runHandler(ctrl.updatePassword, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -230,9 +223,8 @@ describe("getUserData", () => {
   });
   it("passes error", async () => {
     authService.getUserData.mockRejectedValue({ status: 404, message: "not found" });
-    const res = makeRes();
-    await ctrl.getUserData(makeReq(), res);
-    expect(res.status).toHaveBeenCalledWith(404);
+    const { statusCode } = await runHandler(ctrl.getUserData, makeReq(), { path: '/v2/test' });
+    expect(statusCode).toBe(404);
   });
 });
 
@@ -252,9 +244,8 @@ describe("updateProfile", () => {
   });
   it("passes error", async () => {
     authService.updateProfile.mockRejectedValue({ status: 400, message: "bad" });
-    const res = makeRes();
-    await ctrl.updateProfile(makeReq(), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    const { statusCode } = await runHandler(ctrl.updateProfile, makeReq(), { path: '/v2/test' });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -268,9 +259,8 @@ describe("deleteAccount", () => {
   });
   it("passes error", async () => {
     authService.deleteAccount.mockRejectedValue({ status: 404, message: "not found" });
-    const res = makeRes();
-    await ctrl.deleteAccount(makeReq(), res);
-    expect(res.status).toHaveBeenCalledWith(404);
+    const { statusCode } = await runHandler(ctrl.deleteAccount, makeReq(), { path: '/v2/test' });
+    expect(statusCode).toBe(404);
   });
 });
 
@@ -283,9 +273,8 @@ describe("verifyRecoveryCode", () => {
   });
   it("passes error", async () => {
     authService.verifyRecoveryCode.mockRejectedValue({ status: 400, message: "bad" });
-    const res = makeRes();
-    await ctrl.verifyRecoveryCode(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    const { statusCode } = await runHandler(ctrl.verifyRecoveryCode, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(400);
   });
 });
 
@@ -298,8 +287,7 @@ describe("resendRecoveryCode", () => {
   });
   it("passes error", async () => {
     authService.resendRecoveryCode.mockRejectedValue({ status: 429, message: "too many" });
-    const res = makeRes();
-    await ctrl.resendRecoveryCode(makeReq({ body: {} }), res);
-    expect(res.status).toHaveBeenCalledWith(429);
+    const { statusCode } = await runHandler(ctrl.resendRecoveryCode, makeReq({ body: {} }), { path: '/v2/test' });
+    expect(statusCode).toBe(429);
   });
 });

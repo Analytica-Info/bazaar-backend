@@ -4,7 +4,7 @@
  */
 const authService = require('../../../services/authService');
 const { wrap, wrapError } = require('../_shared/responseEnvelope');
-const { handleError } = require('../_shared/errors');
+const { toDomainError } = require('../_shared/errors');
 const { asyncHandler } = require('../../../middleware');
 const logger = require('../../../utilities/logger');
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL;
@@ -17,7 +17,7 @@ exports.register = asyncHandler(async (req, res) => {
         return res.status(status).json(wrap(null, result.restored ? 'Account restored successfully' : 'User registered successfully'));
     } catch (error) {
         logger.error({ err: error }, 'v2 register error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -41,7 +41,7 @@ exports.login = asyncHandler(async (req, res) => {
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 login error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -65,7 +65,7 @@ exports.googleLogin = asyncHandler(async (req, res) => {
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 google login error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -89,7 +89,7 @@ exports.appleLogin = asyncHandler(async (req, res) => {
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 apple login error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -104,7 +104,7 @@ exports.getUserData = asyncHandler(async (req, res) => {
         }));
     } catch (error) {
         logger.error({ err: error }, 'v2 getUserData error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -113,7 +113,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
         await authService.forgotPassword(req.body.email);
         return res.status(200).json(wrap(null, 'Verification code sent to email'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -122,7 +122,7 @@ exports.verifyCode = asyncHandler(async (req, res) => {
         await authService.verifyCode(req.body.email, req.body.code);
         return res.status(200).json(wrap(null, 'Code verified successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -132,7 +132,7 @@ exports.resetPassword = asyncHandler(async (req, res) => {
         await authService.resetPassword(email, code, new_password, 'mobile');
         return res.status(200).json(wrap(null, 'Password reset successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -146,7 +146,7 @@ exports.refreshToken = asyncHandler(async (req, res) => {
         return res.status(200).json(wrap({ accessToken: result.accessToken, refreshToken: result.refreshToken }));
     } catch (error) {
         logger.error({ err: error }, 'v2 refreshToken error');
-        return handleError(res, { status: 403, code: 'INVALID_TOKEN', message: error.message || 'Invalid or expired refresh token' });
+        throw toDomainError({ status: 403, code: 'INVALID_TOKEN', message: error.message || 'Invalid or expired refresh token' });
     }
 });
 
@@ -160,7 +160,7 @@ exports.checkAccessToken = asyncHandler(async (req, res) => {
         const result = await authService.checkAccessToken(accessToken, refreshToken);
         return res.status(200).json(wrap(result));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -171,7 +171,7 @@ exports.updateProfile = asyncHandler(async (req, res) => {
         const result = await authService.updateProfile(req.user._id, { name, email, phone }, filePath);
         return res.status(200).json(wrap({ user: result.user }, 'Profile updated successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -181,7 +181,7 @@ exports.deleteAccount = asyncHandler(async (req, res) => {
         return res.status(200).json(wrap(null, 'Account deleted successfully'));
     } catch (error) {
         logger.error({ err: error }, 'v2 deleteAccount error');
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -191,7 +191,7 @@ exports.verifyRecoveryCode = asyncHandler(async (req, res) => {
         await authService.verifyRecoveryCode(email, recoveryCode, newPassword, 'mobile');
         return res.status(200).json(wrap(null, 'Account recovered successfully. You can now log in.'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -201,7 +201,7 @@ exports.resendRecoveryCode = asyncHandler(async (req, res) => {
         const result = await authService.resendRecoveryCode(email);
         return res.status(200).json(wrap({ attemptsUsed: result.attemptsUsed, attemptsLeft: result.attemptsLeft }, 'Recovery code resent successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
 
@@ -211,6 +211,6 @@ exports.updatePassword = asyncHandler(async (req, res) => {
         await authService.updatePassword(req.user._id, old_password, new_password);
         return res.status(200).json(wrap(null, 'Password updated successfully'));
     } catch (error) {
-        return handleError(res, error);
+        throw toDomainError(error);
     }
 });
