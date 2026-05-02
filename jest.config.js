@@ -25,21 +25,45 @@ module.exports = {
     // PR9 merged-total actuals: lines=77.82%, stmts=76.88%, branches=61.55%, funcs=79.71%
     // PR10 merged-total actuals: lines=81.51%, stmts=80.48%, branches=64.95%, funcs=82.99%
     // PR11 merged-total actuals: lines=85.38%, stmts=84.31%, branches=71.71%, funcs=83.90%
+    // PR12 merged-total actuals: lines=87.21%, stmts=86.11%, branches=74.11%, funcs=85.27%
     // Jest threshold check uses single-project (unit) actuals (lower) — ratcheted to actual − 1pp.
     global: {
-      lines: 80,
-      statements: 79,
-      branches: 57,
-      functions: 76,
+      lines: 81,
+      statements: 80,
+      branches: 58,
+      functions: 77,
     },
     // --- PR7: services directory threshold (excl. payments/) ---
     // PR11 actuals: authService 94.98%, checkoutService 84.73%, orderService 80.26%
+    // PR12 actuals: productSyncService 93.6%, adminService 82.73%, productService 80.14%
     // Directory actuals improved significantly; thresholds raised at actual − 2pp for lagging files.
     './src/services/': {
-      lines: 52,
-      statements: 51,
-      branches: 38,
-      functions: 54,
+      lines: 54,
+      statements: 53,
+      branches: 40,
+      functions: 56,
+    },
+    // --- PR12: per-file thresholds for 3 target services ---
+    // productSyncService: lines=93.6%, branches=72.98%
+    './src/services/productSyncService.js': {
+      lines: 91,
+      statements: 90,
+      branches: 70,
+      functions: 76,
+    },
+    // adminService: lines=82.73%, branches=73.22%
+    './src/services/adminService.js': {
+      lines: 80,
+      statements: 78,
+      branches: 71,
+      functions: 68,
+    },
+    // productService: lines=80.14%, branches=71.1%
+    './src/services/productService.js': {
+      lines: 78,
+      statements: 75,
+      branches: 69,
+      functions: 77,
     },
     // --- PR11: per-file thresholds for 3 target service files ---
     // authService: lines=94.98%, branches=89.37%, funcs=100%, stmts=95.14%

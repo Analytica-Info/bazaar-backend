@@ -94,6 +94,22 @@ Living tracker of production bugs discovered while writing tests across PR1–PR
 - **Recommended fix:** Either (a) refactor to read `process.env.ENVIRONMENT` inline at call-time instead of module-scope, or (b) maintain separate `*.env.test.js` files that set the var before importing (as done for checkoutService.env.test.js in PR11).
 - **Source:** Discovered during PR11 coverage push.
 
+### BUG-012 — checkSpelling function in productService is dead code (never called)
+- **File:** `src/services/productService.js:242`
+- **Status:** OPEN
+- **Symptom:** `checkSpelling(word)` is defined at line 242 but has zero call sites in the file. No function in `productService.js` ever invokes it. The function references the module-level `dictionary` (typo-js) and `spellingCache` (NodeCache). Its 28 lines (242-269) are permanently uncovered.
+- **Impact:** Dead code: ~28 lines of untestable coverage debt, plus a misleading API surface. Any consumer expecting spelling-correction suggestions in search results gets none silently.
+- **Recommended fix:** Either (a) call `checkSpelling` from `searchProducts` when `filteredProducts.length === 0` to surface spelling suggestions in the API response, or (b) delete the function if the feature is deferred.
+- **Source:** PR12 finding.
+
+### BUG-013 — logStatusFalseItems in productService has unreachable branches
+- **File:** `src/services/productService.js:101-108`
+- **Status:** OPEN
+- **Symptom:** `logStatusFalseItems` has branches for `responseData.data.products` (line 102) and `responseData.data` as array (lines 104-108). No call site in the file passes a responseData with either of these shapes — all callers pass shapes with `.products`, `.filteredProducts`, or `.product + .id`. The branches are permanently uncovered.
+- **Impact:** Dead branch coverage debt (~7 lines). Not a runtime risk, but the defensive checks are misleading.
+- **Recommended fix:** Remove unused branches, or add a caller that exercises those shapes.
+- **Source:** PR12 finding.
+
 ### BUG-011 — verifyTabbyPayment in orderService calls axios.post for capture but no post mock guard
 - **File:** `src/services/orderService.js` (line 1540)
 - **Status:** **OPEN** (test isolation only)

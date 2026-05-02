@@ -725,3 +725,56 @@ Test count: 2394 total (2391 pass, 3 skip)
 
 - The `logStatusFalseItems` function in `smartCategoriesController.js` writes to a log file when products with `status: false` are found. Tests trigger this path via a mocked service response returning a status-false item. The fs write is not separately mocked — the test verifies the controller still returns 200 regardless.
 - `sendPushNotification.js` functions coverage is 80% (not 85%) because `initializeFirebase` / `isFirebaseInitialized` internal sub-branches (file-exist + admin.apps.length combo) are partially covered. The 2 private functions contribute to the function denominator but `initializeFirebase` is only partially reachable because the service-account file path is always mocked as missing.
+
+
+---
+
+# PR12 Coverage Push
+
+Date: 2026-05-01
+Branch: feat/v2-api-unification
+
+## Global Summary (PR12)
+
+| Metric      | PR11 (before) | PR12 (after) | Delta  |
+|-------------|---------------|--------------|--------|
+| Statements  | 84.31%        | 86.11%       | +1.80pp |
+| Branches    | 71.71%        | 74.11%       | +2.40pp |
+| Functions   | 83.90%        | 85.27%       | +1.37pp |
+| Lines       | 85.38%        | 87.21%       | +1.83pp |
+
+Tests: 2533 total (2530 pass, 3 skip) — was 2391
+
+## Per-File Coverage (PR12 targets)
+
+| File                        | Lines Before | Lines After | Branches Before | Branches After | Hit 80%? |
+|-----------------------------|-------------|-------------|-----------------|----------------|----------|
+| productSyncService.js       | 72.1%        | 93.6%       | ~65%            | 72.98%         | YES      |
+| adminService.js             | 75.1%        | 82.73%      | ~68%            | 73.22%         | YES      |
+| productService.js           | 70.2%        | 80.14%      | ~67%            | 71.1%          | YES      |
+
+## New Test Files (PR12)
+
+- `tests/services/productSyncService.pr12.test.js` — 20 tests: refreshSingleProductById paths, fetchProductDetailsForRefresh (inactive product, tax_exclusive fallback, variant inventory fail), discount sync error swallowing, sale status != SAVED path, inactive product in sale update
+- `tests/services/adminService.pr12.test.js` — 75 tests: adminRegister/Login missing-field matrix, forgotPassword success, verifyCode/resetPassword full paths, updatePassword, getAdminById, createSubAdmin/updateSubAdmin edge cases, getAllUsers filter branches (status/platform/authProvider/dates), getOrders filter branches (paymentStatus/paymentMethod/platform), updateOrderStatus, blockUser/unblockUser/deleteUser/restoreUser error paths, enrichOrdersWithDetails with OrderDetails, getCoupons 404
+- `tests/services/productService.pr12.test.js` — 44 tests: getProductDetails 404 + trackProductView update, searchProducts Atlas fallback + no-result, searchSingleProduct, fetchDbProducts filter matrix, getAllProducts, getBrands, getBrandNameById, getSimilarProducts, getCategoriesProduct, getHomeProducts uncategorized, error path coverage
+
+## New jest.config.js Thresholds (PR12, at actual − 2pp)
+
+| Scope                               | Stmts | Branches | Funcs | Lines |
+|-------------------------------------|-------|----------|-------|-------|
+| global                              | 80    | 58       | 77    | 81    |
+| src/services/ (directory)           | 53    | 40       | 56    | 54    |
+| src/services/productSyncService.js  | 90    | 70       | 76    | 91    |
+| src/services/adminService.js        | 78    | 71       | 68    | 80    |
+| src/services/productService.js      | 75    | 69       | 77    | 78    |
+
+## Bugs Found (PR12)
+
+- BUG-012: `checkSpelling` in productService is dead code — defined but never called (28 unreachable lines)
+- BUG-013: `logStatusFalseItems` in productService has 2 unreachable branches — no caller passes `data.products` or `data[]` shapes
+
+## Notes
+
+- productService hits exactly 80.14% lines. The remaining ~114 missed lines are: (a) dead code — `checkSpelling` (28 lines, never called), (b) `logStatusFalseItems` dead branches (7 lines, no caller uses those shapes), (c) deeply nested category-path building in getCategoriesProduct/getSubCategoryProducts/getSubSubCategoriesProduct (require Lightspeed API data with specific category_path structures).
+- V8 instrumentation note: no V8 under-instrumentation issues observed in these files.
