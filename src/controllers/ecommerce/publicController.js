@@ -30,6 +30,7 @@ const { sendEmail } = require("../../mail/emailService");
 const crypto = require("crypto");
 const year = new Date().getFullYear();
 const cache = require('../../utilities/cache');
+const runtimeConfig = require('../../config/runtime');
 const { Readable } = require("stream");
 const fs = require("fs");
 const path = require("path");
@@ -1840,7 +1841,7 @@ async function filterProductsByInventory(productsResponse) {
 
 async function filterAndCacheProductsByInventory() {
   const cacheKey = cache.key('lightspeed', 'products-inventory', 'v1');
-  return cache.getOrSet(cacheKey, 300, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsInventoryTtl, async () => {
     logger.info("Fetching filtered products from Lightspeed API");
 
     const productsResponse = await axios.get(PRODUCTS_URL, {
@@ -1941,7 +1942,7 @@ async function fetchProducts() {
 
 async function fetchAndCacheProducts() {
   const cacheKey = cache.key('lightspeed', 'products', 'v1');
-  return cache.getOrSet(cacheKey, 600, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsProductsTtl, async () => {
     logger.info("Fetching products from Lightspeed API");
 
     const response = await axios.get(PRODUCTS_URL, {
@@ -1989,7 +1990,7 @@ async function fetchCategories() {
 
 async function fetchAndCacheCategories() {
   const cacheKey = cache.key('lightspeed', 'categories', 'v1');
-  return cache.getOrSet(cacheKey, 3600, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsCategoriesTtl, async () => {
     logger.info("Fetching categories from Lightspeed API");
 
     const categoriesResponse = await axios.get(CATEGORIES_URL, {

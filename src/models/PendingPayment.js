@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const runtimeConfig = require('../config/runtime');
 
 const pendingPaymentSchema = new mongoose.Schema({
     user_id: { 
@@ -31,7 +32,7 @@ const pendingPaymentSchema = new mongoose.Schema({
     },
     expires_at: {
         type: Date,
-        default: () => new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+        default: () => new Date(Date.now() + runtimeConfig.order.pendingPaymentExpiryMs) // 30 minutes default
     },
     webhook_received: {
         type: Boolean,

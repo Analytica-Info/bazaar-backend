@@ -14,6 +14,7 @@ const CartData = repositories.cartData.rawModel();
 
 const logger = require('../../../utilities/logger');
 const { resolveCheckoutDiscountAED } = require('../domain/discountResolver');
+const { STRIPE_AMOUNT_MULTIPLIER } = require('../../../config/constants/money');
 
 /**
  * Create a Stripe checkout session.
@@ -38,14 +39,14 @@ async function createStripeCheckout(cartData, userId, metadata) {
     cartData, bankPromoId, discountPercent, discountAmount, capAED,
   });
   const subtotalAfter = Math.max(0, subtotalBefore - disc);
-  const totalBeforeCents = Math.round(subtotalBefore * 100);
-  const totalAfterCents = Math.round(subtotalAfter * 100);
+  const totalBeforeCents = Math.round(subtotalBefore * STRIPE_AMOUNT_MULTIPLIER);
+  const totalAfterCents = Math.round(subtotalAfter * STRIPE_AMOUNT_MULTIPLIER);
 
   let lineItems;
   if (disc > 0 && subtotalBefore > 0 && totalBeforeCents > 0) {
     let allocatedCents = 0;
     lineItems = cartData.map((item, index) => {
-      const lineBeforeCents = Math.round(Number(item.price) * 100) * Number(item.qty);
+      const lineBeforeCents = Math.round(Number(item.price) * STRIPE_AMOUNT_MULTIPLIER) * Number(item.qty);
       let lineAfterCents;
       if (index === cartData.length - 1) {
         lineAfterCents = totalAfterCents - allocatedCents;
@@ -69,7 +70,7 @@ async function createStripeCheckout(cartData, userId, metadata) {
       price_data: {
         currency: currency,
         product_data: { name: item.name, description: item.variant || '' },
-        unit_amount: Math.round(Number(item.price) * 100),
+        unit_amount: Math.round(Number(item.price) * STRIPE_AMOUNT_MULTIPLIER),
       },
       quantity: Number(item.qty),
     }));
@@ -81,7 +82,7 @@ async function createStripeCheckout(cartData, userId, metadata) {
         price_data: {
           currency: currency,
           product_data: { name: 'Shipping Cost' },
-          unit_amount: Math.round(Number(shippingCost) * 100),
+          unit_amount: Math.round(Number(shippingCost) * STRIPE_AMOUNT_MULTIPLIER),
         },
         quantity: 1,
       });

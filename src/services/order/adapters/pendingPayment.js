@@ -18,6 +18,10 @@ const cache = require('../../../utilities/cache');
 const { updateQuantities } = require('../shared/quantities');
 const { buildWebhookAdminEmailHtml, buildWebhookUserEmailHtml } = require('../domain/emailTemplates');
 const markCouponUsed = require('../use-cases/markCouponUsed');
+const { MS_PER_DAY } = require('../../../config/constants/time');
+const runtimeConfig = require('../../../config/runtime');
+
+const DELIVERY_DAYS = runtimeConfig.order.deliveryDays;
 
 const ENVIRONMENT = process.env.ENVIRONMENT;
 
@@ -248,7 +252,7 @@ async function processPendingPayment(paymentId, payment) {
         }
 
         const currentDate = clock.now();
-        const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+        const deliveryDate = new Date(currentDate.getTime() + DELIVERY_DAYS * MS_PER_DAY);
         const day = deliveryDate.getDate();
         const month = deliveryDate.toLocaleString('default', { month: 'long' });
         const deliveryYear = deliveryDate.getFullYear();

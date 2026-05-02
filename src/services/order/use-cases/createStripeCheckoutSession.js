@@ -18,6 +18,10 @@ const { normalizeCartDataWithGifts, applyGiftLogic } = require('../domain/cartNo
 const { buildAdminOrderEmailHtml, buildUserOrderEmailHtml } = require('../domain/emailTemplates');
 const { updateQuantities } = require('../shared/quantities');
 const markCouponUsed = require('./markCouponUsed');
+const { MS_PER_DAY } = require('../../../config/constants/time');
+const runtimeConfig = require('../../../config/runtime');
+
+const DELIVERY_DAYS = runtimeConfig.order.deliveryDays;
 
 // Private internal helper — not the same as the public exports.verifyTabbyPayment
 async function verifyTabbyPaymentInternal(paymentId) {
@@ -416,7 +420,7 @@ module.exports = async function createStripeCheckoutSession(userId, bodyData, me
     }
 
     const currentDate = clock.now();
-    const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const deliveryDate = new Date(currentDate.getTime() + DELIVERY_DAYS * MS_PER_DAY);
     const day = deliveryDate.getDate();
     const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });
     const month = deliveryDate.toLocaleString('default', { month: 'long' });

@@ -2,6 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const PaymentProvider = require('./PaymentProvider');
 const logger = require('../../utilities/logger');
+const runtimeConfig = require('../../config/runtime');
 
 const NOMOD_BASE_URL = 'https://api.nomod.com';
 
@@ -16,7 +17,7 @@ class NomodProvider extends PaymentProvider {
                 'Accept': 'application/json',
                 'X-API-KEY': this.apiKey,
             },
-            timeout: 30000,
+            timeout: runtimeConfig.external.nomodTimeoutMs,
         });
     }
 

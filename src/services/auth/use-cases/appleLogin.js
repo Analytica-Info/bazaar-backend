@@ -8,6 +8,7 @@ const appleSignin = require('apple-signin-auth');
 const { generateTokens, decodeToken } = require('../domain/tokenIssuer');
 const { upsertSession } = require('../domain/sessionState');
 const { getCouponStatus, User, Order } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * Apple login/signup.
@@ -162,7 +163,7 @@ async function _webAppleLogin({ idToken, code, authorizationCode, userData, name
     }
 
     const jwtExpiry = rememberMe ? '30d' : '7d';
-    const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    const cookieMaxAge = rememberMe ? runtimeConfig.auth.rememberMeCookieMaxAgeMs : runtimeConfig.auth.sessionCookieMaxAgeMs;
 
     let isNewUser = false;
     let tokens;

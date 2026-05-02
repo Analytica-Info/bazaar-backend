@@ -3,8 +3,9 @@
 const Order = require('../../../repositories').orders.rawModel();
 const OrderDetail = require('../../../repositories').orderDetails.rawModel();
 const Product = require('../../../repositories').products.rawModel();
+const { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } = require('../../../config/constants/pagination');
 
-module.exports = async function getOrders(userId, { page = 1, limit = 20 } = {}) {
+module.exports = async function getOrders(userId, { page = DEFAULT_PAGE, limit = DEFAULT_PAGE_SIZE } = {}) {
     const userFilter = { $or: [{ userId }, { user_id: userId }] };
     const skip = (page - 1) * limit;
 

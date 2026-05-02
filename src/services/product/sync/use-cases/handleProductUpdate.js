@@ -14,7 +14,8 @@ const { getMatchingProductIds } = require('../domain/lightspeedHelpers');
 const API_KEY = process.env.API_KEY;
 
 // Redis-backed dedup lock TTL (seconds).
-const WEBHOOK_DEDUP_TTL = 3;
+const runtimeConfig = require('../../../../config/runtime');
+const WEBHOOK_DEDUP_TTL = runtimeConfig.cache.webhookDedupTtl;
 
 async function inventoryProductDetailUpdate(type, updateProductId, timeFormatted) {
   const allParkedProductIds = await filterParkProducts();

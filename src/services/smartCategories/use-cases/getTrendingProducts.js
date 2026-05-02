@@ -6,7 +6,9 @@ const cache = require('../../../utilities/cache');
 const clock = require('../../../utilities/clock');
 const { LIST_EXCLUDE_PROJECTION, LIST_EXCLUDE_SELECT } = require('../domain/projections');
 
-const SMART_CAT_TTL = 300;
+const runtimeConfig = require('../../../config/runtime');
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
+const { MS_PER_HOUR } = require('../../../config/constants/time');
 
 /**
  * Get trending products based on recent sales.
@@ -19,7 +21,7 @@ async function getTrendingProducts({ timeWindowHours }) {
         SMART_CAT_TTL,
         async () => {
             const nowDubaiUTC = clock.now();
-            const cutoff = new Date(nowDubaiUTC.getTime() - timeWindowHours * 60 * 60 * 1000);
+            const cutoff = new Date(nowDubaiUTC.getTime() - timeWindowHours * MS_PER_HOUR);
 
             const soldProducts = await OrderDetail.aggregate([
                 { $match: { createdAt: { $gte: cutoff } } },

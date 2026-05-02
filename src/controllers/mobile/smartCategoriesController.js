@@ -232,7 +232,8 @@ const LIST_EXCLUDE_PROJECTION = {
 };
 
 const cache = require("../../utilities/cache");
-const PRODUCTS_BY_VARIANT_TTL = 300; // 5 min
+const runtimeConfig = require("../../config/runtime");
+const PRODUCTS_BY_VARIANT_TTL = runtimeConfig.cache.productsByVariantTtl;
 
 exports.getProductByVariant = asyncHandler(async (req, res) => {
     try {

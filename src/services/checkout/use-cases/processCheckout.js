@@ -10,6 +10,7 @@
  */
 
 const stripe = require('stripe')(process.env.STRIPE_SK);
+const { STRIPE_AMOUNT_MULTIPLIER } = require('../../../config/constants/money');
 
 const repositories = require('../../../repositories');
 const Order = repositories.orders.rawModel();
@@ -28,7 +29,7 @@ async function processCheckout(orderData, userId) {
       shippingCost;
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount * STRIPE_AMOUNT_MULTIPLIER),
       currency: currency || 'usd',
       payment_method_types: ['card'],
     });

@@ -8,9 +8,11 @@
  */
 
 const clock = require('../../../utilities/clock');
+const { MS_PER_HOUR } = require('../../../config/constants/time');
+const { MAX_RECOVERY_ATTEMPTS } = require('../../../config/constants/business');
 
-const MAX_ATTEMPTS = 5;
-const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_ATTEMPTS = MAX_RECOVERY_ATTEMPTS;
+const WINDOW_MS = 24 * MS_PER_HOUR; // 24 hours
 
 /**
  * Determine whether a recovery-code resend is allowed given the user's

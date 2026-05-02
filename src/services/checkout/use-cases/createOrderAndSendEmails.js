@@ -27,6 +27,10 @@ const { clearUserCart, getUaeDateTime } = require('../domain/cartHelpers');
 const { updateQuantities } = require('../shared/inventory');
 const { buildTabbyAdminOrderHtml, buildTabbyUserOrderHtml } = require('../templates/tabbyOrderHtml');
 const clock = require('../../../utilities/clock');
+const { MS_PER_DAY } = require('../../../config/constants/time');
+const runtimeConfig = require('../../../config/runtime');
+
+const DELIVERY_DAYS = runtimeConfig.order.deliveryDays;
 
 // BUG-010: module-load const — do NOT move into the function body
 const ENVIRONMENT = process.env.ENVIRONMENT;
@@ -224,7 +228,7 @@ async function createOrderAndSendEmails(payment, user_id) {
 
   const currentDate = clock.now();
   const deliveryDate = new Date(
-    currentDate.getTime() + 3 * 24 * 60 * 60 * 1000
+    currentDate.getTime() + DELIVERY_DAYS * MS_PER_DAY
   );
   const dayNum = deliveryDate.getDate();
   const dayOfWeek = deliveryDate.toLocaleString('default', {

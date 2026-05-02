@@ -6,7 +6,8 @@ const cache = require('../../../utilities/cache');
 const clock = require('../../../utilities/clock');
 const { LIST_EXCLUDE_SELECT } = require('../domain/projections');
 
-const SMART_CAT_TTL = 300;
+const runtimeConfig = require('../../../config/runtime');
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
 
 /**
  * Get flash sale products.

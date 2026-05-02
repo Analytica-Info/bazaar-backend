@@ -4,6 +4,7 @@ const clock = require('../../../utilities/clock');
 const { signCodeToken } = require('../domain/tokenIssuer');
 const { sendForgotPasswordEmail } = require('../domain/emailTemplates');
 const { generateVerificationCode, User } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
 
 async function forgotPassword(email) {
     const user = await User.findOne({ email });
@@ -25,7 +26,7 @@ async function forgotPassword(email) {
     sendForgotPasswordEmail(email, verificationCode);
 
     user.resetPasswordToken = token;
-    user.resetPasswordExpires = clock.nowMs() + 10 * 60 * 1000;
+    user.resetPasswordExpires = clock.nowMs() + runtimeConfig.auth.resetPasswordExpiryMs;
     await user.save();
 
     return {};

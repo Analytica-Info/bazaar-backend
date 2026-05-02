@@ -37,6 +37,10 @@ const { clearUserCart, getUaeDateTime } = require('../domain/cartHelpers');
 const { updateQuantities } = require('../shared/inventory');
 const { buildStripeAdminOrderHtml, buildStripeUserOrderHtml } = require('../templates/stripeOrderHtml');
 const clock = require('../../../utilities/clock');
+const { MS_PER_DAY } = require('../../../config/constants/time');
+const runtimeConfig = require('../../../config/runtime');
+
+const DELIVERY_DAYS = runtimeConfig.order.deliveryDays;
 
 /**
  * @param {string} sessionId
@@ -215,7 +219,7 @@ async function verifyStripePayment(sessionId, userId) {
       }
 
       const currentDate = clock.now();
-      const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const deliveryDate = new Date(currentDate.getTime() + DELIVERY_DAYS * MS_PER_DAY);
       const dayNum = deliveryDate.getDate();
       const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });
       const monthStr = deliveryDate.toLocaleString('default', { month: 'long' });

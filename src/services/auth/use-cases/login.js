@@ -8,6 +8,7 @@ const { compare } = require('../domain/passwordHasher');
 const { generateTokens } = require('../domain/tokenIssuer');
 const { upsertSession } = require('../domain/sessionState');
 const { getCouponStatus, User, Order } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * Login with email + password.
@@ -69,7 +70,7 @@ async function loginWithCredentials({ email, password, fcmToken, rememberMe, dev
         await user.save();
     } else {
         const jwtExpiry = rememberMe ? '30d' : '7d';
-        cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+        cookieMaxAge = rememberMe ? runtimeConfig.auth.rememberMeCookieMaxAgeMs : runtimeConfig.auth.sessionCookieMaxAgeMs;
         tokens = generateTokens(user, { accessExpiry: jwtExpiry, refreshExpiry: '7d' });
         if (fcmToken) {
             user.fcmToken = fcmToken;

@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 const repos = require('../../../repositories');
 const { escapeRegex } = require('../../../utilities/stringUtils');
+const { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } = require('../../../config/constants/pagination');
 
 /**
  * Get notifications for a specific user with optional pagination.
@@ -82,7 +83,7 @@ async function trackNotificationClick(userId, notificationId) {
 /**
  * Search users with pagination.
  */
-async function searchUsers({ search = '', page = 1, limit = 20 } = {}) {
+async function searchUsers({ search = '', page = DEFAULT_PAGE, limit = DEFAULT_PAGE_SIZE } = {}) {
   const regexSafe = search ? escapeRegex(search) : null;
   const { items, total } = await repos.users.searchPaginated({ regexSafe, page, limit });
   const totalPages = Math.ceil(total / limit);

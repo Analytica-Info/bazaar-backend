@@ -2,6 +2,7 @@
 
 const stripe = require("stripe")(process.env.STRIPE_SK);
 const User = require('../../../repositories').users.rawModel();
+const { STRIPE_AMOUNT_MULTIPLIER } = require('../../../config/constants/money');
 
 module.exports = async function initStripePayment(userId, amountAED) {
     const user = await User.findById(userId);
@@ -25,7 +26,7 @@ module.exports = async function initStripePayment(userId, amountAED) {
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amountAED * 100),
+        amount: Math.round(amountAED * STRIPE_AMOUNT_MULTIPLIER),
         currency: 'aed',
         customer: customerId,
         setup_future_usage: 'off_session',

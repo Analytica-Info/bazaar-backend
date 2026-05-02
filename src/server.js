@@ -16,6 +16,7 @@ require("dotenv").config();
 
 const logger = require("./utilities/logger");
 const JWT_SECRET = require("./config/jwtSecret.js");
+const runtimeConfig = require("./config/runtime");
 const authMiddleware = require("./middleware/authMiddleware");
 const { requestContext, notFound, errorHandler } = require("./middleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
@@ -104,8 +105,8 @@ app.use(
 
 // Rate limiting on auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per window
+  windowMs: runtimeConfig.rateLimit.authWindowMs,
+  max: runtimeConfig.rateLimit.authMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: "Too many attempts, please try again later." },
@@ -123,8 +124,8 @@ app.use("/v2/auth/refresh-token", authLimiter);
 
 // Stricter rate limit for password reset
 const passwordResetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: runtimeConfig.rateLimit.passwordResetWindowMs,
+  max: runtimeConfig.rateLimit.passwordResetMax,
   message: { success: false, message: "Too many password reset attempts, please try again later." },
 });
 app.use("/user/forgot-password", passwordResetLimiter);

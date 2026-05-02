@@ -4,7 +4,8 @@ const Product = require('../../../repositories').products.rawModel();
 const cache = require('../../../utilities/cache');
 const { LIST_EXCLUDE_PROJECTION } = require('../domain/projections');
 
-const SMART_CAT_TTL = 300;
+const runtimeConfig = require('../../../config/runtime');
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
 
 /**
  * Get new arrival products with pagination.

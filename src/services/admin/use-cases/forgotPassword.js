@@ -6,6 +6,7 @@ const Admin      = require('../../../repositories').admins.rawModel();
 const { sendEmail } = require('../../../mail/emailService');
 const clock      = require('../../../utilities/clock');
 const logger     = require('../../../utilities/logger');
+const runtimeConfig = require('../../../config/runtime');
 
 module.exports = async function forgotPassword(email) {
     logger.info({ email }, 'forgotPassword called');
@@ -82,7 +83,7 @@ module.exports = async function forgotPassword(email) {
     await sendEmail(email, subject, html);
 
     admin.resetPasswordToken = token;
-    admin.resetPasswordExpires = clock.nowMs() + 10 * 60 * 1000;
+    admin.resetPasswordExpires = clock.nowMs() + runtimeConfig.auth.resetPasswordExpiryMs;
     await admin.save();
 
     return {};

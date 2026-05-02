@@ -325,3 +325,32 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Symptom:** 30 `console.error(...)` calls scattered across mobile and ecommerce controllers bypassed the structured pino logger. Errors were invisible in log aggregators and structured log streams.
 - **Fix applied:** All 30 occurrences replaced with `logger.error({ err: error }, 'descriptive message:')` matching the project-standard pino structured logging style.
 - **Source:** PR15 sweep during errorHandler migration workstream.
+
+---
+
+### BUG-035 — Access token expiry inconsistency between login and refresh paths
+- **Severity:** LOW (security hygiene / documentation gap)
+- **Files:** `src/services/auth/use-cases/refresh.js` line 28, `src/services/auth/use-cases/checkAccessToken.js` line 37, `src/services/auth/use-cases/login.js` line 66
+- **Status:** **OPEN**
+- **Symptom:** `refresh.js` issues new access tokens with `expiresIn: '2m'` (2 minutes). `checkAccessToken.js` issues new access tokens with `expiresIn: '1h'`. `login.js` also uses `'1h'`. The three paths produce tokens with different lifetimes, which is surprising and undocumented.
+- **Impact:** A client that goes through the refresh flow gets a 2-minute access token instead of a 1-hour one. This is likely intentional (short-lived access tokens after rotation), but it is not commented or reflected in any config.
+- **Recommended fix:** Document the intent with a clear comment in each file. If the 2-minute value is intentional for security (force-refresh frequently), expose it as `ACCESS_TOKEN_EXPIRY_AFTER_REFRESH` in `.env.example` with a note. If it is a bug, align all three to `'1h'`.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-036 — INVENTORY_CONCURRENCY = 5 duplicated across three independent files
+- **Severity:** LOW (maintenance)
+- **Files:** `src/services/order/shared/quantities.js` line 15, `src/services/order/use-cases/validateInventoryBeforeCheckout.js` line 11, `src/services/product/sync/domain/lightspeedFetchers.js` line 25
+- **Status:** **OPEN**
+- **Symptom:** Each file independently defines `const INVENTORY_CONCURRENCY = 5`. If ops needs to tune concurrency (e.g., to reduce Lightspeed API rate-limit pressure), all three must be changed in sync.
+- **Impact:** Low — all three happen to agree on 5. Risk is drift if one is changed during a future refactor.
+- **Recommended fix:** Consolidate into `src/config/constants/business.js` as `INVENTORY_CONCURRENCY = 5` and import from there.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-037 — scripts/updateProductsNew.js has its own MAX_DISCOUNT_TTL independent of helpers/productDiscountSync.js
+- **Severity:** LOW (config drift)
+- **Files:** `src/scripts/updateProductsNew.js` line 12, `src/helpers/productDiscountSync.js` line 17
+- **Status:** **OPEN** (partial fix: `productDiscountSync.js` now reads from runtime config; `updateProductsNew.js` still has `MAX_DISCOUNT_TTL = 60 * 60 * 6` inline)
+- **Symptom:** The nightly product-update script (`updateProductsNew.js`) defines its own `MAX_DISCOUNT_TTL = 60 * 60 * 6` separately from `productDiscountSync.js`. Both resolved to the same value (21600 s) during this audit, so they agree today.
+- **Impact:** If `CACHE_TTL_MAX_DISCOUNT` is changed via env, the script does not pick it up — it always uses its hardcoded 6-hour value. The runtime cache will expire at the configured TTL while the script re-populates it at 6 hours.
+- **Recommended fix:** In `updateProductsNew.js`, replace `MAX_DISCOUNT_TTL = 60 * 60 * 6` with `require('../config/runtime').cache.maxDiscountTtl`.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).

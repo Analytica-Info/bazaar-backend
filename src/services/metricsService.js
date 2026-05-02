@@ -20,9 +20,10 @@
 const { getClient, isEnabled } = require('../config/redis');
 const logger = require('../utilities/logger');
 const clock = require('../utilities/clock');
+const runtimeConfig = require('../config/runtime');
 
 const NAMESPACE = 'bazaar:';
-const COUNTER_TTL = 60 * 60 * 3; // 3 hours
+const COUNTER_TTL = runtimeConfig.cache.metricsCounterTtl; // 3 hours default
 const ERROR_LOG_KEY = `${NAMESPACE}metrics:error-log`;
 const ERROR_LOG_CAP = 200;
 
@@ -68,7 +69,7 @@ async function recordError(context, message) {
         });
         await client.lpush(ERROR_LOG_KEY, entry);
         await client.ltrim(ERROR_LOG_KEY, 0, ERROR_LOG_CAP - 1);
-        await client.expire(ERROR_LOG_KEY, 60 * 60 * 24); // 24h
+        await client.expire(ERROR_LOG_KEY, runtimeConfig.cache.errorLogTtl); // 24h default
     } catch (err) {
         logger.warn({ module: 'metrics', err }, 'metrics error-log push failed');
     }

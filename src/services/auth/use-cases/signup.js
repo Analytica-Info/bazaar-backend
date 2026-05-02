@@ -8,6 +8,7 @@ const clock = require('../../../utilities/clock');
 const { hash } = require('../domain/passwordHasher');
 const { sendRecoveryEmail, sendWelcomeEmail } = require('../domain/emailTemplates');
 const { generateVerificationCode, isValidPassword, User, CouponMobile } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * Register a new user.
@@ -46,7 +47,7 @@ async function signup({ name, email, phone, password, platform = 'web' }) {
     if (existingUser && existingUser.isDeleted) {
         const recoveryCode = generateVerificationCode();
         existingUser.recoveryCode = recoveryCode;
-        existingUser.recoveryCodeExpires = clock.nowMs() + 15 * 60 * 1000;
+        existingUser.recoveryCodeExpires = clock.nowMs() + runtimeConfig.auth.recoveryCodeExpiryMs;
         await existingUser.save();
         sendRecoveryEmail(existingUser.email, recoveryCode);
         throw {

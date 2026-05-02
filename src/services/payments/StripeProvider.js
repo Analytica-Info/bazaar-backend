@@ -1,5 +1,6 @@
 const PaymentProvider = require('./PaymentProvider');
 const logger = require('../../utilities/logger');
+const { STRIPE_AMOUNT_MULTIPLIER } = require('../../config/constants/money');
 
 const stripe = require('stripe')(process.env.STRIPE_SK);
 
@@ -16,7 +17,7 @@ class StripeProvider extends PaymentProvider {
             price_data: {
                 currency: currency.toLowerCase(),
                 product_data: { name: item.name || 'Product', description: item.variant || '' },
-                unit_amount: Math.round(Number(item.price) * 100),
+                unit_amount: Math.round(Number(item.price) * STRIPE_AMOUNT_MULTIPLIER),
             },
             quantity: Number(item.quantity) || 1,
         }));
@@ -26,7 +27,7 @@ class StripeProvider extends PaymentProvider {
                 price_data: {
                     currency: currency.toLowerCase(),
                     product_data: { name: 'Shipping Cost' },
-                    unit_amount: Math.round(Number(shippingCost) * 100),
+                    unit_amount: Math.round(Number(shippingCost) * STRIPE_AMOUNT_MULTIPLIER),
                 },
                 quantity: 1,
             });
@@ -58,7 +59,7 @@ class StripeProvider extends PaymentProvider {
                 id: session.id,
                 status: paid ? 'paid' : session.status, // complete, expired, open
                 paid,
-                amount: session.amount_total / 100,
+                amount: session.amount_total / STRIPE_AMOUNT_MULTIPLIER,
                 currency: session.currency?.toUpperCase(),
                 raw: session,
             };
@@ -80,7 +81,7 @@ class StripeProvider extends PaymentProvider {
         try {
 
             const refundParams = { payment_intent: paymentIntentId };
-            if (amount) refundParams.amount = Math.round(Number(amount) * 100);
+            if (amount) refundParams.amount = Math.round(Number(amount) * STRIPE_AMOUNT_MULTIPLIER);
             if (reason) refundParams.reason = reason;
 
             const refund = await stripe.refunds.create(refundParams);
@@ -89,7 +90,7 @@ class StripeProvider extends PaymentProvider {
             return {
                 refundId: refund.id,
                 status: refund.status, // succeeded, pending, failed, canceled
-                amount: refund.amount / 100,
+                amount: refund.amount / STRIPE_AMOUNT_MULTIPLIER,
                 raw: refund,
             };
         } catch (error) {

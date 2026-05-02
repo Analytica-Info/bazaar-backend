@@ -9,7 +9,8 @@ const { currentTime, getMatchingProductIds } = require('../domain/lightspeedHelp
 const { filterParkProducts, fetchProductInventoryDetails } = require('../domain/lightspeedFetchers');
 
 // Redis-backed dedup lock TTL (seconds).
-const WEBHOOK_DEDUP_TTL = 3;
+const runtimeConfig = require('../../../../config/runtime');
+const WEBHOOK_DEDUP_TTL = runtimeConfig.cache.webhookDedupTtl;
 
 /**
  * Handle Lightspeed inventory.update webhook.

@@ -20,6 +20,10 @@ const Notification = repositories.notifications.rawModel();
 const logger = require('../../../utilities/logger');
 const clock = require('../../../utilities/clock');
 const createOrderAndSendEmails = require('./createOrderAndSendEmails');
+const { MS_PER_DAY } = require('../../../config/constants/time');
+const runtimeConfig = require('../../../config/runtime');
+
+const DELIVERY_DAYS = runtimeConfig.order.deliveryDays;
 
 /**
  * @param {string} paymentId
@@ -75,7 +79,7 @@ async function verifyTabbyPayment(paymentId, userId, bankPromoId) {
       }
 
       const currentDate = clock.now();
-      const deliveryDate = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const deliveryDate = new Date(currentDate.getTime() + DELIVERY_DAYS * MS_PER_DAY);
       const dayNum = deliveryDate.getDate();
       const dayOfWeek = deliveryDate.toLocaleString('default', { weekday: 'long' });
       const monthStr = deliveryDate.toLocaleString('default', { month: 'long' });

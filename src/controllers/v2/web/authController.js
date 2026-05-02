@@ -9,6 +9,7 @@ const { asyncHandler } = require('../../../middleware');
 const logger = require('../../../utilities/logger');
 const JWT_SECRET = require('../../../config/jwtSecret');
 const jwt = require('jsonwebtoken');
+const runtimeConfig = require('../../../config/runtime');
 
 const domain = process.env.DOMAIN;
 
@@ -34,7 +35,7 @@ exports.login = asyncHandler(async (req, res) => {
         };
         const result = await authService.loginWithCredentials({ email, password, fcmToken, deviceInfo, platform: 'web', rememberMe });
 
-        const cookieMaxAge = result.cookieMaxAge || (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
+        const cookieMaxAge = result.cookieMaxAge || (rememberMe ? runtimeConfig.auth.rememberMeCookieMaxAgeMs : runtimeConfig.auth.webCookieMaxAgeMs);
         res.cookie('user_token', result.tokens.accessToken, {
             httpOnly: true,
             secure: true,
@@ -65,7 +66,7 @@ exports.googleLogin = asyncHandler(async (req, res) => {
             secure: true,
             sameSite: 'none',
             domain: domain || undefined,
-            maxAge: 24 * 60 * 60 * 1000,
+            maxAge: runtimeConfig.auth.webCookieMaxAgeMs,
         });
 
         return res.status(200).json(wrap({
@@ -89,7 +90,7 @@ exports.appleLogin = asyncHandler(async (req, res) => {
             secure: true,
             sameSite: 'none',
             domain: domain || undefined,
-            maxAge: 24 * 60 * 60 * 1000,
+            maxAge: runtimeConfig.auth.webCookieMaxAgeMs,
         });
 
         return res.status(200).json(wrap({

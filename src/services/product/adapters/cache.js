@@ -11,6 +11,7 @@
 const axios = require('axios');
 const cache = require('../../../utilities/cache');
 const logger = require('../../../utilities/logger');
+const runtimeConfig = require('../../../config/runtime');
 
 const API_KEY = process.env.API_KEY;
 const CATEGORIES_URL = process.env.CATEGORIES_URL;
@@ -39,7 +40,7 @@ async function fetchAndCacheCategories() {
       categoriesResponse.data.data?.data?.categories || [];
 
     // 30 minutes — matches previous NodeCache stdTTL
-    await cache.set(cacheKey, categories, 1800);
+    await cache.set(cacheKey, categories, runtimeConfig.cache.productTypeTtl);
 
     return categories;
   } catch (error) {
@@ -60,7 +61,7 @@ async function fetchCategoriesType(id) {
   // Lightspeed call for a product_type (category) — one external HTTP hit per
   // category view. Categories change rarely; 30 min TTL is safe.
   const cacheKey = cache.key('lightspeed', 'product-type', String(id), 'v1');
-  return cache.getOrSet(cacheKey, 1800, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.productTypeTtl, async () => {
     try {
       const categoriesResponse = await axios.get(PRODUCT_TYPE + '/' + id, {
         headers: {

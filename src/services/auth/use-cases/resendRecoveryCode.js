@@ -3,9 +3,11 @@
 const clock = require('../../../utilities/clock');
 const { sendRecoveryEmail } = require('../domain/emailTemplates');
 const { generateVerificationCode, User } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
+const { MAX_RECOVERY_ATTEMPTS } = require('../../../config/constants/business');
 
-const MAX_ATTEMPTS = 5;
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_ATTEMPTS = MAX_RECOVERY_ATTEMPTS;
+const WINDOW_MS = runtimeConfig.auth.recoveryResendWindowMs;
 
 async function resendRecoveryCode(email) {
     if (!email) throw { status: 400, message: 'Email is required.' };
@@ -31,7 +33,7 @@ async function resendRecoveryCode(email) {
 
     const recoveryCode = generateVerificationCode();
     user.recoveryCode = recoveryCode;
-    user.recoveryCodeExpires = clock.nowMs() + 15 * 60 * 1000;
+    user.recoveryCodeExpires = clock.nowMs() + runtimeConfig.auth.recoveryCodeExpiryMs;
     user.recoveryAttempts += 1;
     user.lastRecoveryRequest = now;
     await user.save();

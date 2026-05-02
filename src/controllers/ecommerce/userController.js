@@ -2,6 +2,11 @@ const authService = require("../../services/authService");
 const userService = require("../../services/userService");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = require("../../config/jwtSecret");
+const { SEC_PER_DAY } = require("../../config/constants/time");
+
+// Apple client-secret JWT must expire within 6 months per Apple's rules.
+// We issue it with a 24-hour (1-day) window to minimise exposure on each request.
+const APPLE_CLIENT_SECRET_EXPIRY_SECS = SEC_PER_DAY;
 
 const logger = require("../../utilities/logger");
 const BACKEND_URL = process.env.BACKEND_URL;
@@ -177,7 +182,7 @@ exports.appleCallback = async (req, res) => {
     {
       iss: teamId,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600 * 24,
+      exp: Math.floor(Date.now() / 1000) + APPLE_CLIENT_SECRET_EXPIRY_SECS,
       aud: "https://appleid.apple.com",
       sub: clientId,
     },

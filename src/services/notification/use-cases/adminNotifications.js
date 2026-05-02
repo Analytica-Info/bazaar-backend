@@ -3,11 +3,12 @@
 const mongoose = require('mongoose');
 const repos = require('../../../repositories');
 const { getUaeDateTime } = require('../domain/uaeDateTime');
+const { DEFAULT_PAGE, ADMIN_DEFAULT_PAGE_SIZE } = require('../../../config/constants/pagination');
 
 /**
  * Get paginated list of admin-created notifications with counts.
  */
-async function getNotifications({ page = 1, limit = 10 } = {}) {
+async function getNotifications({ page = DEFAULT_PAGE, limit = ADMIN_DEFAULT_PAGE_SIZE } = {}) {
   const { items, total } = await repos.notifications.listAdminNotificationsPaginated({ page, limit });
   const totalPages = Math.ceil(total / limit);
 

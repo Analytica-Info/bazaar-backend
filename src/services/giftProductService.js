@@ -1,4 +1,5 @@
 const Product = require('../repositories').products.rawModel();
+const { GIFT_THRESHOLD_DEFAULT_AED } = require('../config/constants/business');
 
 /**
  * Set a product (and optionally a specific variant) as the gift product.
@@ -33,7 +34,7 @@ async function setGiftProduct({ productId, variantId, giftThreshold }) {
         resolvedVariantId = firstWithStock ? firstWithStock.id : null;
     }
 
-    const threshold = giftThreshold != null && giftThreshold !== '' ? Number(giftThreshold) : 400;
+    const threshold = giftThreshold != null && giftThreshold !== '' ? Number(giftThreshold) : GIFT_THRESHOLD_DEFAULT_AED;
     if (Number.isNaN(threshold) || threshold < 0) {
         throw { status: 400, message: 'Gift threshold must be a valid number (AED) >= 0.' };
     }

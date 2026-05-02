@@ -6,7 +6,9 @@ const cache = require('../../../utilities/cache');
 const clock = require('../../../utilities/clock');
 const { LIST_EXCLUDE_PROJECTION, LIST_EXCLUDE_SELECT } = require('../domain/projections');
 
-const SMART_CAT_TTL = 300;
+const runtimeConfig = require('../../../config/runtime');
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
+const { MS_PER_DAY } = require('../../../config/constants/time');
 
 /**
  * Get favourites of the week based on sales in last 7 days.
@@ -14,7 +16,7 @@ const SMART_CAT_TTL = 300;
 async function favouritesOfWeek() {
     return cache.getOrSet(cache.key('catalog', 'favourites-of-week', 'v1'), SMART_CAT_TTL, async () => {
         const nowDubaiUTC = clock.now();
-        const sevenDaysAgoUTC = new Date(nowDubaiUTC.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const sevenDaysAgoUTC = new Date(nowDubaiUTC.getTime() - 7 * MS_PER_DAY);
 
         const soldProducts = await OrderDetail.aggregate([
             { $match: { createdAt: { $gte: sevenDaysAgoUTC } } },

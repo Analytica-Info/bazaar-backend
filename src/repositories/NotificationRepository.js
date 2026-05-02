@@ -4,6 +4,7 @@
  */
 const Notification = require('../models/Notification');
 const BaseRepository = require('./BaseRepository');
+const { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } = require('../config/constants/pagination');
 
 class NotificationRepository extends BaseRepository {
     constructor() {
@@ -53,7 +54,7 @@ class NotificationRepository extends BaseRepository {
      * @param {string|import('mongoose').Types.ObjectId} userId
      * @param {{ paginate: boolean, page?: number, limit?: number }} opts
      */
-    async listForUser(userId, { paginate, page = 1, limit = 20 }) {
+    async listForUser(userId, { paginate, page = DEFAULT_PAGE, limit = DEFAULT_PAGE_SIZE }) {
         const filter = { userId };
         const cursor = this.model.find(filter).sort({ createdAt: -1 });
         if (paginate) cursor.skip((page - 1) * limit).limit(limit);

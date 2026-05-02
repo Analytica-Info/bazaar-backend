@@ -8,6 +8,7 @@ const { generateTokens } = require('../domain/tokenIssuer');
 const { upsertSession } = require('../domain/sessionState');
 const googleVerifier = require('../adapters/googleVerifier');
 const { getCouponStatus, User, Order } = require('./_shared');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * Google login/signup.
@@ -92,7 +93,7 @@ async function googleLogin({ tokenId, accessToken, fcmToken, rememberMe, deviceI
         await user.save();
     } else {
         const jwtExpiry = rememberMe ? '30d' : '7d';
-        cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+        cookieMaxAge = rememberMe ? runtimeConfig.auth.rememberMeCookieMaxAgeMs : runtimeConfig.auth.sessionCookieMaxAgeMs;
         tokens = generateTokens(user, { accessExpiry: jwtExpiry, refreshExpiry: '7d' });
         user.refreshToken = tokens.refreshToken;
         await user.save({ validateBeforeSave: false });
