@@ -31,8 +31,8 @@ const EXCEPTIONS = [
   },
   {
     file: 'src/services/checkout/use-cases/createOrderAndSendEmails.js',
-    limit: 450,
-    reason: 'PR-MOD-3: orchestrates order creation + multi-email dispatch; accepted pre-guardrail',
+    limit: 350,
+    reason: 'email-template-extract: orchestrator for Tabby order flow; templates extracted, residual LOC is pure orchestration logic',
   },
   // ── Existing large files not yet modularized (pre-PR-MOD-8 backlog) ───────
   // These are candidates for a future "small services" PR.
@@ -46,11 +46,7 @@ const EXCEPTIONS = [
     limit: 450,
     reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
   },
-  {
-    file: 'src/services/checkout/shared/inventory.js',
-    limit: 400,
-    reason: 'PR-MOD-3: complex inventory orchestration; accepted pre-guardrail',
-  },
+  // inventory.js is now 289 LOC — within the 300-line module limit; exception removed (email-template-extract).
   {
     file: 'src/services/contactService.js',
     limit: 500,
