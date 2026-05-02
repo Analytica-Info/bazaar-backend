@@ -1,6 +1,6 @@
 'use strict';
 
-const Product = require("../models/Product");
+const Product = require('../repositories').products.rawModel();
 const metrics = require("../services/metricsService");
 const cache = require("../utilities/cache");
 const logger = require("../utilities/logger");

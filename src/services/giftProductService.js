@@ -1,4 +1,4 @@
-const Product = require('../models/Product');
+const Product = require('../repositories').products.rawModel();
 
 /**
  * Set a product (and optionally a specific variant) as the gift product.

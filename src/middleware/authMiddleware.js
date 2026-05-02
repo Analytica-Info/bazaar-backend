@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Admin = require('../models/Admin');
+const User = require('../repositories').users.rawModel();
+const Admin = require('../repositories').admins.rawModel();
 const JWT_SECRET = require('../config/jwtSecret');
 const cache = require('../utilities/cache');
 

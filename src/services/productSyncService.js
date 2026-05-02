@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { mapLimit } = require('async');
-const Product = require('../models/Product');
-const ProductId = require('../models/ProductId');
+const Product = require('../repositories').products.rawModel();
+const ProductId = require('../repositories').productIds.rawModel();
 const logger = require("../utilities/logger");
 const cache = require('../utilities/cache');
 const metrics = require('./metricsService');

@@ -1,5 +1,5 @@
-const contacts = require('../models/Contact');
-const ActivityLog = require('../models/ActivityLog');
+const contacts = require('../repositories').contacts.rawModel();
+const ActivityLog = require('../repositories').activityLogs.rawModel();
 const { sendEmail } = require('../mail/emailService');
 const axios = require('axios');
 const fs = require('fs');

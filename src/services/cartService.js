@@ -1,6 +1,6 @@
-const Cart = require("../models/Cart");
-const Category = require("../models/Category");
-const Product = require("../models/Product");
+const Cart = require('../repositories').carts.rawModel();
+const Category = require('../repositories').categories.rawModel();
+const Product = require('../repositories').products.rawModel();
 
 const logger = require("../utilities/logger");
 const GIFT_THRESHOLD_DEFAULT_AED = 400;

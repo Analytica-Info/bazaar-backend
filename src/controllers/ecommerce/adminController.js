@@ -1,5 +1,5 @@
 const adminService = require("../../services/adminService");
-const User = require("../../models/User");
+const User = require('../../repositories').users.rawModel();
 const logger = require("../../utilities/logger");
 exports.orders = async (req, res) => {
     try {

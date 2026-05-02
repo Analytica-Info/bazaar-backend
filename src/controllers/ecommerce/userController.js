@@ -207,7 +207,7 @@ exports.appleCallback = async (req, res) => {
   let appleEmail = user?.email;
   let name = `${user?.name?.firstName} ${user?.name?.lastName}`;
 
-  const User = require("../../models/User");
+  const User = require('../../repositories').users.rawModel();
 
   if (!appleEmail) {
     const existing = await User.findOne({ appleId: appleUserId });
@@ -391,7 +391,7 @@ exports.getNotification = async (req, res) => {
   const email = req.user.email;
 
   try {
-    const Notification = require("../../models/Notification");
+    const Notification = require('../../repositories').notifications.rawModel();
     const notifications = await Notification.find({
       $or: [{ userId: user_id }, { email: email }],
     })
@@ -421,7 +421,7 @@ exports.markNotificationsAsRead = async (req, res) => {
   }
 
   try {
-    const Notification = require("../../models/Notification");
+    const Notification = require('../../repositories').notifications.rawModel();
     await Notification.updateMany(
       {
         _id: { $in: ids },

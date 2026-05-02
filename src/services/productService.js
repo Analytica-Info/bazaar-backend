@@ -1,9 +1,9 @@
-const Product = require("../models/Product");
-const ProductId = require("../models/ProductId");
-const ProductView = require("../models/ProductView");
-const Category = require("../models/Category");
-const Brand = require("../models/Brand");
-const Review = require("../models/Review");
+const Product = require('../repositories').products.rawModel();
+const ProductId = require('../repositories').productIds.rawModel();
+const ProductView = require('../repositories').productViews.rawModel();
+const Category = require('../repositories').categories.rawModel();
+const Brand = require('../repositories').brands.rawModel();
+const Review = require('../repositories').reviews.rawModel();
 const NodeCache = require("node-cache");
 // spellingCache keeps 7-day in-memory storage for fuzzy-match suggestions —
 // left on NodeCache: tiny, very hot, fine to re-warm on restart.

@@ -1,7 +1,7 @@
-const Product = require("../models/Product");
-const Review = require("../models/Review");
-const OrderDetail = require("../models/OrderDetail");
-const FlashSale = require("../models/FlashSale");
+const Product = require('../repositories').products.rawModel();
+const Review = require('../repositories').reviews.rawModel();
+const OrderDetail = require('../repositories').orderDetails.rawModel();
+const FlashSale = require('../repositories').flashSales.rawModel();
 const mongoose = require('mongoose');
 const cache = require('../utilities/cache');
 

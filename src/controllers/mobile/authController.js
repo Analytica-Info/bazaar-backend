@@ -1,8 +1,8 @@
 const authService = require("../../services/authService");
 const userService = require("../../services/userService");
-const User = require('../../models/User');
-const CouponMobile = require("../../models/Coupons");
-const CouponsCount = require("../../models/CouponsCount");
+const User = require('../../repositories').users.rawModel();
+const CouponMobile = require('../../repositories').couponsMobile.rawModel();
+const CouponsCount = require('../../repositories').couponsCount.rawModel();
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require("../../config/jwtSecret");
 const { sendEmail } = require('../../mail/emailService');

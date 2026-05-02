@@ -1,9 +1,9 @@
-const User = require('../models/User');
-const Order = require('../models/Order');
-const Coupon = require('../models/Coupon');
-const CouponMobile = require('../models/Coupons');
-const CouponsCount = require('../models/CouponsCount');
-const Notification = require('../models/Notification');
+const User = require('../repositories').users.rawModel();
+const Order = require('../repositories').orders.rawModel();
+const Coupon = require('../repositories').coupons.rawModel();
+const CouponMobile = require('../repositories').couponsMobile.rawModel();
+const CouponsCount = require('../repositories').couponsCount.rawModel();
+const Notification = require('../repositories').notifications.rawModel();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { isValidPassword } = require('../helpers/validator');

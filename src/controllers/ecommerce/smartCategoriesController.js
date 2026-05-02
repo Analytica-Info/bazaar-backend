@@ -1,6 +1,6 @@
 const smartCategoriesService = require("../../services/smartCategoriesService");
-const FlashSale = require("../../models/FlashSale");
-const Product = require("../../models/Product");
+const FlashSale = require('../../repositories').flashSales.rawModel();
+const Product = require('../../repositories').products.rawModel();
 
 const logger = require("../../utilities/logger");
 exports.hotOffers = async (req, res) => {

@@ -1,4 +1,4 @@
-const NewsLetter = require("../models/NewsLetter");
+const NewsLetter = require('../repositories').newsletters.rawModel();
 const { sendEmail } = require("../mail/emailService");
 const { getAdminEmail } = require("../utilities/emailHelper");
 const axios = require("axios");
