@@ -24,22 +24,44 @@ module.exports = {
     // Thresholds set at PR8 jest-check actuals − 1pp to ratchet progress without false-failing CI.
     // PR9 merged-total actuals: lines=77.82%, stmts=76.88%, branches=61.55%, funcs=79.71%
     // PR10 merged-total actuals: lines=81.51%, stmts=80.48%, branches=64.95%, funcs=82.99%
+    // PR11 merged-total actuals: lines=85.38%, stmts=84.31%, branches=71.71%, funcs=83.90%
     // Jest threshold check uses single-project (unit) actuals (lower) — ratcheted to actual − 1pp.
     global: {
-      lines: 78,
-      statements: 77,
-      branches: 53,
-      functions: 74,
+      lines: 80,
+      statements: 79,
+      branches: 57,
+      functions: 76,
     },
     // --- PR7: services directory threshold (excl. payments/) ---
-    // Actuals: lines=53.5%, branches=40.3%, funcs=56%, stmts=52.7%
-    // The low values reflect that long async function bodies in checkoutService/orderService
-    // (400-600 line functions) are not instrumented by Node.js 24 V8 despite being exercised.
+    // PR11 actuals: authService 94.98%, checkoutService 84.73%, orderService 80.26%
+    // Directory actuals improved significantly; thresholds raised at actual − 2pp for lagging files.
     './src/services/': {
       lines: 52,
       statements: 51,
       branches: 38,
       functions: 54,
+    },
+    // --- PR11: per-file thresholds for 3 target service files ---
+    // authService: lines=94.98%, branches=89.37%, funcs=100%, stmts=95.14%
+    './src/services/authService.js': {
+      lines: 93,
+      statements: 93,
+      branches: 87,
+      functions: 98,
+    },
+    // checkoutService: lines=84.73%, branches=73.95%, funcs=72%, stmts=83.25%
+    './src/services/checkoutService.js': {
+      lines: 82,
+      statements: 81,
+      branches: 71,
+      functions: 70,
+    },
+    // orderService: lines=80.26%, branches=67.12%, funcs=76.19%, stmts=79.79%
+    './src/services/orderService.js': {
+      lines: 78,
+      statements: 77,
+      branches: 65,
+      functions: 74,
     },
     // --- PR9: publicController.js per-file threshold ---
     // Actuals: lines=80.24%, stmts=79.17%, branches=58.95%, funcs=76.85%

@@ -86,6 +86,23 @@ Living tracker of production bugs discovered while writing tests across PR1–PR
 
 ---
 
+### BUG-010 — orderService/checkoutService ENVIRONMENT=true gated blocks uncoverable in shared test context
+- **File:** `src/services/orderService.js` (lines 1000-1037, 2041-2553), `src/services/checkoutService.js` (lines 756-779, 1367-1385)
+- **Status:** **OPEN** (by design — not a runtime bug)
+- **Symptom:** `const ENVIRONMENT = process.env.ENVIRONMENT` is captured at module-import time. Jest runs multiple test files sharing the same Node process; files that set `ENVIRONMENT=test` are already loaded before tests run. The ENVIRONMENT=true blocks cannot be reached within a test file that imported the service before setting the env var.
+- **Impact:** Branch/line coverage gap (~119 lines in checkoutService, ~88 lines in orderService). Runtime is unaffected.
+- **Recommended fix:** Either (a) refactor to read `process.env.ENVIRONMENT` inline at call-time instead of module-scope, or (b) maintain separate `*.env.test.js` files that set the var before importing (as done for checkoutService.env.test.js in PR11).
+- **Source:** Discovered during PR11 coverage push.
+
+### BUG-011 — verifyTabbyPayment in orderService calls axios.post for capture but no post mock guard
+- **File:** `src/services/orderService.js` (line 1540)
+- **Status:** **OPEN** (test isolation only)
+- **Symptom:** When `verifyTabbyPayment` receives AUTHORIZED status, it calls `axios.post(...)` for the capture. Tests that mock `axios.get` but not `axios.post` can get undefined behavior if the post mock isn't set.
+- **Impact:** None at runtime. Tests must explicitly mock `axios.post` when testing the AUTHORIZED→capture path.
+- **Source:** Discovered during PR11 test writing.
+
+---
+
 ## How to use
 
 When a new bug is found:
