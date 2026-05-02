@@ -116,9 +116,10 @@ async function handleInventoryUpdate(data) {
     logger.error({ err: discountErr }, 'inventoryUpdate discount sync failed:');
   }
 
-  // Invalidate catalog caches — inventory/totalQty affects product listings and variants
+  // Invalidate catalog + product caches — inventory/totalQty affects product listings and variants
   await Promise.all([
     cache.delPattern('catalog:*'),
+    cache.delPattern('product:*'),
     cache.del(cache.key('lightspeed', 'products-inventory', 'v1')),
   ]);
   logger.info({ productId: itemId, type }, 'cache invalidated after inventory.update');

@@ -14,10 +14,24 @@ src/
 ├── services/
 │   ├── _kernel/      # Foundation layer (PR-MOD-1) — see below
 │   ├── payments/     # Payment provider strategy pattern (Stripe, Nomod)
-│   ├── authService.js
-│   ├── checkoutService.js
-│   ├── orderService.js
-│   └── ...           # Other services
+│   ├── auth/         # Auth use-cases (PR-MOD-4)
+│   ├── authService.js        # Thin facade → auth/
+│   ├── checkout/     # Checkout use-cases (PR-MOD-3)
+│   ├── checkoutService.js    # Thin facade → checkout/
+│   ├── cms/          # CMS use-cases (PR-MOD-8)
+│   ├── cmsService.js         # Thin facade → cms/
+│   ├── coupon/       # Coupon use-cases (PR-MOD-8)
+│   ├── couponService.js      # Thin facade → coupon/
+│   ├── order/        # Order use-cases (PR-MOD-2)
+│   ├── orderService.js       # Thin facade → order/
+│   ├── product/      # Product use-cases + sync (PR-MOD-5)
+│   ├── productService.js     # Thin facade → product/
+│   ├── productSyncService.js # Thin facade → product/sync/
+│   ├── smartCategories/      # Smart-category use-cases (PR-MOD-8)
+│   ├── smartCategoriesService.js # Thin facade → smartCategories/
+│   ├── admin/        # Admin use-cases (PR-MOD-7)
+│   ├── adminService.js       # Thin facade → admin/
+│   └── shared/       # Cross-service helpers
 └── utilities/        # Low-level shared utilities (cache, clock, logger)
 ```
 
@@ -121,18 +135,41 @@ The migration strategy is:
 
 ---
 
-## 8-PR Roadmap
+## 8-PR Roadmap — ALL DONE
 
-| PR | Name | Files touched |
-|----|------|--------------|
-| MOD-1 | Kernel foundation | `src/services/_kernel/**` (additive only) |
-| MOD-2 | Order use-cases | `src/services/orders/`, thin `orderService.js` shim |
-| MOD-3 | Checkout use-cases | `src/services/checkout/`, thin `checkoutService.js` shim |
-| MOD-4 | Auth use-cases | `src/services/auth/`, thin `authService.js` shim |
-| MOD-5 | Product use-cases | `src/services/products/`, thin `productService.js` shim |
-| MOD-6 | Coupon use-cases | `src/services/coupons/`, thin `couponService.js` shim |
-| MOD-7 | Admin use-cases | `src/services/admin/`, thin `adminService.js` shim |
-| MOD-8 | Remaining services | Any remaining service files not covered in MOD-2–7 |
+| PR | Name | Status | Key files |
+|----|------|--------|-----------|
+| MOD-1 | Kernel foundation | DONE | `src/services/_kernel/**` |
+| MOD-2 | Order use-cases | DONE | `src/services/order/`, thin `orderService.js` |
+| MOD-3 | Checkout use-cases | DONE | `src/services/checkout/`, thin `checkoutService.js` |
+| MOD-4 | Auth use-cases | DONE | `src/services/auth/`, thin `authService.js` |
+| MOD-5 | Product use-cases | DONE | `src/services/product/`, thin `productService.js` |
+| MOD-6 | Product sync | DONE | `src/services/product/sync/`, thin `productSyncService.js` |
+| MOD-7 | Admin use-cases | DONE | `src/services/admin/`, thin `adminService.js` |
+| MOD-8 | smartCategories + cms + coupon + cache + guardrails | DONE | 3 new modules, cache adoption, `scripts/check-service-size.js`, `docs/CACHING.md` |
+
+### Adding a New Service (post-MOD-8 pattern)
+
+```
+src/services/
+├── myThing/
+│   ├── use-cases/
+│   │   ├── doX.js          # One exported async function per file
+│   │   └── doY.js
+│   ├── domain/             # Pure functions, constants, types — no I/O
+│   │   └── helpers.js
+│   ├── adapters/           # External I/O adapters (HTTP, cache helpers)
+│   │   └── cache.js
+│   └── index.js            # Re-exports all use-cases
+└── myThingService.js       # Thin facade: const { doX, doY } = require('./myThing'); exports.doX = doX; ...
+```
+
+Rules:
+- `myThingService.js` ≤ 120 LOC (enforced by `npm run lint:service-size`)
+- All files in `myThing/` ≤ 300 LOC (same guardrail)
+- Cache hot READ paths with `cache.getOrSet(cache.key(...), TTL, loader)`
+- Add invalidation hooks in write use-cases (`cache.del` or `cache.delPattern`)
+- Document cache keys + TTLs in `docs/CACHING.md`
 
 Each PR:
 - Must leave all existing tests green.

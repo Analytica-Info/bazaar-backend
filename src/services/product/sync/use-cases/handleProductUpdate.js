@@ -156,9 +156,12 @@ async function handleProductUpdate(data) {
     logger.error({ err: discountErr }, 'product.update discount sync failed:');
   }
 
-  // Invalidate all catalog caches — product data (price, discount, status) has changed
-  await cache.delPattern('catalog:*');
-  await cache.del(cache.key('lightspeed', 'categories', 'v1'));
+  // Invalidate all catalog + product caches — product data (price, discount, status) has changed
+  await Promise.all([
+    cache.delPattern('catalog:*'),
+    cache.delPattern('product:*'),
+    cache.del(cache.key('lightspeed', 'categories', 'v1')),
+  ]);
   logger.info({ productId: updateProductId, type }, 'cache invalidated after product.update');
 
   return { success: true };

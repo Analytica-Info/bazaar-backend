@@ -3,11 +3,15 @@
 const Product = require('../../../repositories').products.rawModel();
 const Category = require('../../../repositories').categories.rawModel();
 const logger = require('../../../utilities/logger');
+const cache = require('../../../utilities/cache');
+
+const ALL_CATEGORIES_TTL = 300; // 5 min
 
 /**
- * Full category tree
+ * Full category tree (cached)
  */
 async function getAllCategories() {
+  return cache.getOrSet(cache.key('product', 'all-categories', 'v1'), ALL_CATEGORIES_TTL, async () => {
   try {
     logger.info('API - All Categories');
 
@@ -107,6 +111,7 @@ async function getAllCategories() {
       message: 'Failed to fetch categories or products',
     };
   }
+  }); // end cache.getOrSet
 }
 
 module.exports = { getAllCategories };
