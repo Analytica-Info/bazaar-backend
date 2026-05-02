@@ -7,8 +7,9 @@ const { logActivity } = require('../../../utilities/activityLogger');
 const { logBackendActivity } = require('../../../utilities/backendLogger');
 const logger = require('../../../utilities/logger');
 
+const { INVENTORY_CONCURRENCY } = require('../../../config/constants/business');
+
 const LS_API_KEY = process.env.API_KEY;
-const INVENTORY_CONCURRENCY = 5;
 
 module.exports = async function validateInventoryBeforeCheckout(products, user, platform) {
     const platformLabel = platform || 'Website Backend';

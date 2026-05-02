@@ -9,7 +9,7 @@ const API_KEY = process.env.API_KEY;
 
 // Must match the key in productDiscountSync.js
 const MAX_DISCOUNT_CACHE_KEY = "metrics:discount:max-discount";
-const MAX_DISCOUNT_TTL = 60 * 60 * 6;
+const MAX_DISCOUNT_TTL = require("../config/runtime").cache.maxDiscountTtl;
 
 const LOG_FILE = "cron.log";
 const SYNC_KEY_PRODUCTS_V2 = "lightspeed_products_v2";

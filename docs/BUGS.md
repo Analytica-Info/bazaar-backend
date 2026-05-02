@@ -330,17 +330,19 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 
 ### BUG-035 — Access token expiry inconsistency between login and refresh paths
 - **Severity:** LOW (security hygiene / documentation gap)
-- **Files:** `src/services/auth/use-cases/refresh.js` line 28, `src/services/auth/use-cases/checkAccessToken.js` line 37, `src/services/auth/use-cases/login.js` line 66
-- **Status:** **OPEN**
-- **Symptom:** `refresh.js` issues new access tokens with `expiresIn: '2m'` (2 minutes). `checkAccessToken.js` issues new access tokens with `expiresIn: '1h'`. `login.js` also uses `'1h'`. The three paths produce tokens with different lifetimes, which is surprising and undocumented.
-- **Impact:** A client that goes through the refresh flow gets a 2-minute access token instead of a 1-hour one. This is likely intentional (short-lived access tokens after rotation), but it is not commented or reflected in any config.
-- **Recommended fix:** Document the intent with a clear comment in each file. If the 2-minute value is intentional for security (force-refresh frequently), expose it as `ACCESS_TOKEN_EXPIRY_AFTER_REFRESH` in `.env.example` with a note. If it is a bug, align all three to `'1h'`.
+- **Files:** `src/services/auth/use-cases/refresh.js`, `src/services/auth/use-cases/checkAccessToken.js`, `src/services/auth/domain/tokenIssuer.js`
+- **Status:** **DOCUMENTED** (feat/v2-api-unification)
+- **Symptom:** `refresh.js` issues new access tokens with `expiresIn: '2m'` (2 minutes). `checkAccessToken.js` and `tokenIssuer.js` use `'1h'`. The two paths intentionally produce tokens with different lifetimes.
+- **Resolution:** The `'2m'` value on the refresh path is treated as intentional security behaviour — short-lived access tokens after rotation reduce blast-radius of leaked tokens. Both expiries are now surfaced as named config knobs in `src/config/runtime.js`:
+  - `auth.accessTokenExpiry` (default `'1h'`) — controlled by `JWT_ACCESS_EXPIRY`
+  - `auth.accessTokenRefreshExpiry` (default `'2m'`) — controlled by `JWT_ACCESS_REFRESH_EXPIRY`
+  Both are documented in `.env.example`. If the short refresh expiry is found to be a bug, set `JWT_ACCESS_REFRESH_EXPIRY=1h` via env to align without a code change.
 - **Source:** Magic-numbers audit (feat/v2-api-unification).
 
 ### BUG-036 — INVENTORY_CONCURRENCY = 5 duplicated across three independent files
 - **Severity:** LOW (maintenance)
-- **Files:** `src/services/order/shared/quantities.js` line 15, `src/services/order/use-cases/validateInventoryBeforeCheckout.js` line 11, `src/services/product/sync/domain/lightspeedFetchers.js` line 25
-- **Status:** **OPEN**
+- **Files:** `src/services/order/shared/quantities.js`, `src/services/order/use-cases/validateInventoryBeforeCheckout.js`, `src/services/product/sync/domain/lightspeedFetchers.js`
+- **Status:** **FIXED** (feat/v2-api-unification)
 - **Symptom:** Each file independently defines `const INVENTORY_CONCURRENCY = 5`. If ops needs to tune concurrency (e.g., to reduce Lightspeed API rate-limit pressure), all three must be changed in sync.
 - **Impact:** Low — all three happen to agree on 5. Risk is drift if one is changed during a future refactor.
 - **Recommended fix:** Consolidate into `src/config/constants/business.js` as `INVENTORY_CONCURRENCY = 5` and import from there.
@@ -348,8 +350,8 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 
 ### BUG-037 — scripts/updateProductsNew.js has its own MAX_DISCOUNT_TTL independent of helpers/productDiscountSync.js
 - **Severity:** LOW (config drift)
-- **Files:** `src/scripts/updateProductsNew.js` line 12, `src/helpers/productDiscountSync.js` line 17
-- **Status:** **OPEN** (partial fix: `productDiscountSync.js` now reads from runtime config; `updateProductsNew.js` still has `MAX_DISCOUNT_TTL = 60 * 60 * 6` inline)
+- **Files:** `src/scripts/updateProductsNew.js`, `src/helpers/productDiscountSync.js`
+- **Status:** **FIXED** (feat/v2-api-unification)
 - **Symptom:** The nightly product-update script (`updateProductsNew.js`) defines its own `MAX_DISCOUNT_TTL = 60 * 60 * 6` separately from `productDiscountSync.js`. Both resolved to the same value (21600 s) during this audit, so they agree today.
 - **Impact:** If `CACHE_TTL_MAX_DISCOUNT` is changed via env, the script does not pick it up — it always uses its hardcoded 6-hour value. The runtime cache will expire at the configured TTL while the script re-populates it at 6 hours.
 - **Recommended fix:** In `updateProductsNew.js`, replace `MAX_DISCOUNT_TTL = 60 * 60 * 6` with `require('../config/runtime').cache.maxDiscountTtl`.

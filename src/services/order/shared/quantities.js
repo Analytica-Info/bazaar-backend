@@ -9,10 +9,11 @@ const { logActivity } = require('../../../utilities/activityLogger');
 const { logBackendActivity } = require('../../../utilities/backendLogger');
 const logger = require('../../../utilities/logger');
 
+const { INVENTORY_CONCURRENCY } = require('../../../config/constants/business');
+
 const LS_API_KEY = process.env.API_KEY;
 const PRODUCTS_UPDATE = process.env.PRODUCTS_UPDATE;
 const WEBURL = process.env.URL;
-const INVENTORY_CONCURRENCY = 5;
 
 async function updateQuantities(cartData, orderId = null) {
     try {

@@ -5,6 +5,7 @@ const { verifyRefreshToken, generateTokens } = require('../domain/tokenIssuer');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require('../../../config/jwtSecret');
 const JWT_REFRESH_SECRET = require('../../../config/refreshJwtSecret');
+const runtimeConfig = require('../../../config/runtime');
 const { User } = require('./_shared');
 
 async function refreshToken(refreshTokenValue) {
@@ -25,8 +26,8 @@ async function refreshToken(refreshTokenValue) {
     const sessionIndex = user.sessions.findIndex(s => s.refreshToken === refreshTokenValue && !s.revokedAt);
     if (sessionIndex === -1) throw { status: 403, message: 'Invalid refresh token' };
 
-    const newAccessToken = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '2m' });
-    const newRefreshToken = jwt.sign({ id: user._id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    const newAccessToken = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: runtimeConfig.auth.accessTokenRefreshExpiry });
+    const newRefreshToken = jwt.sign({ id: user._id }, JWT_REFRESH_SECRET, { expiresIn: runtimeConfig.auth.refreshTokenExpiry });
 
     user.sessions[sessionIndex].refreshToken = newRefreshToken;
     user.sessions[sessionIndex].lastUsed = clock.now();

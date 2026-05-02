@@ -14,7 +14,7 @@ module.exports = async function forgotPassword(email) {
     if (!admin) throw { status: 404, message: 'Admin not found' };
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const token = jwt.sign({ code: verificationCode }, JWT_SECRET, { expiresIn: '10m' });
+    const token = jwt.sign({ code: verificationCode }, JWT_SECRET, { expiresIn: runtimeConfig.auth.resetCodeTokenExpiry });
     const logoUrl = 'https://www.bazaar-uae.com/logo.png';
 
     const subject = 'Password Reset Verification Code';

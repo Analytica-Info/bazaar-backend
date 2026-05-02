@@ -1,9 +1,10 @@
 'use strict';
 
-const bcrypt     = require('bcryptjs');
-const jwt        = require('jsonwebtoken');
-const JWT_SECRET = require('../../../config/jwtSecret');
-const Admin      = require('../../../repositories').admins.rawModel();
+const bcrypt        = require('bcryptjs');
+const jwt           = require('jsonwebtoken');
+const JWT_SECRET    = require('../../../config/jwtSecret');
+const runtimeConfig = require('../../../config/runtime');
+const Admin         = require('../../../repositories').admins.rawModel();
 
 module.exports = async function adminLogin(email, password) {
     if (!email)    throw { status: 400, message: 'Email is required' };
@@ -22,7 +23,7 @@ module.exports = async function adminLogin(email, password) {
         })
         .select('-password -resetPasswordToken -resetPasswordExpires');
 
-    const token = jwt.sign({ id: admin._id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: admin._id }, JWT_SECRET, { expiresIn: runtimeConfig.auth.adminTokenExpiry });
     return {
         admin: {
             name: `${admin.firstName} ${admin.lastName}`,

@@ -114,6 +114,37 @@ const config = Object.freeze({
      * Default: 1 day (matches previous hardcoded 24 * 60 * 60 * 1000).
      */
     webCookieMaxAgeMs:         envInt('WEB_COOKIE_DAYS',            1)  * MS_PER_DAY,
+
+    // ── JWT expiry strings (jsonwebtoken format, e.g. '1h', '7d') ──────────
+
+    /**
+     * Standard access token lifetime (login and checkAccessToken re-issue).
+     */
+    accessTokenExpiry:         process.env.JWT_ACCESS_EXPIRY              || '1h',
+
+    /**
+     * Access token lifetime issued by the dedicated /refresh endpoint.
+     * Intentionally shorter than accessTokenExpiry — the refresh path
+     * rotates tokens frequently, so short-lived access tokens reduce the
+     * blast radius of a leaked token between rotations.
+     * See docs/BUGS.md BUG-035 for context.
+     */
+    accessTokenRefreshExpiry:  process.env.JWT_ACCESS_REFRESH_EXPIRY      || '2m',
+
+    /**
+     * Refresh token lifetime (all issuance paths share the same window).
+     */
+    refreshTokenExpiry:        process.env.JWT_REFRESH_EXPIRY             || '7d',
+
+    /**
+     * Admin session token lifetime.
+     */
+    adminTokenExpiry:          process.env.JWT_ADMIN_EXPIRY               || '7d',
+
+    /**
+     * Short-lived code token used for password-reset verification.
+     */
+    resetCodeTokenExpiry:      process.env.JWT_RESET_CODE_EXPIRY          || '10m',
   },
 
   /**

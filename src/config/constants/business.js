@@ -41,9 +41,23 @@ const DELIVERY_DAYS = 3;
  */
 const MAX_RECOVERY_ATTEMPTS = 5;
 
+/**
+ * Maximum concurrent Lightspeed inventory API calls when processing a batch
+ * of product variants (mapLimit concurrency).  Lightspeed does not publish a
+ * hard rate limit; 5 keeps us well clear of triggering 429s while still
+ * collapsing N sequential calls into ~1 RTT batch.
+ *
+ * Used by:
+ *   - src/services/order/shared/quantities.js
+ *   - src/services/order/use-cases/validateInventoryBeforeCheckout.js
+ *   - src/services/product/sync/domain/lightspeedFetchers.js
+ */
+const INVENTORY_CONCURRENCY = 5;
+
 module.exports = {
   GIFT_THRESHOLD_DEFAULT_AED,
   GIFT_MIN_STOCK,
   DELIVERY_DAYS,
   MAX_RECOVERY_ATTEMPTS,
+  INVENTORY_CONCURRENCY,
 };

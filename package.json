@@ -27,6 +27,7 @@
     "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
     "lint:no-direct-time": "node scripts/check-no-direct-time.js",
+    "validate-env": "node scripts/validateEnv.js",
     "smoke": "node scripts/smoke.js",
     "check": "npm run validate && npm run lint && npm test"
   },

@@ -10,6 +10,7 @@
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require('../../../config/jwtSecret');
 const JWT_REFRESH_SECRET = require('../../../config/refreshJwtSecret');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * Generate an access + refresh token pair for a user.
@@ -19,7 +20,10 @@ const JWT_REFRESH_SECRET = require('../../../config/refreshJwtSecret');
  * @returns {{ accessToken: string, refreshToken: string }}
  */
 function generateTokens(user, options = {}) {
-    const { accessExpiry = '1h', refreshExpiry = '7d' } = options;
+    const {
+        accessExpiry  = runtimeConfig.auth.accessTokenExpiry,
+        refreshExpiry = runtimeConfig.auth.refreshTokenExpiry,
+    } = options;
     const accessToken = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: accessExpiry });
     const refreshToken = jwt.sign({ id: user._id }, JWT_REFRESH_SECRET, { expiresIn: refreshExpiry });
     return { accessToken, refreshToken };
@@ -54,7 +58,7 @@ function verifyRefreshToken(token) {
  * @param {string} expiresIn
  * @returns {string}
  */
-function signCodeToken(payload, expiresIn = '10m') {
+function signCodeToken(payload, expiresIn = runtimeConfig.auth.resetCodeTokenExpiry) {
     return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 

@@ -17,12 +17,9 @@ const axios = require('axios');
 const { mapLimit } = require('async');
 const logger = require('../../../../utilities/logger');
 
-const API_KEY = process.env.API_KEY;
+const { INVENTORY_CONCURRENCY } = require('../../../../config/constants/business');
 
-// Max concurrent Lightspeed inventory calls per product fetch.
-// Lightspeed does not publish a hard rate limit; 5 keeps us well clear of
-// triggering 429s while still collapsing N sequential calls into ~1 RTT batch.
-const INVENTORY_CONCURRENCY = 5;
+const API_KEY = process.env.API_KEY;
 
 async function filterParkProducts() {
   try {

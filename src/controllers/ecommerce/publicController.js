@@ -1008,7 +1008,7 @@ exports.contactUs = [
       const { email, name, message, phone, recaptchaToken } = req.body;
 
       if (!email) {
-        return res.status(400).json({ message: "Email is required123" });
+        return res.status(400).json({ message: "Email is required" });
       }
       if (!name) {
         return res.status(400).json({ message: "Name is required" });
