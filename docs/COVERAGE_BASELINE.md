@@ -602,3 +602,78 @@ The target of ≥80% lines was not reached for two reasons:
 2. **OAuth mock infra** — Mock google-auth-library and apple-signin-auth to cover authService social login paths (58%). Estimated +2pp global.
 3. **Replica-set integration tests** — Validate UnitOfWork transaction rollback atomicity.
 4. **Node.js version tracking** — If project downgrades to Node.js ≤22, re-run coverage to verify the async function instrumentation issue is resolved and targets are naturally met.
+
+---
+
+# Coverage Baseline — PR10 (Controller Coverage Push — 6 Target Files)
+
+Date: 2026-05-02
+Branch: feat/v2-api-unification
+
+## Global Summary
+
+| Metric      | PR9 Baseline | PR10 Result | Delta   |
+|-------------|-------------|-------------|---------|
+| Statements  | 76.9%       | 80.48%      | +3.58%  |
+| Branches    | 61.6%       | 64.95%      | +3.35%  |
+| Functions   | 79.7%       | 82.99%      | +3.29%  |
+| Lines       | 77.8%       | 81.51%      | +3.71%  |
+
+**Global lines ≥80% target: ACHIEVED (81.51%).**
+
+All coverage thresholds in jest.config.js **pass**.
+
+## Per-File Coverage — 6 Target Files
+
+| File                                       | Pre-PR10 Lines | Post-PR10 Lines | Pre Branches | Post Branches |
+|--------------------------------------------|---------------|-----------------|-------------|---------------|
+| controllers/mobile/productController.js    | 40.3%         | 97.12%          | —           | 86.84%        |
+| controllers/mobile/authController.js       | 66.2%         | 91.98%          | —           | 70.90%        |
+| helpers/sendPushNotification.js            | 49.0%         | 92.25%          | —           | 79.06%        |
+| controllers/mobile/smartCategoriesController.js | 64.6%    | 95.91%          | —           | 80.88%        |
+| controllers/v2/mobile/authController.js    | 45.4%         | 100%            | —           | 97.56%        |
+| controllers/v2/web/authController.js       | 52.5%         | 100%            | —           | 83.92%        |
+
+## Test Count
+
+| PR    | Suites | Tests | Skipped |
+|-------|--------|-------|---------|
+| PR7   | 87     | 1406  | 3       |
+| PR8   | ~100   | ~1800 | 3       |
+| PR9   | 113    | 2076  | 3       |
+| PR10  | 114    | 2206  | 3       |
+
+## New Test Files Added in PR10
+
+| File                                                         | Tests | Surface |
+|--------------------------------------------------------------|-------|---------|
+| tests/controllers/mobile/productController.test.js (extended) | +22   | addReview, review, UserReview, categoryImages, subCategories, similarProducts, search error paths |
+| tests/controllers/mobile/authController.test.js (extended)   | +22   | coupons, createCoupon (all validation paths), checkCouponCode UAE10 (6 branches), FIRST15 phone lookup, generic coupon |
+| tests/helpers/sendPushNotification.test.js (extended)        | +9    | FCM success/failure, no-token skip, insertMany error, sendToAll, scheduled send, lock retry |
+| tests/controllers/mobile/smartCategoriesController.test.js (extended) | +8 | getProductByVariant (4 paths), logStatusFalseItems shape variants (6 branches), structured errors |
+| tests/controllers/v2/mobile/authController.test.js (new)     | +34   | All 15 exports: register, login, social logins, password ops, tokens, profile, account ops |
+| tests/controllers/v2/web/authController.test.js (new)        | +33   | All 18 exports: register, login (cookie+rememberMe), social logins, checkAuth, logout, deleteAccount+cookie-clear |
+
+## Thresholds Set in jest.config.js (PR10)
+
+| Scope                                              | Stmts | Branches | Funcs | Lines |
+|----------------------------------------------------|-------|----------|-------|-------|
+| global                                             | 77    | 53       | 74    | 78    |
+| src/controllers/mobile/productController.js        | 94    | 84       | 95    | 95    |
+| src/controllers/mobile/authController.js           | 89    | 68       | 85    | 89    |
+| src/helpers/sendPushNotification.js                | 89    | 77       | 78    | 90    |
+| src/controllers/mobile/smartCategoriesController.js | 93   | 78       | 93    | 93    |
+| src/controllers/v2/mobile/authController.js        | 98    | 95       | 98    | 98    |
+| src/controllers/v2/web/authController.js           | 98    | 81       | 98    | 98    |
+| src/controllers/mobile/                            | 80    | 65       | 80    | 80    |
+| src/controllers/v2/                                | 78    | 60       | 78    | 78    |
+| src/helpers/                                       | 75    | 55       | 70    | 75    |
+
+## Production Bugs Found During PR10
+
+None new. All controller paths tested as expected. The UAE10 coupon branch in `checkCouponCode` and the FCM delivery path in `sendPushNotification` both behaved correctly under test.
+
+## Notes
+
+- The `logStatusFalseItems` function in `smartCategoriesController.js` writes to a log file when products with `status: false` are found. Tests trigger this path via a mocked service response returning a status-false item. The fs write is not separately mocked — the test verifies the controller still returns 200 regardless.
+- `sendPushNotification.js` functions coverage is 80% (not 85%) because `initializeFirebase` / `isFirebaseInitialized` internal sub-branches (file-exist + admin.apps.length combo) are partially covered. The 2 private functions contribute to the function denominator but `initializeFirebase` is only partially reachable because the service-account file path is always mocked as missing.

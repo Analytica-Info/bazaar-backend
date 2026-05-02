@@ -478,6 +478,212 @@ describe("getPaymentHistory", () => {
   });
 });
 
+// ── coupons ───────────────────────────────────────────────────────
+describe("coupons", () => {
+  it("200 with coupon count", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    CouponMobile.countDocuments.mockResolvedValue(5);
+    const req = makeReq({});
+    const res = makeRes();
+    await ctrl.coupons(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, count: 5 }));
+  });
+  it("500 on db error", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    CouponMobile.countDocuments.mockRejectedValue(new Error("db"));
+    const req = makeReq({});
+    const res = makeRes();
+    await ctrl.coupons(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+  });
+});
+
+// ── createCoupon ──────────────────────────────────────────────────
+describe("createCoupon", () => {
+  it("400 when name or phone missing", async () => {
+    const req = makeReq({ body: { name: "A" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+  });
+  it("404 when user not found", async () => {
+    mockUser.findById.mockResolvedValue(null);
+    const req = makeReq({ body: { name: "A", phone: "055" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+  it("400 when user has no phone", async () => {
+    mockUser.findById.mockResolvedValue({ _id: "u1", phone: null });
+    const req = makeReq({ body: { name: "A", phone: "055" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+  it("400 when phone mismatch", async () => {
+    mockUser.findById.mockResolvedValue({ _id: "u1", phone: "056" });
+    const req = makeReq({ body: { name: "A", phone: "055" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+  it("400 when phone already exists for another user", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    mockUser.findById.mockResolvedValue({ _id: "u1", phone: "055" });
+    CouponMobile.findOne.mockResolvedValue({ _id: "other" });
+    const req = makeReq({ body: { name: "A", phone: "055" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Phone already exists" }));
+  });
+  it("201 on successful coupon creation", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    const sendEmail = require("../../../src/mail/emailService").sendEmail;
+    mockUser.findById.mockResolvedValue({ _id: "u1", phone: "055" });
+    // first findOne: check duplicate phone → null (no duplicate)
+    // second findOne().sort().exec() → lastCoupon: null
+    const chainNull = { sort: jest.fn().mockReturnThis(), exec: jest.fn().mockResolvedValue(null) };
+    CouponMobile.findOne
+      .mockResolvedValueOnce(null)   // no duplicate
+      .mockReturnValueOnce(chainNull); // lastCoupon chain
+    CouponMobile.find.mockResolvedValue([]); // generateCouponCode
+    sendEmail.mockResolvedValue(undefined);
+    const req = makeReq({ body: { name: "Ali", phone: "055" }, user: { _id: "u1" } });
+    const res = makeRes();
+    await ctrl.createCoupon(req, res);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+});
+
+// ── checkCouponCode — FIRST15 via phone lookup ──────────────────
+describe("checkCouponCode FIRST15 phone lookup", () => {
+  it("looks up user by phone when not authenticated and coupon=FIRST15", async () => {
+    mockUser.findOne = jest.fn().mockResolvedValue({ usedFirst15Coupon: false });
+    const req = { ...makeReq({ body: { couponCode: "FIRST15", phone: "055" } }), user: null };
+    req.header = jest.fn().mockReturnValue(undefined);
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+  it("400 when neither user nor phone provided for FIRST15", async () => {
+    const req = { ...makeReq({ body: { couponCode: "FIRST15" } }), user: null };
+    req.header = jest.fn().mockReturnValue(undefined);
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+});
+
+// ── checkCouponCode — UAE10 path ──────────────────────────────────
+describe("checkCouponCode UAE10", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("404 when coupon details not found from API", async () => {
+    axios.get.mockResolvedValue({ data: {} }); // no data.data
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("400 when promotion not active", async () => {
+    axios.get.mockResolvedValue({
+      data: { data: { status: "inactive", start_time: new Date().toISOString(), end_time: new Date().toISOString() } }
+    });
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "This promotion is not active." }));
+  });
+
+  it("400 when promotion not started yet", async () => {
+    const future = new Date(Date.now() + 86400000);
+    axios.get.mockResolvedValue({
+      data: { data: { status: "active", start_time: future.toISOString(), end_time: new Date(Date.now() + 172800000).toISOString() } }
+    });
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Promotion has not started yet." }));
+  });
+
+  it("400 when promotion expired", async () => {
+    const past = new Date(Date.now() - 86400000);
+    axios.get.mockResolvedValue({
+      data: { data: { status: "active", start_time: new Date(Date.now() - 172800000).toISOString(), end_time: past.toISOString() } }
+    });
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: "Promotion has expired." }));
+  });
+
+  it("200 when UAE10 coupon is valid and active", async () => {
+    const now = Date.now();
+    axios.get.mockResolvedValue({
+      data: { data: { status: "active", start_time: new Date(now - 3600000).toISOString(), end_time: new Date(now + 3600000).toISOString() } }
+    });
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it("404 when axios throws (fetchCouponDetails returns null)", async () => {
+    axios.get.mockRejectedValue(new Error("network error"));
+    const req = makeReq({ body: { couponCode: "UAE10" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+// ── checkCouponCode — generic coupon path ────────────────────────
+describe("checkCouponCode generic", () => {
+  it("200 when coupon found", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    CouponMobile.findOne.mockResolvedValue({ coupon: "DH1YHZXB", status: "unused" });
+    const req = makeReq({ body: { couponCode: "DH1YHZXB", phone: "055" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+  it("404 when coupon not found", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    CouponMobile.findOne.mockResolvedValue(null);
+    const req = makeReq({ body: { couponCode: "INVALID", phone: "055" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+  });
+  it("500 on db error", async () => {
+    const repositories = require("../../../src/repositories");
+    const CouponMobile = repositories.couponsMobile.rawModel();
+    CouponMobile.findOne.mockRejectedValue(new Error("db"));
+    const req = makeReq({ body: { couponCode: "DH1YHZXB", phone: "055" } });
+    const res = makeRes();
+    await ctrl.checkCouponCode(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+});
+
 // ── appleCallback ─────────────────────────────────────────────────
 describe("appleCallback", () => {
   it("200 with customerId", async () => {

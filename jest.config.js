@@ -23,11 +23,11 @@ module.exports = {
     // PR8 adds v1 controller tests (18 ecommerce + 7 mobile + 2 shared controllers).
     // Thresholds set at PR8 jest-check actuals − 1pp to ratchet progress without false-failing CI.
     // PR9 merged-total actuals: lines=77.82%, stmts=76.88%, branches=61.55%, funcs=79.71%
-    // Jest threshold check uses single-project (unit) actuals (lower): lines=72.4%, stmts=71.95%, branches=54.31%, funcs=75%
-    // Thresholds ratcheted to jest-check actuals − 1pp.
+    // PR10 merged-total actuals: lines=81.51%, stmts=80.48%, branches=64.95%, funcs=82.99%
+    // Jest threshold check uses single-project (unit) actuals (lower) — ratcheted to actual − 1pp.
     global: {
-      lines: 71,
-      statements: 70,
+      lines: 78,
+      statements: 77,
       branches: 53,
       functions: 74,
     },
@@ -72,11 +72,12 @@ module.exports = {
       branches: 79,
       functions: 95,
     },
+    // PR10 actuals: v2 controllers lines~95%, stmts~94%, branches~80%, funcs~95%
     './src/controllers/v2/': {
-      lines: 62,
-      statements: 62,
-      branches: 46,
-      functions: 62,
+      lines: 78,
+      statements: 78,
+      branches: 60,
+      functions: 78,
     },
     // --- New per-directory thresholds for PR6 surface ---
     // Actuals: middleware stmts=97.1%, branches=87.4%, funcs=90.9%, lines=97.1%
@@ -100,12 +101,58 @@ module.exports = {
       branches: 80,
       functions: 98,
     },
-    // Actuals: helpers stmts=67.2%, branches=44.6%, funcs=63.9%, lines=67.2%
+    // Actuals after PR10: helpers lines=92.25% (sendPushNotification), overall dir higher
     './src/helpers/': {
-      lines: 65,
-      statements: 65,
-      branches: 39,
-      functions: 61,
+      lines: 75,
+      statements: 75,
+      branches: 55,
+      functions: 70,
+    },
+    // --- PR10: per-file thresholds for 6 target files ---
+    // Actual − 2pp
+    './src/controllers/mobile/productController.js': {
+      lines: 95,
+      statements: 94,
+      branches: 84,
+      functions: 95,
+    },
+    './src/controllers/mobile/authController.js': {
+      lines: 89,
+      statements: 89,
+      branches: 68,
+      functions: 85,
+    },
+    './src/helpers/sendPushNotification.js': {
+      lines: 90,
+      statements: 89,
+      branches: 77,
+      functions: 78,
+    },
+    './src/controllers/mobile/smartCategoriesController.js': {
+      lines: 93,
+      statements: 93,
+      branches: 78,
+      functions: 93,
+    },
+    './src/controllers/v2/mobile/authController.js': {
+      lines: 98,
+      statements: 98,
+      branches: 95,
+      functions: 98,
+    },
+    './src/controllers/v2/web/authController.js': {
+      lines: 98,
+      statements: 98,
+      branches: 81,
+      functions: 98,
+    },
+    // --- PR10: per-directory ratchets ---
+    // controllers/mobile/ actuals: lines~93%, stmts~92%, branches~72%, funcs~92%
+    './src/controllers/mobile/': {
+      lines: 80,
+      statements: 80,
+      branches: 65,
+      functions: 80,
     },
   },
 
