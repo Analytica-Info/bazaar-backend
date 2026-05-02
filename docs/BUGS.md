@@ -264,6 +264,30 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Recommended action:** Do NOT route real client traffic to v2 yet. When backend modernization is complete, schedule client migration sprints — web (auth + cart + orders + user) and mobile auth first — and burn down v1 only after each client is confirmed off it.
 - **Source:** PR14 audit summary; reclassified per project owner.
 
+### BUG-028 — fetchProductDetails price field divergence: tax_inclusive (checkout) vs tax_exclusive (order/mobile)
+- **Files:** `src/services/shared/lightspeedClient.js` (canonical), formerly `src/services/checkoutService.js` and `src/services/order/adapters/lightspeedClient.js`
+- **Severity:** HIGH (pricing correctness)
+- **Status:** OPEN
+- **Symptom:** Two copies of `fetchProductDetails` existed with different price fields:
+  - `checkoutService.js` (website) used `price_standard.tax_inclusive`
+  - `order/adapters/lightspeedClient.js` (mobile) used `price_standard.tax_exclusive`
+  The shared version (PR-MOD-3) uses `tax_inclusive` because it is the customer-facing checkout path where prices must include VAT.
+- **Impact:** If mobile callers were relying on `tax_exclusive` pricing, they now receive `tax_inclusive` prices. Mobile clients should verify their displayed prices are correct. If mobile must show pre-tax prices, a separate `fetchProductDetailsExclusive` function should be introduced.
+- **Recommended fix:** Confirm with mobile team whether `tax_exclusive` or `tax_inclusive` is correct for mobile display. If both are needed, add a `priceTax` parameter defaulting to `'tax_inclusive'`.
+- **Source:** PR-MOD-3 dedup analysis.
+
+### BUG-029 — updateQuantityMail admin email resolution divergence: dynamic (checkout) vs static env var (order/mobile)
+- **Files:** `src/services/checkoutService.js` and `src/services/order/shared/quantities.js`
+- **Severity:** MEDIUM
+- **Status:** OPEN
+- **Symptom:** Two copies of `updateQuantityMail` with different admin email resolution:
+  - `checkoutService.js` calls `getAdminEmail()` (dynamic DB lookup) and includes a logo `<img>` tag
+  - `order/shared/quantities.js` reads `process.env.ADMIN_EMAIL` directly (static) and has no logo
+  These functions are NOT merged into shared/ because they serve different platforms and have meaningfully different behaviour.
+- **Impact:** Mobile inventory-update emails have no logo and use a static email address that may diverge from the DB-stored admin email. If the admin email is changed in the DB but not in the env var, mobile emails go to the old address.
+- **Recommended fix:** Migrate `order/shared/quantities.js::updateQuantityMail` to also use `getAdminEmail()` from `src/utilities/emailHelper.js`. Add the logo img tag for consistency.
+- **Source:** PR-MOD-3 dedup analysis.
+
 ### BUG-027 — 150+ v1 backend routes have no client caller (UNUSED)
 - **Severity:** MEDIUM (cleanup)
 - **Backend file:** various, see `docs/api-map/MAP.md` UNUSED rows
