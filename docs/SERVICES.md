@@ -18,17 +18,17 @@ Never import directly from `src/services/<name>/use-cases/` in a controller.
 | `productSyncService.js`        | `product/sync/`               | `handleProductUpdate`, `handleInventoryUpdate`, `syncWebhookDiscounts`, ... |
 | `smartCategoriesService.js`    | `smartCategories/`            | `getHotOffers`, `getTrendingProducts`, `getFlashSales`, `getNewArrivals`, `todayDeal`, ... |
 | `adminService.js`              | `admin/`                      | `getDashboardStats`, `getUsers`, `updateUserRole`, ... |
+| `cartService.js`               | `cart/`                       | `getCart`, `addToCart`, `removeFromCart`, `increaseQty`, `decreaseQty`, ... |
+| `userService.js`               | `user/`                       | `getUserOrders`, `getPaymentHistory`, `getTabbyBuyerHistory`, `getDashboard`, `addReview`, `getProfile`, `getOrderCount`, ... |
+| `shippingService.js`           | `shipping/`                   | `listCountries`, `calculateShippingCost`, `addCity`, `addArea`, `bulkImportCities`, ... |
+| `notificationService.js`       | `notification/`               | `createNotification`, `getNotifications`, `getUserNotifications`, `markNotificationsAsRead`, `trackNotificationClick`, ... |
+| `newsletterService.js`         | `newsletter/`                 | `subscribe`, `getSubscribers`, `sendBulkEmails` |
+| `contactService.js`            | `contact/`                    | `submitContactForm`, `submitFeedback`, `downloadFile`, `createMobileAppLog` |
 
 ### Still-monolithic facades (follow-up PR candidates)
 
 | Facade                      | LOC  | Note |
 |-----------------------------|------|------|
-| `cartService.js`            | ~417 | Complex cart operations; high coupling |
-| `userService.js`            | ~494 | User CRUD + profile; separate profile module planned |
-| `shippingService.js`        | ~405 | Shipping calculation + address; split by concern |
-| `notificationService.js`    | ~422 | Push + in-app notification dispatch |
-| `newsletterService.js`      | ~362 | Newsletter subscribe/unsubscribe + mail dispatch |
-| `contactService.js`         | ~463 | Contact form + CRM integration |
 | `bankPromoCodeService.js`   | ~151 | Bank promo CRUD + validation |
 | `metricsService.js`         | ~291 | Analytics aggregations |
 

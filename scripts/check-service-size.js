@@ -41,30 +41,10 @@ const EXCEPTIONS = [
     limit: 200,
     reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
   },
-  {
-    file: 'src/services/cartService.js',
-    limit: 450,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
-  },
   // inventory.js is now 289 LOC — within the 300-line module limit; exception removed (email-template-extract).
-  {
-    file: 'src/services/contactService.js',
-    limit: 500,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
-  },
   {
     file: 'src/services/metricsService.js',
     limit: 320,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
-  },
-  {
-    file: 'src/services/newsletterService.js',
-    limit: 400,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
-  },
-  {
-    file: 'src/services/notificationService.js',
-    limit: 450,
     reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
   },
   {
@@ -91,16 +71,6 @@ const EXCEPTIONS = [
     file: 'src/services/product/sync/domain/lightspeedFetchers.js',
     limit: 510,
     reason: 'PR-MOD-5: Lightspeed sync fetch domain; accepted pre-guardrail',
-  },
-  {
-    file: 'src/services/shippingService.js',
-    limit: 450,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
-  },
-  {
-    file: 'src/services/userService.js',
-    limit: 520,
-    reason: 'Legacy monolith — not in scope for MOD-1..8; follow-up PR planned',
   },
 ];
 
