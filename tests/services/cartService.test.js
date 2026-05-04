@@ -154,6 +154,28 @@ describe("cartService", () => {
         status: 400,
       });
     });
+
+    it("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)", async () => {
+      const otherProduct = await Product.create({
+        product: { id: "lsB", name: "Product B" },
+        variantsData: [{ id: "vB", qty: 5, price: "20.00" }],
+        totalQty: 5,
+        status: true,
+      });
+      await Cart.create({
+        user: userId,
+        items: [cartItem(productId), cartItem(otherProduct._id.toString(), { variantId: "vB" })],
+      });
+
+      const result = await cartService.removeFromCart(userId, productId);
+
+      expect(result.cartCount).toBe(1);
+      expect(Array.isArray(result.cart)).toBe(true);
+      // The surviving item's `product` must be a populated object with _id —
+      // not a bare ObjectId string. Without this, the web's next mutation
+      // sends product_id=undefined and the user can't delete the item.
+      expect(result.cart[0].product).toEqual(expect.objectContaining({ _id: expect.anything() }));
+    });
   });
 
   describe("increaseQty", () => {

@@ -330,7 +330,10 @@ async function addToCart(userId, itemData, options = {}) {
   }
 
   await cart.save();
-  return { cartCount: cart.items.length, cart: cart.items };
+  // BUG-056: return populated shape so the web optimistic update can read
+  // item.product._id on the next mutation. Without populate the response
+  // ships item.product as a bare ObjectId string.
+  return getCart(userId, { includeGiftLogic: false });
 }
 
 /**
@@ -350,7 +353,8 @@ async function removeFromCart(userId, productId) {
   }
 
   await cart.save();
-  return { cartCount: cart.items.length, cart: cart.items };
+  // BUG-056: return populated shape — see addToCart comment above.
+  return getCart(userId, { includeGiftLogic: false });
 }
 
 /**
@@ -378,7 +382,8 @@ async function increaseQty(userId, productId, qty, options = {}) {
 
   item.quantity += qty;
   await cart.save();
-  return { cart: cart.items };
+  // BUG-056: return populated shape — see addToCart comment.
+  return getCart(userId, { includeGiftLogic: false });
 }
 
 /**
@@ -402,7 +407,9 @@ async function decreaseQty(userId, productId, qty) {
   }
 
   await cart.save();
-  return { cart: cart.items, message };
+  // BUG-056: return populated shape (preserve `message`) — see addToCart comment.
+  const shape = await getCart(userId, { includeGiftLogic: false });
+  return { ...shape, message };
 }
 
 module.exports = {
