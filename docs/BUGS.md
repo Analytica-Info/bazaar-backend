@@ -454,7 +454,7 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 ### BUG-054 — Cron and refresh paths derive `status` from `totalQty>0`, silently re-publishing in-store-only products online
 - **Severity:** **CRITICAL** (catalog leak; merchant intent overridden)
 - **Files:** `src/scripts/updateProductsNew.js:115` (cron `updateParkedDetails`), `src/services/product/sync/use-cases/refreshSingleProductById.js:38` (admin refresh-by-id)
-- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Status:** **FIXED on both branches.** Modular branch fix in `feat/v2-api-unification` (commit `b072e6c`); equivalent fix on `main` (commit `c010ae0`, PR #7). Both shipped 2026-05-04. Merge confirmed parity 2026-05-04 (commit `7cb6374`).
 - **Symptom:** Both code paths set `status: totalQty > 0`, ignoring Lightspeed's `ecwid_enabled_webstore` flag. Lightspeed API 3.0 (used by these paths' fetcher) does not expose `ecwid_enabled_webstore`; only API 2.0 does. The webhook handler `handleProductUpdate.js:144` reads it correctly from 2.0, but the cron and refresh paths shortcut to qty as a proxy for online-status — two unrelated concepts. Result: any product the merchant sets to in-store-only via Lightspeed POS gets silently flipped back online whenever (a) the cron processes a parked sale referencing it, or (b) admin clicks "Refresh Product."
 - **Reproduced on:** SKU `123456789` ("Dell4455", itemId `977e2b4a-f3f4-4ca5-82c4-171cf270c569`). Lightspeed 2.0 returned `ecwid_enabled_webstore: false`; Mongo had `status: true` because the cron re-stamped it.
 - **Audit:** of 4929 products, 1801 are `status: true`; 1643 of those were last written by a code path with the bug. True authorship is masked because `productDiscountSync.js` clobbers the `webhook` audit field on every run (filed as BUG-055).
@@ -480,13 +480,12 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 ### BUG-056 — Cart mutation endpoints return unpopulated items, breaking web's optimistic state update
 - **Severity:** **HIGH** (web users can't delete a second item without refresh; checkout friction)
 - **Files:**
-  - `src/services/cartService.js` (main) — `addToCart`, `removeFromCart`, `increaseQty`, `decreaseQty`
-  - `src/services/cart/use-cases/modifyCart.js` (dev) — same four functions
-- **Status:** **FIXED** on dev (`feat/v2-api-unification`); hotfix branch off main pending
+  - `src/services/cartService.js` (pre-modular layout, now on `main`) — `addToCart`, `removeFromCart`, `increaseQty`, `decreaseQty`
+  - `src/services/cart/use-cases/modifyCart.js` (modular layout, on `feat/v2-api-unification`) — same four functions, via `reloadCartShape()` helper
+- **Status:** **FIXED on both branches.** Modular branch fix in `feat/v2-api-unification` (commit `20a46ad`); equivalent fix on `main` (commit `6422251`, PR #8). Both shipped 2026-05-04. Merge confirmed parity 2026-05-04 (commit `7cb6374`).
 - **Symptom:** All four cart mutation endpoints return `{ cart: cart.items }` from a `Cart.findOne()` without `.populate("items.product")`. The serialized response has each item's `product` field as a bare ObjectId string instead of a populated Product object. The web's `CartContext.handleRemoveItem` does `setCartItems(response.data.cart)` after a successful mutation, which puts these unpopulated items into React state. The next mutation sends `handleRemoveItem(item?.product?._id)` — but `item.product` is a string, so `_id` is `undefined`. Backend rejects with 400 "product_id is required". User sees "Failed to remove item from cart" toast.
 - **Reproduction:** authenticated user → load cart → delete first item (works) → delete second item (fails). Page refresh restores normal behavior.
 - **Latent since:** 2026-04-09 (`c2f24d1`, unified backend) — masked because the web always re-fetched after mutations.
 - **User-visible since:** 2026-04-26 (`d97cd3d` in bazaar-web, "perf: eliminate redundant API calls") — web optimization removed the safety re-fetch and started trusting the mutation response shape, exposing the latent backend bug.
-- **Fix applied (dev):** All four mutation endpoints now return `getCart(userId, { includeGiftLogic: false })` instead of raw `cart.items`. `decreaseQty` preserves its `message` by spreading `getCart`'s shape and appending `message`. New lock-in test in `tests/services/cartService.test.js` ("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)") asserts the surviving item's `product` field is a populated object with `_id`.
-- **Hotfix for main:** to be applied on a branch off `origin/main` against the pre-modular `src/services/cartService.js` and bundled into the same prod-deploy window as BUG-054.
+- **Fix applied:** All four mutation endpoints now return `getCart(userId, { includeGiftLogic: false })` instead of raw `cart.items`. `decreaseQty` preserves its `message` by spreading `getCart`'s shape and appending `message`. Lock-in test in `tests/services/cartService.test.js` ("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)") asserts the surviving item's `product` field is a populated object with `_id`.
 - **Source:** User-reported "web user can't delete from cart" investigation (2026-05-04).
