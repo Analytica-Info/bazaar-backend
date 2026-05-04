@@ -357,3 +357,31 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** If `CACHE_TTL_MAX_DISCOUNT` is changed via env, the script does not pick it up — it always uses its hardcoded 6-hour value. The runtime cache will expire at the configured TTL while the script re-populates it at 6 hours.
 - **Recommended fix:** In `updateProductsNew.js`, replace `MAX_DISCOUNT_TTL = 60 * 60 * 6` with `require('../config/runtime').cache.maxDiscountTtl`.
 - **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-038 — PENDING_PAYMENT_EXPIRY_MINUTES env var is misleading (Mongo TTL index gotcha)
+- **Severity:** LOW (operational footgun)
+- **Files:** `src/config/runtime.js`, `src/models/PendingPayment.js`, `.env.example`
+- **Status:** OPEN
+- **Symptom:** `PENDING_PAYMENT_EXPIRY_MINUTES` is exposed as a tunable env var, but Mongoose TTL indexes are baked into MongoDB at index-creation time (`expireAfterSeconds: 1800`). Changing the env var changes only what `runtime.js` returns; the live Mongo TTL index is unchanged.
+- **Impact:** Setting `PENDING_PAYMENT_EXPIRY_MINUTES=60` does NOT extend pending-payment lifetime. Mongo continues to delete docs after 30 minutes regardless. Ops would need to drop and recreate the index.
+- **Recommended fix:** Either (a) demote to a constant in `src/config/constants/business.js` with a clear comment that it must match the Mongoose `expireAfterSeconds`, OR (b) add a startup script that reconciles the index TTL with the env value via `db.collection('pendingpayments').dropIndex(...)` + recreate.
+- **Source:** Magic-numbers env-vs-constant evaluation (2026-05-04).
+
+### BUG-039 — Mobile checkAccessToken response-shape mismatch (pre-existing, not a v2-unification regression)
+- **Severity:** MEDIUM (silent logout)
+- **Files:** `Bazaar-Mobile-App/lib/data/services/api_service.dart:126-145`, `bazaar-backend/src/services/auth/use-cases/checkAccessToken.js:16,45-50`
+- **Status:** OPEN (pre-existing; surfaced by login-flow audit)
+- **Symptom:** Mobile expects `accessToken` in every `check-access-token` response. Backend returns `{ valid: true, message, userId }` when the token is still valid; only includes `accessToken` on the refresh branch.
+- **Impact:** Any spurious 401 retry that revalidates a still-good token gets misread by the mobile client as a failure → user is logged out unnecessarily. Behavior is identical on `main`, so this is NOT a regression introduced by the v2-unification branch.
+- **Recommended fix (backend):** Always include `accessToken` in the response (echo current token when still valid). One-line fix in `checkAccessToken.js:16`.
+- **Recommended fix (mobile):** Treat `valid: true` as success regardless of `accessToken` presence.
+- **Source:** Login-flow audit (2026-05-04, docs/LOGIN-AUDIT.md).
+
+### BUG-040 — Google OAuth requires three client IDs; missing any breaks one platform silently
+- **Severity:** MEDIUM (deploy-time configuration risk)
+- **Files:** `src/services/auth/adapters/googleVerifier.js:27-44`, `.env.example`
+- **Status:** OPEN (operational checklist item)
+- **Symptom:** `googleVerifier` switches the audience by User-Agent: Android UA → `ANDROID_GOOGLE_CLIENT_ID`, iOS UA → `IOS_GOOGLE_CLIENT_ID`, web → `GOOGLE_CLIENT_ID`. Mobile sets the UA correctly. If any of the three env vars is unset in production, that platform's Google login fails with an opaque "Invalid token" error.
+- **Impact:** Silent failure for one platform if env is incomplete. Hard to diagnose because the other platforms continue working.
+- **Recommended fix:** Add all three to the `validateEnv.js` REQUIRED list (or at least flag them as "required for Google OAuth" in the warning section). Pre-deploy checklist must verify all three are populated.
+- **Source:** Login-flow audit (2026-05-04).
