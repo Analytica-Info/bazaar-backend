@@ -43,5 +43,10 @@ exports[`validate() — representative output snapshot matches snapshot for a ty
   "  . PENDING_PAYMENT_EXPIRY_MINUTES = default",
   "# Tunables — external",
   "  . NOMOD_TIMEOUT_MS = default",
+  "# Tunables — mobile-version-gate",
+  "  . MIN_SUPPORTED_MOBILE_VERSION = default",
+  "  . MIN_SUPPORTED_MOBILE_VERSION_ENFORCE = default",
+  "  . IOS_UPDATE_URL = default",
+  "  . ANDROID_UPDATE_URL = default",
 ]
 `;

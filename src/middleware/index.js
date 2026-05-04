@@ -14,4 +14,5 @@ module.exports = {
   validate: require('./validate'),
   requestContext: require('./requestContext'),
   securityHeaders: require('./securityHeaders'),
+  versionGate: require('./versionGate'),
 };

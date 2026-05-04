@@ -79,6 +79,26 @@ Changing these requires a server restart (values are read at startup).
 
 ---
 
+## Mobile version gate
+
+Read by `src/middleware/versionGate.js`. The middleware runs on every request; requests that don't carry the `x-app-version` header are always allowed through (web / admin / cURL bypass).
+
+| Env var | Default | Controls |
+|---|---|---|
+| `MIN_SUPPORTED_MOBILE_VERSION` | `1.0.0` | Minimum acceptable mobile app version. Requests with a lower version receive `426 Upgrade Required` when enforcement is on. |
+| `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE` | `false` | Set to the literal string `'true'` to actively reject stale versions. Any other value (unset, `false`, `0`, `yes`) keeps enforcement off. Default off until BUG-053 ships. |
+| `IOS_UPDATE_URL` | `https://apps.apple.com/app/bazaar/id0000000000` | App Store deep-link returned in the `426` body for iOS clients. |
+| `ANDROID_UPDATE_URL` | `https://play.google.com/store/apps/details?id=com.bazaar.app` | Play Store deep-link returned in the `426` body for Android clients. |
+
+**Ops runbook — turning enforcement on:**
+1. Confirm mobile release with `X-App-Version` header + force-update dialog (BUG-053) is at ≥80% adoption.
+2. Set `MIN_SUPPORTED_MOBILE_VERSION=<target>` and `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=true` in the environment.
+3. Restart the server.
+4. Monitor `426_count` metric; it should only come from the tail of users below the floor version.
+5. To roll back, set `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=false` (or unset it) and restart.
+
+---
+
 ## Code Constants (not env-driven)
 
 These live in `src/config/constants/` and require a code change + deploy to modify.

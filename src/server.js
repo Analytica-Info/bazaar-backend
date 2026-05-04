@@ -18,7 +18,7 @@ const logger = require("./utilities/logger");
 const JWT_SECRET = require("./config/jwtSecret.js");
 const runtimeConfig = require("./config/runtime");
 const authMiddleware = require("./middleware/authMiddleware");
-const { requestContext, notFound, errorHandler } = require("./middleware");
+const { requestContext, notFound, errorHandler, versionGate } = require("./middleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const Coupon = require("./models/Coupon.js");
 const Cronjoblog = require("./models/Cronjoblog.js");
@@ -183,6 +183,9 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Correlation ID + child logger — must come before any route-level logging
 app.use(requestContext);
+
+// Mobile version gate — must come after requestContext so req.log is available
+app.use(versionGate);
 
 // Request logging — duration + response size
 app.use((req, res, next) => {

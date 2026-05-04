@@ -247,7 +247,7 @@ When the backend hardening is complete and you're ready to migrate clients:
 
 ## Action items, ordered
 
-1. **Fix BUG-052** — implement `versionGate` middleware. Deploy with `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=false` initially.
+1. **Fix BUG-052** — DONE (pending merge). `versionGate` middleware implemented in `src/middleware/versionGate.js`. Deployed inert with `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=false` by default. Flipping enforcement to `true` is a separate ops step — see `docs/CONFIG.md` for the runbook.
 2. **Coordinate with mobile team on BUG-053** — `package_info_plus`, `X-App-Version` interceptor, force-update dialog. Ship in next mobile release.
 3. **Once mobile release adoption ≥80%** — turn on `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=true`. The safety valve is now functional.
 4. **For v2 auth design** — bake in `tv` (token version) claim from day one. Use RS256/ES256, not HS256. Issue tokens with `iss`/`aud`/`sub`/`jti` populated.

@@ -71,6 +71,12 @@ const TUNABLE_GROUPS = {
   'external': [
     'NOMOD_TIMEOUT_MS',
   ],
+  'mobile-version-gate': [
+    'MIN_SUPPORTED_MOBILE_VERSION',
+    'MIN_SUPPORTED_MOBILE_VERSION_ENFORCE',
+    'IOS_UPDATE_URL',
+    'ANDROID_UPDATE_URL',
+  ],
 };
 
 // ── Pure validation function ──────────────────────────────────────────────────

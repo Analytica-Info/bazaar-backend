@@ -187,6 +187,35 @@ const config = Object.freeze({
     /** Nomod checkout API request timeout */
     nomodTimeoutMs: envInt('NOMOD_TIMEOUT_MS', 30_000),
   },
+
+  /**
+   * Mobile version gate.
+   * Read by src/middleware/versionGate.js.
+   */
+  mobile: {
+    /**
+     * Minimum mobile app version. Mobile clients sending an older version
+     * receive 426 Upgrade Required when enforcement is on.
+     */
+    minSupportedVersion: process.env.MIN_SUPPORTED_MOBILE_VERSION || '1.0.0',
+
+    /**
+     * Whether to actively reject old versions (true) or just log/observe (false).
+     * Default false until mobile side ships X-App-Version + force-update dialog
+     * (BUG-053). Flip to true after the mobile release adoption is high enough.
+     * Only the literal string 'true' enables enforcement — opt-in only.
+     */
+    enforceMinVersion: process.env.MIN_SUPPORTED_MOBILE_VERSION_ENFORCE === 'true',
+
+    /**
+     * Update URLs returned in the 426 response body so mobile clients can
+     * deep-link to the app store.
+     */
+    updateUrls: {
+      ios:     process.env.IOS_UPDATE_URL     || 'https://apps.apple.com/app/bazaar/id0000000000',
+      android: process.env.ANDROID_UPDATE_URL || 'https://play.google.com/store/apps/details?id=com.bazaar.app',
+    },
+  },
 });
 
 module.exports = config;
