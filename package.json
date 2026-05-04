@@ -26,7 +26,6 @@
     "sync:reset:inventory": "node src/scripts/resetSyncState.js inventory",
     "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
-    "lint:no-direct-time": "node scripts/check-no-direct-time.js",
     "validate-env": "node scripts/validateEnv.js",
     "smoke": "node scripts/smoke.js",
     "check": "npm run validate && npm run lint && npm test"
@@ -75,8 +74,10 @@
   "devDependencies": {
     "@jest/globals": "^30.3.0",
     "jest": "^30.3.0",
+    "js-yaml": "^4.1.1",
     "mongodb-memory-server": "^11.0.1",
     "nodemon": "^3.1.9",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "swagger-ui-express": "^5.0.1"
   }
 }

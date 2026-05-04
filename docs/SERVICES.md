@@ -3,6 +3,15 @@
 All controllers import from facade files (`src/services/<name>Service.js`).
 Never import directly from `src/services/<name>/use-cases/` in a controller.
 
+## v2 API Reference
+
+The v2 API surface (60 routes mounted under `/v2/*`) is documented in:
+
+- **OpenAPI spec**: [`docs/openapi/v2.yaml`](./openapi/v2.yaml)
+- **Swagger UI**: `GET /v2/docs` (start server with `V2_ENABLED=true`)
+- **Raw JSON**: `GET /v2/openapi.json`
+- **Guide**: [`docs/openapi/README.md`](./openapi/README.md)
+
 ---
 
 ## Public Surface — Facades

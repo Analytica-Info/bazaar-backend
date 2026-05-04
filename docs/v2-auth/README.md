@@ -48,6 +48,9 @@ This pack is the strawman the team will argue with before any line of v2 code la
 - [`docs/MOBILE-VERSION-COMPATIBILITY.md`](../MOBILE-VERSION-COMPATIBILITY.md) — v1 freeze policy; v2 versioning strategy.
 - [`docs/LOGIN-AUDIT.md`](../LOGIN-AUDIT.md) — current v1 login surface findings that motivated v2.
 - [`docs/BUGS.md`](../BUGS.md) — open bugs BUG-035, BUG-047, BUG-048, BUG-049, BUG-050, BUG-051. **All resolved by v2.**
+- **OpenAPI spec**: [`docs/openapi/v2.yaml`](../openapi/v2.yaml) — machine-readable contract for all 60 v2 routes.
+- **Live API docs**: `GET /v2/docs` (Swagger UI) and `GET /v2/openapi.json` (raw spec) — start the server with `V2_ENABLED=true` and visit [http://localhost:5000/v2/docs](http://localhost:5000/v2/docs).
+- **OpenAPI guide**: [`docs/openapi/README.md`](../openapi/README.md) — how to update the spec, run the parity guard, generate a typed SDK.
 - Code:
   - `src/routes/v2/{web,mobile}/authRoutes.js` — current dev-only v2 routes.
   - `src/controllers/v2/{web,mobile}/authController.js` — controllers (will be regenerated to match this contract).

@@ -255,6 +255,40 @@ app.get("/readyz", (req, res) => {
 });
 
 // ==========================================
+// V2 OPENAPI SPEC + SWAGGER UI (public, no auth, no platform middleware)
+// Mounted before connectAndRun so the router is available immediately on boot.
+// ==========================================
+{
+  const yaml = require("js-yaml");
+  const swaggerUi = require("swagger-ui-express");
+  const specPath = path.join(__dirname, "../docs/openapi/v2.yaml");
+
+  let specJson = null;
+  try {
+    specJson = yaml.load(fs.readFileSync(specPath, "utf8"));
+  } catch (err) {
+    logger.warn({ err }, "Could not load OpenAPI spec — /v2/openapi.json and /v2/docs will be unavailable");
+  }
+
+  if (specJson) {
+    app.get("/v2/openapi.json", (req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.json(specJson);
+    });
+
+    app.use(
+      "/v2/docs",
+      swaggerUi.serve,
+      swaggerUi.setup(specJson, {
+        customSiteTitle: "Bazaar v2 API Docs",
+        swaggerOptions: { persistAuthorization: true },
+      })
+    );
+    logger.info("OpenAPI spec served at /v2/openapi.json and /v2/docs");
+  }
+}
+
+// ==========================================
 // INLINE ROUTES FROM ECOMMERCE SERVER.JS
 // ==========================================
 
