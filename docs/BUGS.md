@@ -442,3 +442,21 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Recommended fix (one line):** In `mobile/authController.js:75`, add `platform: 'mobile'` to the `authService.googleLogin({ ... })` call. The `if (platform === 'mobile')` branch in `resolveClient` then handles `userAgent === 'ios'` correctly. Apple already does this — match the pattern.
 - **Alternative fix:** In `googleVerifier.js:39`, change `ua.includes('iphone') || ua.includes('ipad')` to `ua === 'ios' || ua.includes('iphone') || ua.includes('ipad')`. Less clean but no controller change.
 - **Source:** OAuth flow verification (2026-05-04).
+
+### BUG-052 — MIN_SUPPORTED_MOBILE_VERSION env var exists but is never enforced
+- **Severity:** HIGH (safety valve is non-functional)
+- **Files:** `.env.example`, `src/routes/mobile/configRoutes.js:10`, **no middleware exists**
+- **Status:** OPEN
+- **Symptom:** `MIN_SUPPORTED_MOBILE_VERSION=1.0.35` is set in `.env.example` and exposed via `/api/mobile/config`. However, **no backend middleware compares an incoming `X-App-Version` header against this value**. The env var is purely informational — it's echoed back to clients via the config endpoint and used in admin activity log displays, but it never blocks a request.
+- **Impact:** The safety-valve mechanism for forcing old mobile app versions to update doesn't exist. Any breaking change to a v1 endpoint (or an inadvertent shape drift) will silently affect every previously-released app version, with no force-update prompt. Tens of thousands of users on stale versions could get logged out / shown broken UI / fail to checkout, with no graceful degradation path.
+- **Recommended fix:** Add `src/middleware/versionGate.js` that runs early in the request pipeline, reads `X-App-Version` header (if present), and returns `426 Upgrade Required` when `clientVersion < MIN_SUPPORTED_MOBILE_VERSION`. Skip when header is absent (web/admin). Add a `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=false` flag for staged rollout.
+- **Source:** Mobile-version-compatibility audit (2026-05-04).
+
+### BUG-053 — Mobile app does not send X-App-Version header and does not consume /api/mobile/config
+- **Severity:** HIGH (companion to BUG-052; blocks the version-gate from ever working)
+- **Files:** `Bazaar-Mobile-App/lib/**` — no version-check code path exists
+- **Status:** OPEN (mobile-side fix, tracked here for backend awareness)
+- **Symptom:** A grep of `Bazaar-Mobile-App/lib/` for `minSupportedVersion`, `forceUpdate`, `package_info`, `in_app_update`, `upgrader`, `X-App-Version`, `versionGate` returned zero matches. The only `app_version` reference is a hardcoded string `"1.0.33"` in `lib/core/utils/payment_error_logger.dart:28` used in one error-log payload. Mobile does not call `/api/mobile/config` at startup, does not read its own version from `package_info_plus` or equivalent, does not send `X-App-Version` on any request, and has no force-update dialog.
+- **Impact:** Even if the backend implements BUG-052's middleware, mobile clients will never trigger it. Backend must default to "skip when header absent" or all mobile traffic returns 426.
+- **Recommended fix (mobile):** Add `package_info_plus` dependency. On app launch, call `/api/mobile/config`. If `appVersion < minSupportedVersion`, show non-dismissable update prompt with App Store / Play Store deep link. Add `X-App-Version: <currentVersion>` header to all backend requests (Dio interceptor or `ApiService` base headers).
+- **Source:** Mobile-version-compatibility audit (2026-05-04).
