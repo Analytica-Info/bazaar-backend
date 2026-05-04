@@ -385,3 +385,49 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** Silent failure for one platform if env is incomplete. Hard to diagnose because the other platforms continue working.
 - **Recommended fix:** Add all three to the `validateEnv.js` REQUIRED list (or at least flag them as "required for Google OAuth" in the warning section). Pre-deploy checklist must verify all three are populated.
 - **Source:** Login-flow audit (2026-05-04).
+
+### BUG-041 — Mobile coupon validation gates on missing `success` key
+- **Severity:** MEDIUM (customer-visible — coupons unusable on mobile)
+- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:1097-1117`, `bazaar-backend/src/services/coupon/use-cases/checkCouponCode.js:45,51,77-83`
+- **Status:** OPEN (pre-existing; surfaced by critical-flows audit)
+- **Symptom:** Mobile `applyCoupon` calls `POST /api/check-coupon` and branches on `data['success'] == true`. Backend response is `{ message, type, discountPercent, capAED?, bankPromoId? }` with **no `success` field** on the 200 path; `success` is implicit via HTTP status. Every valid coupon therefore fails the `success == true` check and shows a generic error toast; `isDiscountApplied` is never set.
+- **Impact:** Mobile users cannot apply any coupon (FIRST15, UAE10, bank promos). Web works because it gates on HTTP 200 instead of `data.success`.
+- **Recommended fix (backend):** Add `success: true` to the return shape of `checkCouponCode` in `src/services/coupon/use-cases/checkCouponCode.js:45,51,77`. Cheapest, cross-client safe.
+- **Recommended fix (mobile):** Branch on HTTP 2xx instead of `data['success']` in `applyCoupon`.
+- **Source:** Critical-flows audit (2026-05-01, docs/CRITICAL-FLOWS-AUDIT.md, Flow 2).
+
+### BUG-042 — Cart mutation endpoints omit gift-logic enrichment fields
+- **Severity:** LOW (transient UI flicker)
+- **Files:** `bazaar-backend/src/services/cart/use-cases/modifyCart.js:83,106,126,154,178`, `bazaar-backend/src/services/cart/use-cases/getCart.js:48-55,87-93`, `Bazaar-Mobile-App/lib/data/models/cart_response.dart:91-115`
+- **Status:** OPEN
+- **Symptom:** `getCart` (with `includeGiftLogic: true`) enriches each cart line with `category_id`, `category_name`, `price`, `isGiftWithPurchase`. `modifyCart` use-cases (`addToCart` / `increaseQty` / `decreaseQty` / `removeFromCart`) return raw `cart.items` from the Mongoose schema with none of those fields.
+- **Impact:** Mobile UI consuming `addToCart` / `increase` / `decrease` responses transiently sees nulls for category and `isGiftWithPurchase` until the next full `get-cart` refresh. Null-tolerant on mobile today, but latent if either client begins gating on these fields.
+- **Recommended fix:** Have `modifyCart` use-cases return the same enrichment as `getCart({ includeGiftLogic: true })` — extract a shared `enrichCartItems(cart, options)` helper in `services/cart/domain/`.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-043 — Per-item price precision drifts between web (rounded) and mobile (raw double)
+- **Severity:** LOW (latent; AED-only catalogue today)
+- **Files:** `bazaar-web/src/components/Checkout/Checkout.jsx:616,686,747`, `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:489,628`, `bazaar-backend/src/services/checkout/use-cases/createStripeCheckout.js:49,73,85`
+- **Status:** OPEN
+- **Symptom:** Web sends `price: Math.round(item.variantPrice)` for every cart line on the checkout payload. Mobile sends `double.tryParse(product.variantPrice ?? '0')`. Backend `createStripeCheckout` then does its own `Math.round(Number(item.price) * 100)` for cents.
+- **Impact:** For non-integer AED prices, web orders charge integer AED while mobile orders charge full precision — same SKU, different totals across platforms. Currently no fractional-AED prices in the catalogue, but this becomes a real-money divergence the day fractional pricing is enabled or a non-AED currency is added.
+- **Recommended fix:** Consolidate price rounding on the backend; never trust client `price`. Either (a) re-derive unit price server-side from the cart in DB, or (b) pin client behavior to send raw `Number(variantPrice)` and let backend do all rounding.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-044 — Mobile reads `data['freeShipping']` from /api/shipping-cost which backend never emits
+- **Severity:** LOW (drift; fallback covers it)
+- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:265`, `bazaar-backend/src/services/shipping/use-cases/calculateShippingCost.js:14-22,46-52`
+- **Status:** OPEN (pre-existing)
+- **Symptom:** Mobile sets `isFreeShippingEligible.value = data['freeShipping'] == true`. Backend response is `{ shippingCost, ratePerKm, baseRate, freeShippingThreshold, currency }` — no `freeShipping` boolean.
+- **Impact:** `isFreeShippingEligible` is always false on mobile. Mobile compensates because the same response includes `freeShippingThreshold`, which mobile compares against `discountedProductsTotal` to decide free shipping locally (`shippingCost` getter). Two-source-of-truth risk: when backend decides free shipping for a region not driven by threshold (e.g. promo code), mobile won't render it as free.
+- **Recommended fix:** Either backend adds `freeShipping: bool` to the response (single line in `calculateShippingCost.js`), or mobile drops the `freeShipping` read and trusts `shippingCost === 0`.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-045 — Mobile bypasses backend Stripe init and ships Stripe secret key in `.env`
+- **Severity:** HIGH (security — Stripe best-practice violation; pre-existing)
+- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:44,710-810`, `bazaar-backend/src/routes/mobile/orderRoutes.js:11`, `bazaar-backend/src/controllers/mobile/orderController.js:168-184`
+- **Status:** OPEN (pre-existing; surfaced by critical-flows audit)
+- **Symptom:** Mobile imports `STRIPE_SECRET_KEY` via `dotenv.env['STRIPE_SECRET_KEY']` and calls `https://api.stripe.com/v1/customers`, `/v1/ephemeral_keys`, and `/v1/payment_intents` directly. Backend exposes `/api/order/stripe/init` which is intended for this exact purpose and is never invoked.
+- **Impact:** Stripe explicitly forbids client-side use of secret keys. Anyone reverse-engineering the mobile app gets full Stripe API write access (refund any charge, list any customer, create payments). PCI / Stripe compliance issue regardless of the v2 unification work.
+- **Recommended fix:** Mobile must call `POST /api/order/stripe/init` for PaymentIntent creation and remove `STRIPE_SECRET_KEY` from the mobile bundle. Rotate the existing key after the change ships.
+- **Source:** Critical-flows audit (2026-05-01).
