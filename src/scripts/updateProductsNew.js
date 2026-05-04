@@ -112,17 +112,19 @@ const updateParkedDetails = async (productIds) => {
           (sum, v) => sum + (v.qty || 0),
           0
         );
-        const status = totalQty > 0;
         const webhook = "updateParkedDetails";
         const webhookTime = await currentTime();
 
+        // Status (online/in-store) is owned by the product.update webhook path
+        // and the initial-sync path. This is a qty-only update; overwriting
+        // status here would silently re-publish in-store-only items online
+        // because totalQty > 0 is not a valid proxy for ecwid_enabled_webstore.
         await Product.updateOne(
           { "product.id": itemId },
           {
             $set: {
               variantsData: updatedVariants,
               totalQty,
-              status,
               webhook,
               webhookTime,
             },

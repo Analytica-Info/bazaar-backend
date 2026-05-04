@@ -161,7 +161,7 @@ describe('updateParkedDetails — batch DB fetch (N+1 fix)', () => {
         expect(v3.qty).toBe(10); // untouched — status is OPEN
     });
 
-    it('sets status=false when all variants reach zero qty', async () => {
+    it('does not overwrite status when all variants reach zero qty (storefront uses totalQty>0 to hide)', async () => {
         await Product.create(makeProductDoc({
             parentId: 'p3',
             variants: [{ id: 'v4', qty: 2 }],
@@ -178,7 +178,12 @@ describe('updateParkedDetails — batch DB fetch (N+1 fix)', () => {
 
         const updated = await Product.findOne({ 'product.id': 'p3' }).lean();
         expect(updated.totalQty).toBe(0);
-        expect(updated.status).toBe(false);
+        // Status is owned by the product.update webhook handler. The cron must
+        // never derive status from qty — that proxy silently re-publishes
+        // in-store-only items online. Storefront queries already filter on
+        // totalQty > 0, so an out-of-stock product is correctly hidden without
+        // mutating status.
+        expect(updated.status).toBe(true); // unchanged from seed
     });
 
     it('skips variants not found in DB and logs them, without crashing', async () => {

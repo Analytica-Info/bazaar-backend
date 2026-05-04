@@ -386,6 +386,28 @@ async function fetchProductInventoryDetails(itemId, matchedProductIds = []) {
  * Refresh product details from Lightspeed (used by productRefreshController).
  * Uses tax_inclusive ?? tax_exclusive pricing (refresh-specific behavior).
  */
+// Lightspeed 3.0 dropped `ecwid_enabled_webstore`; only 2.0 still exposes it.
+// Without this lookup, refresh paths fall back to qty>0 and silently
+// re-publish in-store-only items online. Fail-safe on lookup errors so we
+// never accidentally publish — caller treats undefined as "not online".
+async function fetchOnlineStatusFromV2(productId) {
+    try {
+        const res = await axios.get(
+            `https://bazaargeneraltrading.retail.lightspeed.app/api/2.0/products/${productId}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${API_KEY}`,
+                    Accept: 'application/json',
+                },
+            }
+        );
+        return res?.data?.data?.ecwid_enabled_webstore;
+    } catch (err) {
+        logger.warn({ productId, err: err.message }, '[Refresh Product] online-status v2 lookup failed');
+        return undefined;
+    }
+}
+
 async function fetchProductDetailsForRefresh(id) {
     logger.info({ id }, '[Refresh Product] Hitting Lightspeed API: GET /api/3.0/products/:id');
     const response = await axios.get(
@@ -524,12 +546,18 @@ async function inventoryProductDetailUpdate(type, updateProductId, timeFormatted
     }
 
     const { variantsData, totalQty } = await fetchProductInventoryDetails(itemId, matchedProductIds);
-    const status = totalQty !== 0;
     const webhook = type;
     const webhookTime = timeFormatted;
+    // Inventory updates must not touch `status`. Status (online/in-store) is
+    // owned by the product.update webhook handler which reads the merchant's
+    // `ecwid_enabled_webstore` setting from Lightspeed 2.0. Deriving status
+    // from totalQty silently re-publishes in-store-only items online — and
+    // the inverse (status: totalQty !== 0) prematurely hides legitimate
+    // out-of-stock items from re-sync. Storefront queries already filter
+    // `totalQty > 0` so an out-of-stock product is correctly hidden.
     await Product.updateOne(
         { 'product.id': itemId, status: true },
-        { $set: { variantsData, totalQty, status, webhook, webhookTime } }
+        { $set: { variantsData, totalQty, webhook, webhookTime } }
     );
     logger.info({ itemId, type }, 'Inventory Updated (Product Update)');
     return itemId;
@@ -568,7 +596,6 @@ async function refreshSingleProductById(productId) {
     fixZeroTaxInclusive(product, variantsData);
     const timeFormatted = await currentTime();
     const type = 'api';
-    const productStatus = totalQty > 0;
 
     const existingEntry = await Product.findOne({ 'product.id': product.id });
     if (existingEntry) {
@@ -578,6 +605,11 @@ async function refreshSingleProductById(productId) {
     }
 
     if (!existingEntry) {
+        // Status (online/in-store) only needs computing on create. Lightspeed
+        // 3.0 doesn't return ecwid_enabled_webstore — must consult 2.0 directly.
+        // Fail-safe to false on lookup error so we never accidentally publish.
+        const onlineStatus = await fetchOnlineStatusFromV2(id);
+        const productStatus = onlineStatus === true && totalQty > 0;
         const newProductDetails = new Product({
             product,
             variantsData,
@@ -597,6 +629,10 @@ async function refreshSingleProductById(productId) {
         };
     }
 
+    // Update path intentionally does NOT touch `status`. The merchant's
+    // ecwid_enabled_webstore setting is owned by the product.update webhook
+    // handler. Refresh is a data-correctness operation and must not silently
+    // flip in-store-only products online.
     await Product.updateOne(
         { 'product.id': product.id },
         {
@@ -606,7 +642,6 @@ async function refreshSingleProductById(productId) {
                 totalQty,
                 webhook: type,
                 webhookTime: timeFormatted,
-                status: productStatus,
             },
         }
     );
