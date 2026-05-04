@@ -111,10 +111,12 @@ describe('refreshSingleProductById', () => {
     });
 
     it('creates a new product when it does not exist in DB', async () => {
-        // No ProductId record, no Product record — should create both
+        // No ProductId record, no Product record — should create both.
+        // Create path consults Lightspeed 2.0 for ecwid_enabled_webstore.
         axios.get
             .mockResolvedValueOnce(makeProductResponse('newprod1'))    // 3.0/products
-            .mockResolvedValueOnce(makeInventoryResponse(5));           // 2.0/inventory
+            .mockResolvedValueOnce(makeInventoryResponse(5))           // 2.0/inventory
+            .mockResolvedValueOnce({ data: { data: { ecwid_enabled_webstore: true } } }); // 2.0/products status lookup
 
         const result = await productSyncService.refreshSingleProductById('newprod1');
 
@@ -131,7 +133,7 @@ describe('refreshSingleProductById', () => {
         expect(pidDoc).not.toBeNull();
     });
 
-    it('updates an existing product when it already exists in DB', async () => {
+    it('updates an existing product without overwriting status (preserves merchant in-store-only setting)', async () => {
         await Product.create({
             product: { id: 'existprod', name: 'Old Name' },
             variantsData: [],
@@ -152,7 +154,10 @@ describe('refreshSingleProductById', () => {
 
         const dbDoc = await Product.findOne({ 'product.id': 'existprod' }).lean();
         expect(dbDoc.totalQty).toBe(7);
-        expect(dbDoc.status).toBe(true);
+        // Status is owned by the product.update webhook handler — refresh
+        // updates qty/variantsData but must not flip an in-store-only product
+        // back online. The seeded false stays false.
+        expect(dbDoc.status).toBe(false);
     });
 
     it('does not create a new ProductId record when it already exists', async () => {

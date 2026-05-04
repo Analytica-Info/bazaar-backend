@@ -450,3 +450,29 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** Even if the backend implements BUG-052's middleware, mobile clients will never trigger it. Backend must default to "skip when header absent" or all mobile traffic returns 426.
 - **Recommended fix (mobile):** Add `package_info_plus` dependency. On app launch, call `/api/mobile/config`. If `appVersion < minSupportedVersion`, show non-dismissable update prompt with App Store / Play Store deep link. Add `X-App-Version: <currentVersion>` header to all backend requests (Dio interceptor or `ApiService` base headers).
 - **Source:** Mobile-version-compatibility audit (2026-05-04).
+
+### BUG-054 — Cron and refresh paths derive `status` from `totalQty>0`, silently re-publishing in-store-only products online
+- **Severity:** **CRITICAL** (catalog leak; merchant intent overridden)
+- **Files:** `src/scripts/updateProductsNew.js:115` (cron `updateParkedDetails`), `src/services/product/sync/use-cases/refreshSingleProductById.js:38` (admin refresh-by-id)
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** Both code paths set `status: totalQty > 0`, ignoring Lightspeed's `ecwid_enabled_webstore` flag. Lightspeed API 3.0 (used by these paths' fetcher) does not expose `ecwid_enabled_webstore`; only API 2.0 does. The webhook handler `handleProductUpdate.js:144` reads it correctly from 2.0, but the cron and refresh paths shortcut to qty as a proxy for online-status — two unrelated concepts. Result: any product the merchant sets to in-store-only via Lightspeed POS gets silently flipped back online whenever (a) the cron processes a parked sale referencing it, or (b) admin clicks "Refresh Product."
+- **Reproduced on:** SKU `123456789` ("Dell4455", itemId `977e2b4a-f3f4-4ca5-82c4-171cf270c569`). Lightspeed 2.0 returned `ecwid_enabled_webstore: false`; Mongo had `status: true` because the cron re-stamped it.
+- **Audit:** of 4929 products, 1801 are `status: true`; 1643 of those were last written by a code path with the bug. True authorship is masked because `productDiscountSync.js` clobbers the `webhook` audit field on every run (filed as BUG-055).
+- **Impact:** Catalog leak — products the merchant intended to sell only in-store appear on the storefront and mobile app. Customers can order items the merchant wasn't ready to ship online.
+- **Fix applied:**
+  - `updateProductsNew.js`: removed `status` from the qty-update `$set`. Status is now owned exclusively by the `product.update` webhook handler (which uses 2.0 correctly).
+  - `refreshSingleProductById.js`: split create/update paths. Create path consults Lightspeed 2.0 directly via new `fetchOnlineStatusFromV2()` helper (fail-safe to `undefined → false` on lookup error). Update path no longer touches `status` — preserves merchant's setting.
+  - Lock-in tests updated in `tests/services/productSyncService.pr12.test.js` and `tests/scripts/updateParkedDetails.test.js` to assert status preservation.
+- **Followups still needed:**
+  - One-time reconciliation script: for every product with `status: true`, query Lightspeed 2.0 and flip to `false` if `ecwid_enabled_webstore !== true`. Estimated ~5000 API calls; rate-limit with `mapLimit`. Not run yet — needs explicit approval.
+  - Long-term: collapse `fetchProductDetailsForRefresh` and `fetchProductDetails` into one fetcher with explicit options.
+- **Source:** User-reported "Dell4455 shows two variants and quantity mismatch" investigation (2026-05-04).
+
+### BUG-055 — productDiscountSync overwrites the `webhook` audit field on every run, masking authorship of qty/status changes
+- **Severity:** MEDIUM (observability; turns every "why is this stale" investigation blind)
+- **File:** `src/helpers/productDiscountSync.js:128, 92` — both `fastSync` and `fullScanAndSync` write `webhook: 'updateProductDiscounts'` and `webhookTime` into every target/leader doc.
+- **Status:** OPEN
+- **Symptom:** The `webhook` field is supposed to record which job last *substantively* modified a product. The discount sync runs frequently and overwrites this field even though it only mutates `discount`, `originalPrice`, `discountedPrice`, `isHighest`. Authorship of the actual `variantsData`/`totalQty`/`status` change is destroyed within minutes of any other write.
+- **Impact:** Forensic — postmortems on stale-data bugs cannot determine which writer is at fault. Surfaced during BUG-054 investigation: 1643/1801 affected products show `webhook: 'updateProductDiscounts'`, leaving the true buggy-path attribution unrecoverable.
+- **Recommended fix:** Either (a) drop `webhook`/`webhookTime` from the discount-sync `$set`, or (b) introduce a separate `lastDiscountSyncAt` field. Prefer (a) since the discount sync is a derived/projection job, not a primary writer.
+- **Source:** BUG-054 investigation (2026-05-04).
