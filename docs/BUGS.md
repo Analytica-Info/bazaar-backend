@@ -266,15 +266,16 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 
 ### BUG-028 — fetchProductDetails price field divergence: tax_inclusive (checkout) vs tax_exclusive (order/mobile)
 - **Files:** `src/services/shared/lightspeedClient.js` (canonical), formerly `src/services/checkoutService.js` and `src/services/order/adapters/lightspeedClient.js`
-- **Severity:** HIGH (pricing correctness)
-- **Status:** OPEN
-- **Symptom:** Two copies of `fetchProductDetails` existed with different price fields:
-  - `checkoutService.js` (website) used `price_standard.tax_inclusive`
-  - `order/adapters/lightspeedClient.js` (mobile) used `price_standard.tax_exclusive`
-  The shared version (PR-MOD-3) uses `tax_inclusive` because it is the customer-facing checkout path where prices must include VAT.
-- **Impact:** If mobile callers were relying on `tax_exclusive` pricing, they now receive `tax_inclusive` prices. Mobile clients should verify their displayed prices are correct. If mobile must show pre-tax prices, a separate `fetchProductDetailsExclusive` function should be introduced.
-- **Recommended fix:** Confirm with mobile team whether `tax_exclusive` or `tax_inclusive` is correct for mobile display. If both are needed, add a `priceTax` parameter defaulting to `'tax_inclusive'`.
-- **Source:** PR-MOD-3 dedup analysis.
+- **Severity:** Was HIGH; **revised: NO PRODUCTION IMPACT**
+- **Status:** **RESOLVED — VERIFIED NO-OP** (2026-05-04)
+- **Symptom (original concern):** Two copies of `fetchProductDetails` existed with different price fields. The dedup'd version uses `tax_inclusive`. Concern was that mobile may have relied on `tax_exclusive` and would now display the wrong price.
+- **Verification (2026-05-04):**
+  - `Bazaar-Mobile-App` `main` branch (commit `b5e76a3`) was inspected. Every price-display call site reads `priceStandard.taxInclusive` (`flash_sale_widget.dart:39`, `product_detail_screen.dart:749`, `similar_products_widget.dart:65,70`, `products_card.dart:284`, `product_details_controller.dart:43`). **Zero** `.taxExclusive` reads in any UI or controller. The model parses both fields from JSON but never reads `.taxExclusive`.
+  - The dedup'd `fetchProductDetails` is used **only by post-checkout inventory diagnostic helpers** (`order/shared/quantities.js`, `checkout/shared/inventory.js`). It does **not** populate the canonical `Product.price` document that clients read.
+  - The canonical product price visible to all clients comes from `src/services/product/sync/domain/lightspeedFetchers.js`, which has always used `tax_inclusive` (lines 108, 121, 277, 295, 384).
+  - Stripe/Tabby/Nomod checkout amounts are computed from cart-line prices the client already saw — not from `fetchProductDetails`.
+- **Outcome:** The dedupe is byte-equivalent for every user-facing flow. The only behavior that genuinely changed is which value appears in an internal "inventory updated" admin email — cosmetic, internal-only.
+- **Source:** PR-MOD-3 dedup analysis; verified against `Bazaar-Mobile-App` `main` 2026-05-04.
 
 ### BUG-029 — updateQuantityMail admin email resolution divergence: dynamic (checkout) vs static env var (order/mobile)
 - **Files:** `src/services/checkoutService.js` and `src/services/order/shared/quantities.js`
