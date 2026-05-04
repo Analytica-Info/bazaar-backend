@@ -431,3 +431,14 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** Stripe explicitly forbids client-side use of secret keys. Anyone reverse-engineering the mobile app gets full Stripe API write access (refund any charge, list any customer, create payments). PCI / Stripe compliance issue regardless of the v2 unification work.
 - **Recommended fix:** Mobile must call `POST /api/order/stripe/init` for PaymentIntent creation and remove `STRIPE_SECRET_KEY` from the mobile bundle. Rotate the existing key after the change ships.
 - **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-046 — iOS Google login resolves to wrong audience (web client ID instead of iOS)
+- **Severity:** MEDIUM (auth correctness; pre-existing)
+- **Files:** `src/services/auth/adapters/googleVerifier.js:39`, `src/controllers/mobile/authController.js:67-81`
+- **Status:** OPEN (pre-existing; surfaced 2026-05-04 during OAuth flow verification)
+- **Symptom:** Mobile sends `User-Agent: "ios"` (literal three-letter string) for iOS clients (`Bazaar-Mobile-App/lib/controllers/auth_controller.dart:875`). The mobile controller forwards `userAgent` but does NOT pass `platform: 'mobile'`. The verifier's `resolveClient` falls into the UA-substring branch which checks `ua.includes('iphone') || ua.includes('ipad')` — neither matches the literal `"ios"`. iOS tokens are therefore verified against `GOOGLE_CLIENT_ID` (web audience), not `IOS_GOOGLE_CLIENT_ID`.
+- **Impact:** If `GOOGLE_CLIENT_ID !== IOS_GOOGLE_CLIENT_ID` in production, iOS Google login fails with "Invalid token audience". If they happen to be the same value (currently unconfirmed), the bug is invisible.
+- **Note:** Pre-existing — the same logic existed in `authService.js` before PR-MOD-6 (the verifier was extracted verbatim). NOT a regression from this branch.
+- **Recommended fix (one line):** In `mobile/authController.js:75`, add `platform: 'mobile'` to the `authService.googleLogin({ ... })` call. The `if (platform === 'mobile')` branch in `resolveClient` then handles `userAgent === 'ios'` correctly. Apple already does this — match the pattern.
+- **Alternative fix:** In `googleVerifier.js:39`, change `ua.includes('iphone') || ua.includes('ipad')` to `ua === 'ios' || ua.includes('iphone') || ua.includes('ipad')`. Less clean but no controller change.
+- **Source:** OAuth flow verification (2026-05-04).
