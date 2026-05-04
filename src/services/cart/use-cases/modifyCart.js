@@ -2,6 +2,16 @@
 
 const Cart = require('../../../repositories').carts.rawModel();
 const Product = require('../../../repositories').products.rawModel();
+const { getCart } = require('./getCart');
+
+// All mutation endpoints (add/remove/increase/decrease) must return the same
+// populated shape `/cart/get-cart` returns — the web app's optimistic state
+// update assumes `item.product._id` exists on returned items. Without populate,
+// item.product serializes as a bare ObjectId string and the next mutation
+// sends `product_id: undefined`, causing 400 "product_id is required".
+async function reloadCartShape(userId) {
+  return getCart(userId, { includeGiftLogic: false });
+}
 
 /**
  * Add item to cart.
@@ -103,7 +113,7 @@ async function addToCart(userId, itemData, options = {}) {
   }
 
   await cart.save();
-  return { cartCount: cart.items.length, cart: cart.items };
+  return reloadCartShape(userId);
 }
 
 /**
@@ -123,7 +133,7 @@ async function removeFromCart(userId, productId) {
   }
 
   await cart.save();
-  return { cartCount: cart.items.length, cart: cart.items };
+  return reloadCartShape(userId);
 }
 
 /**
@@ -151,7 +161,7 @@ async function increaseQty(userId, productId, qty, options = {}) {
 
   item.quantity += qty;
   await cart.save();
-  return { cart: cart.items };
+  return reloadCartShape(userId);
 }
 
 /**
@@ -175,7 +185,8 @@ async function decreaseQty(userId, productId, qty) {
   }
 
   await cart.save();
-  return { cart: cart.items, message };
+  const shape = await reloadCartShape(userId);
+  return { ...shape, message };
 }
 
 module.exports = { addToCart, removeFromCart, increaseQty, decreaseQty };

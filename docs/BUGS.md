@@ -476,3 +476,17 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Impact:** Forensic — postmortems on stale-data bugs cannot determine which writer is at fault. Surfaced during BUG-054 investigation: 1643/1801 affected products show `webhook: 'updateProductDiscounts'`, leaving the true buggy-path attribution unrecoverable.
 - **Recommended fix:** Either (a) drop `webhook`/`webhookTime` from the discount-sync `$set`, or (b) introduce a separate `lastDiscountSyncAt` field. Prefer (a) since the discount sync is a derived/projection job, not a primary writer.
 - **Source:** BUG-054 investigation (2026-05-04).
+
+### BUG-056 — Cart mutation endpoints return unpopulated items, breaking web's optimistic state update
+- **Severity:** **HIGH** (web users can't delete a second item without refresh; checkout friction)
+- **Files:**
+  - `src/services/cartService.js` (main) — `addToCart`, `removeFromCart`, `increaseQty`, `decreaseQty`
+  - `src/services/cart/use-cases/modifyCart.js` (dev) — same four functions
+- **Status:** **FIXED** on dev (`feat/v2-api-unification`); hotfix branch off main pending
+- **Symptom:** All four cart mutation endpoints return `{ cart: cart.items }` from a `Cart.findOne()` without `.populate("items.product")`. The serialized response has each item's `product` field as a bare ObjectId string instead of a populated Product object. The web's `CartContext.handleRemoveItem` does `setCartItems(response.data.cart)` after a successful mutation, which puts these unpopulated items into React state. The next mutation sends `handleRemoveItem(item?.product?._id)` — but `item.product` is a string, so `_id` is `undefined`. Backend rejects with 400 "product_id is required". User sees "Failed to remove item from cart" toast.
+- **Reproduction:** authenticated user → load cart → delete first item (works) → delete second item (fails). Page refresh restores normal behavior.
+- **Latent since:** 2026-04-09 (`c2f24d1`, unified backend) — masked because the web always re-fetched after mutations.
+- **User-visible since:** 2026-04-26 (`d97cd3d` in bazaar-web, "perf: eliminate redundant API calls") — web optimization removed the safety re-fetch and started trusting the mutation response shape, exposing the latent backend bug.
+- **Fix applied (dev):** All four mutation endpoints now return `getCart(userId, { includeGiftLogic: false })` instead of raw `cart.items`. `decreaseQty` preserves its `message` by spreading `getCart`'s shape and appending `message`. New lock-in test in `tests/services/cartService.test.js` ("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)") asserts the surviving item's `product` field is a populated object with `_id`.
+- **Hotfix for main:** to be applied on a branch off `origin/main` against the pre-modular `src/services/cartService.js` and bundled into the same prod-deploy window as BUG-054.
+- **Source:** User-reported "web user can't delete from cart" investigation (2026-05-04).
