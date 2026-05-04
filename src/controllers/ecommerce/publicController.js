@@ -790,7 +790,9 @@ exports.verifyCardPayment = async (req, res) => {
 exports.verifyTabbyPayment = async (req, res) => {
   try {
     const { paymentId, bankPromoId } = req.body;
-    const user_id = req.user._id;
+    // BUG-004 fix: optional chaining — verify can be hit without a session;
+    // the service resolves the user from the payment record when needed.
+    const user_id = req.user?._id;
     const result = await checkoutService.verifyTabbyPayment(paymentId, user_id, bankPromoId);
     return res.json(result);
   } catch (error) {
@@ -855,7 +857,11 @@ exports.checkout = async (req, res) => {
 
 exports.tabbyWebhook = async (req, res) => {
   try {
-    const user_id = req.user._id;
+    // BUG-003 fix: webhook is mounted without auth middleware (server.js:144).
+    // req.user is undefined when Tabby calls the endpoint. Optional chain so
+    // we don't crash; downstream service resolves the user from the payment
+    // record (paymentId carries the user reference).
+    const user_id = req.user?._id;
     const forwardedIps = (req.headers["x-forwarded-for"] || "").split(",");
     const clientIP = forwardedIps[0]?.trim() || req.socket.remoteAddress;
     const secret = req.headers["x-webhook-secret"];

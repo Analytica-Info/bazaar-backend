@@ -24,18 +24,16 @@ Living tracker of production bugs discovered while writing tests across PR1–PR
 ### BUG-003 — tabbyWebhook reads `req.user._id` unguarded on a public route
 - **File:** `src/controllers/ecommerce/publicController.js` (~line 857)
 - **Route:** Tabby webhook endpoint (public — no auth middleware)
-- **Status:** **OPEN**
-- **Symptom:** `const user_id = req.user._id;` on a route that may be called without authentication. Throws `TypeError: Cannot read properties of undefined (reading '_id')`. The error is currently swallowed by the surrounding try/catch, but the webhook then runs in a degraded state.
-- **Impact:** Tabby webhooks may be silently mis-recorded if Tabby ever calls the endpoint (which they should — it's a webhook).
-- **Recommended fix:** Use optional chaining (`req.user?._id`) and accept that webhooks have no user; pull user from the payment record instead.
-- **Source:** PR9 finding.
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** `const user_id = req.user._id;` on a route that may be called without authentication. Threw `TypeError: Cannot read properties of undefined (reading '_id')`. Error was swallowed by surrounding try/catch and the webhook returned a generic 500 to Tabby — orders paid via Tabby webhook were silently lost.
+- **Fix applied:** `req.user?._id` (optional chain). Service resolves the user from the payment record. Lock-in test in `tests/controllers/ecommerce/publicController.test.js` ("does not crash when req.user is undefined (Tabby calling webhook)").
+- **Source:** PR9 finding; fixed in Tier-1 fix PR.
 
 ### BUG-004 — verifyTabbyPayment reads `req.user._id` unguarded
 - **File:** `src/controllers/ecommerce/publicController.js` (~line 792)
-- **Status:** **OPEN**
-- **Symptom:** `const user_id = req.user._id;` without optional chaining, unlike sibling `createCardCheckout` which uses `req.user?._id`. Throws TypeError when called without auth; caught and logged as a generic error.
-- **Recommended fix:** Use optional chaining + explicit 401 response when user is required.
-- **Source:** PR9 finding.
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Fix applied:** `req.user?._id` (optional chain). Lock-in test in `tests/controllers/ecommerce/publicController.test.js` ("does not crash when req.user is undefined").
+- **Source:** PR9 finding; fixed in Tier-1 fix PR.
 
 ---
 
@@ -51,10 +49,9 @@ Living tracker of production bugs discovered while writing tests across PR1–PR
 
 ### BUG-006 — contactUs validation message has stray suffix "123"
 - **File:** `src/controllers/ecommerce/publicController.js` (~line 1010)
-- **Status:** **OPEN**
-- **Symptom:** Validation error message reads `"Email is required123"`. Looks like a leftover from debugging.
-- **Impact:** Low; user-facing string only. Embarrassing in production.
-- **Recommended fix:** Remove `123` suffix.
+- **Status:** **FIXED** (resolved in flight during modularization; verified by grep on 2026-05-04 — string "Email is required123" no longer present in `src/`)
+- **Symptom:** Validation error message read `"Email is required123"`.
+- **Source:** PR9 finding; cleaned up incidentally by a refactor pass.
 - **Source:** PR9 finding.
 
 ### BUG-007 — productDetails vs fetchProductDetails use divergent API response shapes
@@ -370,12 +367,10 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 ### BUG-039 — Mobile checkAccessToken response-shape mismatch (pre-existing, not a v2-unification regression)
 - **Severity:** MEDIUM (silent logout)
 - **Files:** `Bazaar-Mobile-App/lib/data/services/api_service.dart:126-145`, `bazaar-backend/src/services/auth/use-cases/checkAccessToken.js:16,45-50`
-- **Status:** OPEN (pre-existing; surfaced by login-flow audit)
-- **Symptom:** Mobile expects `accessToken` in every `check-access-token` response. Backend returns `{ valid: true, message, userId }` when the token is still valid; only includes `accessToken` on the refresh branch.
-- **Impact:** Any spurious 401 retry that revalidates a still-good token gets misread by the mobile client as a failure → user is logged out unnecessarily. Behavior is identical on `main`, so this is NOT a regression introduced by the v2-unification branch.
-- **Recommended fix (backend):** Always include `accessToken` in the response (echo current token when still valid). One-line fix in `checkAccessToken.js:16`.
-- **Recommended fix (mobile):** Treat `valid: true` as success regardless of `accessToken` presence.
-- **Source:** Login-flow audit (2026-05-04, docs/LOGIN-AUDIT.md).
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** Mobile expected `accessToken` in every `check-access-token` response. Backend returned `{ valid: true, message, userId }` when the token was still valid; only included `accessToken` on the refresh branch. Mobile read "no accessToken" as "auth failed" and logged the user out.
+- **Fix applied:** Backend now echoes the still-valid token back in the response (`accessToken: accessTokenValue`) on the valid path. Strictly additive — web ignores the extra field. Lock-in test added to `tests/services/authService.test.js`.
+- **Source:** Login-flow audit (2026-05-04); fixed in Tier-1 fix PR.
 
 ### BUG-040 — Google OAuth requires three client IDs; missing any breaks one platform silently
 - **Severity:** MEDIUM (deploy-time configuration risk)
@@ -388,13 +383,11 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 
 ### BUG-041 — Mobile coupon validation gates on missing `success` key
 - **Severity:** MEDIUM (customer-visible — coupons unusable on mobile)
-- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:1097-1117`, `bazaar-backend/src/services/coupon/use-cases/checkCouponCode.js:45,51,77-83`
-- **Status:** OPEN (pre-existing; surfaced by critical-flows audit)
-- **Symptom:** Mobile `applyCoupon` calls `POST /api/check-coupon` and branches on `data['success'] == true`. Backend response is `{ message, type, discountPercent, capAED?, bankPromoId? }` with **no `success` field** on the 200 path; `success` is implicit via HTTP status. Every valid coupon therefore fails the `success == true` check and shows a generic error toast; `isDiscountApplied` is never set.
-- **Impact:** Mobile users cannot apply any coupon (FIRST15, UAE10, bank promos). Web works because it gates on HTTP 200 instead of `data.success`.
-- **Recommended fix (backend):** Add `success: true` to the return shape of `checkCouponCode` in `src/services/coupon/use-cases/checkCouponCode.js:45,51,77`. Cheapest, cross-client safe.
-- **Recommended fix (mobile):** Branch on HTTP 2xx instead of `data['success']` in `applyCoupon`.
-- **Source:** Critical-flows audit (2026-05-01, docs/CRITICAL-FLOWS-AUDIT.md, Flow 2).
+- **Files:** `bazaar-backend/src/services/coupon/use-cases/checkCouponCode.js:45,51,77-83`, `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:1097-1117`
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** Mobile `applyCoupon` branched on `data['success'] == true`. Backend response had no `success` field on the 200 path. Every valid coupon (FIRST15, UAE10, bank promos) failed silently on mobile; web was unaffected because it gates on HTTP 2xx.
+- **Fix applied:** Added `success: true` to all three return paths in `checkCouponCode` (UAE10 success, generic coupon, bank promo). Strictly additive. Lock-in test added to `tests/integration/couponService.usageLimit.test.js`.
+- **Source:** Critical-flows audit (2026-05-01, docs/CRITICAL-FLOWS-AUDIT.md, Flow 2); fixed in Tier-1 fix PR.
 
 ### BUG-042 — Cart mutation endpoints omit gift-logic enrichment fields
 - **Severity:** LOW (transient UI flicker)
@@ -433,15 +426,12 @@ All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
 - **Source:** Critical-flows audit (2026-05-01).
 
 ### BUG-046 — iOS Google login resolves to wrong audience (web client ID instead of iOS)
-- **Severity:** MEDIUM (auth correctness; pre-existing)
-- **Files:** `src/services/auth/adapters/googleVerifier.js:39`, `src/controllers/mobile/authController.js:67-81`
-- **Status:** OPEN (pre-existing; surfaced 2026-05-04 during OAuth flow verification)
-- **Symptom:** Mobile sends `User-Agent: "ios"` (literal three-letter string) for iOS clients (`Bazaar-Mobile-App/lib/controllers/auth_controller.dart:875`). The mobile controller forwards `userAgent` but does NOT pass `platform: 'mobile'`. The verifier's `resolveClient` falls into the UA-substring branch which checks `ua.includes('iphone') || ua.includes('ipad')` — neither matches the literal `"ios"`. iOS tokens are therefore verified against `GOOGLE_CLIENT_ID` (web audience), not `IOS_GOOGLE_CLIENT_ID`.
-- **Impact:** If `GOOGLE_CLIENT_ID !== IOS_GOOGLE_CLIENT_ID` in production, iOS Google login fails with "Invalid token audience". If they happen to be the same value (currently unconfirmed), the bug is invisible.
-- **Note:** Pre-existing — the same logic existed in `authService.js` before PR-MOD-6 (the verifier was extracted verbatim). NOT a regression from this branch.
-- **Recommended fix (one line):** In `mobile/authController.js:75`, add `platform: 'mobile'` to the `authService.googleLogin({ ... })` call. The `if (platform === 'mobile')` branch in `resolveClient` then handles `userAgent === 'ios'` correctly. Apple already does this — match the pattern.
-- **Alternative fix:** In `googleVerifier.js:39`, change `ua.includes('iphone') || ua.includes('ipad')` to `ua === 'ios' || ua.includes('iphone') || ua.includes('ipad')`. Less clean but no controller change.
-- **Source:** OAuth flow verification (2026-05-04).
+- **Severity:** Was MEDIUM; **revised: NOT BROKEN for mobile**
+- **Files:** `src/services/auth/adapters/googleVerifier.js:39`, `src/controllers/mobile/authController.js:75-82`
+- **Status:** **RESOLVED — VERIFIED NOT BROKEN for mobile** (2026-05-04). One latent edge case (iOS Safari web) acknowledged but rare; not a fix priority.
+- **Re-verification (2026-05-04):** Re-read `src/controllers/mobile/authController.js:75-82` carefully. Mobile **does** pass `platform: 'mobile'` to `authService.googleLogin(...)` (line 80). Earlier audit conclusion was wrong — I read up to line 81 but missed `platform` on line 80. The verifier's explicit `if (platform === 'mobile')` branch correctly handles `userAgent === 'ios'` and resolves to `IOS_GOOGLE_CLIENT_ID`. Mobile iOS Google login works correctly.
+- **Remaining (low-priority) edge case:** iOS Safari users on the **web** flow can have their UA string include `"iphone"` substring → routes to `IOS_GOOGLE_CLIENT_ID` even though Google Sign-In's web button issues tokens for `GOOGLE_CLIENT_ID`. Tiny user pool; would only matter if iOS Safari users report being unable to sign in on the website. Defer.
+- **Source:** OAuth flow verification (2026-05-04); resolved during Tier-1 fix PR with corrected re-read of the mobile controller.
 
 ### BUG-052 — MIN_SUPPORTED_MOBILE_VERSION env var exists but is never enforced
 - **Severity:** HIGH (safety valve is non-functional)

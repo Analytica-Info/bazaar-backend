@@ -259,6 +259,16 @@ describe("verifyTabbyPayment", () => {
     await ctrl.verifyTabbyPayment(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
   });
+  // BUG-004 fix lock-in: handler reads req.user?._id; if user is absent the
+  // service receives undefined and resolves the user from the payment record.
+  it("does not crash when req.user is undefined", async () => {
+    checkoutService.verifyTabbyPayment.mockResolvedValue({ success: true });
+    const req = { params: {}, body: { paymentId: "pay_1" }, query: {}, headers: {}, files: {}, file: null, socket: { remoteAddress: "127.0.0.1" }, header: jest.fn(() => undefined) };
+    const res = makeRes();
+    await ctrl.verifyTabbyPayment(req, res);
+    expect(res.json).toHaveBeenCalledWith({ success: true });
+    expect(checkoutService.verifyTabbyPayment).toHaveBeenCalledWith("pay_1", undefined, undefined);
+  });
 });
 
 // ── createNomodCheckout ───────────────────────────────────────────
@@ -335,6 +345,24 @@ describe("tabbyWebhook", () => {
     const res = makeRes();
     await ctrl.tabbyWebhook(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+  // BUG-003 fix lock-in: webhook is mounted without auth middleware
+  // (server.js:144). Tabby calls it without a session, so req.user is
+  // undefined. The handler must NOT crash with TypeError; it must pass
+  // user_id=undefined to the service, which resolves the user from the
+  // payment record.
+  it("does not crash when req.user is undefined (Tabby calling webhook)", async () => {
+    checkoutService.handleTabbyWebhook.mockResolvedValue("ok");
+    const req = { params: {}, body: { payment: { id: "p1" } }, query: {}, headers: { "x-webhook-secret": "secret" }, files: {}, file: null, socket: { remoteAddress: "127.0.0.1" }, header: jest.fn((h) => ({ "x-webhook-secret": "secret" })[h]) };
+    const res = makeRes();
+    await ctrl.tabbyWebhook(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(checkoutService.handleTabbyWebhook).toHaveBeenCalledWith(
+      expect.any(Object),
+      undefined,
+      expect.any(String),
+      "secret"
+    );
   });
 });
 

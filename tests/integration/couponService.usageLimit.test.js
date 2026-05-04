@@ -71,6 +71,8 @@ describe("couponService — usage limits", () => {
     const result = await couponService.checkCouponCode("FIRSTUSE", userId.toString(), {});
     expect(result.type).toBe("promo");
     expect(result.discountPercent).toBe(20);
+    // BUG-041 fix lock-in: mobile checkout_controller gates on data.success === true.
+    expect(result.success).toBe(true);
   });
 
   it("blocks second use of a singleUsePerCustomer promo by the same user", async () => {

@@ -857,6 +857,9 @@ describe('authService.checkAccessToken', () => {
 
         expect(result.valid).toBe(true);
         expect(result.userId).toBeDefined();
+        // BUG-039 fix lock-in: mobile api_service.dart keys success on
+        // presence of accessToken; backend now echoes it on the valid path.
+        expect(result.accessToken).toBe(accessToken);
     });
 
     it('throws 401 on completely invalid (not JWT) access token', async () => {

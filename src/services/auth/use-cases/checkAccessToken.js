@@ -13,7 +13,16 @@ async function checkAccessToken(accessTokenValue, refreshTokenValue) {
 
     try {
         const decoded = verifyAccessToken(accessTokenValue);
-        return { valid: true, message: 'Access token is valid', userId: decoded.id };
+        // BUG-039 fix: mobile client (api_service.dart) keys success on the
+        // presence of `accessToken` in the response. Echo the still-valid token
+        // back so a 401-retry that revalidates a good token doesn't trigger a
+        // spurious logout. Strictly additive — web ignores the extra field.
+        return {
+            valid: true,
+            message: 'Access token is valid',
+            userId: decoded.id,
+            accessToken: accessTokenValue,
+        };
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
             if (!refreshTokenValue) {

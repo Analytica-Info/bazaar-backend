@@ -42,13 +42,16 @@ async function checkCouponCode(code, userId, cartData) {
         if (currentDubaiTime > endTime) {
             throw { status: 400, message: "Promotion has expired." };
         }
-        return { message: "Coupon code is valid.", type: "coupon", discountPercent: 10 };
+        // BUG-041 fix: mobile checkout_controller gates on data.success === true.
+        // Strictly additive — web reads the same shape and ignores the extra key.
+        return { success: true, message: "Coupon code is valid.", type: "coupon", discountPercent: 10 };
     }
 
     try {
         const coupon = await Coupon.findOne({ coupon: codeTrimmed, status: "unused" });
         if (coupon) {
-            return { message: "Coupon code is valid.", type: "coupon", discountPercent: 10 };
+            // BUG-041 fix
+            return { success: true, message: "Coupon code is valid.", type: "coupon", discountPercent: 10 };
         }
 
         const promoCode = await BankPromoCode.findOne({
@@ -74,7 +77,9 @@ async function checkCouponCode(code, userId, cartData) {
                     };
                 }
             }
+            // BUG-041 fix
             return {
+                success: true,
                 message: `Promo code applied: ${promoCode.discountPercent}% off${promoCode.capAED ? ` (max ${promoCode.capAED} AED)` : ""}.`,
                 type: "promo",
                 discountPercent: promoCode.discountPercent,
