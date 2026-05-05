@@ -1,0 +1,690 @@
+[
+  {
+    "method": "?",
+    "url": "/api/auth/register",
+    "endpointConst": "register",
+    "file": "controllers/auth_controller.dart",
+    "line": 207,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/recovery-account",
+    "endpointConst": "recoverAccount",
+    "file": "controllers/auth_controller.dart",
+    "line": 246,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/contact-us",
+    "endpointConst": "contactUs",
+    "file": "controllers/auth_controller.dart",
+    "line": 282,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/user/update",
+    "endpointConst": "updateUser",
+    "file": "controllers/auth_controller.dart",
+    "line": 322,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/user/update",
+    "endpointConst": "updateUser",
+    "file": "controllers/auth_controller.dart",
+    "line": 419,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/login",
+    "endpointConst": "login",
+    "file": "controllers/auth_controller.dart",
+    "line": 559,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/login",
+    "endpointConst": "login",
+    "file": "controllers/auth_controller.dart",
+    "line": 569,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/forgot-password",
+    "endpointConst": "forgotPassword",
+    "file": "controllers/auth_controller.dart",
+    "line": 625,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/verify-code",
+    "endpointConst": "verifycode",
+    "file": "controllers/auth_controller.dart",
+    "line": 691,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/reset-password",
+    "endpointConst": "resetPassword",
+    "file": "controllers/auth_controller.dart",
+    "line": 760,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/resend-recovery-code",
+    "endpointConst": "resendRecoveryOtp",
+    "file": "controllers/auth_controller.dart",
+    "line": 825,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/google-login",
+    "endpointConst": "googlelogin",
+    "file": "controllers/auth_controller.dart",
+    "line": 870,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/apple-login",
+    "endpointConst": "appleLogin",
+    "file": "controllers/auth_controller.dart",
+    "line": 936,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/delete-account",
+    "endpointConst": "deleteAccount",
+    "file": "controllers/auth_controller.dart",
+    "line": 990,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/check-access-token",
+    "endpointConst": "checkAccessToken",
+    "file": "controllers/auth_controller.dart",
+    "line": 1018,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/cart/get-cart",
+    "endpointConst": "getCart",
+    "file": "controllers/cart_controller.dart",
+    "line": 76,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/cart/add-to-cart",
+    "endpointConst": "addToCart",
+    "file": "controllers/cart_controller.dart",
+    "line": 181,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/cart/remove-to-cart",
+    "endpointConst": "removeFromCart",
+    "file": "controllers/cart_controller.dart",
+    "line": 218,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/cart/increase",
+    "endpointConst": "cartIncrease",
+    "file": "controllers/cart_controller.dart",
+    "line": 305,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/cart/decrease",
+    "endpointConst": "cartDecrease",
+    "file": "controllers/cart_controller.dart",
+    "line": 334,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/categories",
+    "endpointConst": "categories",
+    "file": "controllers/category_controller.dart",
+    "line": 44,
+    "fields": [
+      "side_bar_categories"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/sub-categories-product",
+    "endpointConst": "subcategorieProducts",
+    "file": "controllers/category_controller.dart",
+    "line": 93,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/categories-product",
+    "endpointConst": "categorieProducts",
+    "file": "controllers/category_controller.dart",
+    "line": 94,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/search-categories",
+    "endpointConst": "searchCategories",
+    "file": "controllers/category_controller.dart",
+    "line": 199,
+    "fields": [
+      "side_bar_categories"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/shipping-countries",
+    "endpointConst": "getShippingCountries",
+    "file": "controllers/checkout_controller.dart",
+    "line": 258,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/shipping-cost",
+    "endpointConst": "getShippingCost",
+    "file": "controllers/checkout_controller.dart",
+    "line": 352,
+    "fields": [
+      "shippingCost",
+      "cost",
+      "shipping_cost",
+      "shipping_fee",
+      "freeShipping",
+      "freeShippingThreshold",
+      "currency"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/checkout-session",
+    "endpointConst": "createCheckoutSession",
+    "file": "controllers/checkout_controller.dart",
+    "line": 762,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/order/checkout-session-tabby",
+    "endpointConst": "createTabbyCheckoutSession",
+    "file": "controllers/checkout_controller.dart",
+    "line": 891,
+    "fields": [
+      "error",
+      "methods"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/payment-methods",
+    "endpointConst": "getPaymentMethods",
+    "file": "controllers/checkout_controller.dart",
+    "line": 920,
+    "fields": [
+      "methods",
+      "clientSecret",
+      "paymentIntentId"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/stripe/init",
+    "endpointConst": "stripeInit",
+    "file": "controllers/checkout_controller.dart",
+    "line": 939,
+    "fields": [
+      "clientSecret",
+      "paymentIntentId",
+      "customerId",
+      "ephemeralKey"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/address",
+    "endpointConst": "creatAddress",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1028,
+    "fields": [
+      "message",
+      "address"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/address",
+    "endpointConst": "creatAddress",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1049,
+    "fields": [
+      "address"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/auth/payment-history",
+    "endpointConst": "paymentHistory",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1152,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/address",
+    "endpointConst": "creatAddress",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1177,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/address",
+    "endpointConst": "creatAddress",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1202,
+    "fields": [
+      "message",
+      "success"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/check-coupon",
+    "endpointConst": "checkCoupon",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1229,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/verify-tabby-status",
+    "endpointConst": "verifyTabbyStatus",
+    "file": "controllers/checkout_controller.dart",
+    "line": 1509,
+    "fields": [
+      "finalStatus"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/coupon",
+    "endpointConst": "getCoupon",
+    "file": "controllers/coupon_controller.dart",
+    "line": 23,
+    "fields": [
+      "available_coupons",
+      "count",
+      "message",
+      "success",
+      "coupon"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/create-coupon",
+    "endpointConst": "createCoupon",
+    "file": "controllers/coupon_controller.dart",
+    "line": 46,
+    "fields": [
+      "success",
+      "coupon",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/products",
+    "endpointConst": "products",
+    "file": "controllers/filter_controller.dart",
+    "line": 191,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/search",
+    "endpointConst": "filterProducts",
+    "file": "controllers/filter_controller.dart",
+    "line": 230,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/hot-offers",
+    "endpointConst": "hotOffers",
+    "file": "controllers/home_controller.dart",
+    "line": 149,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/top-rated-items",
+    "endpointConst": "topRatedItems",
+    "file": "controllers/home_controller.dart",
+    "line": 190,
+    "fields": [
+      "status",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/trending-products",
+    "endpointConst": "trendingProducts",
+    "file": "controllers/home_controller.dart",
+    "line": 239,
+    "fields": [
+      "status",
+      "products",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/today-deal",
+    "endpointConst": "todayDeal",
+    "file": "controllers/home_controller.dart",
+    "line": 288,
+    "fields": [
+      "status",
+      "products",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/favourites-of-week",
+    "endpointConst": "favoritesoftheWeek",
+    "file": "controllers/home_controller.dart",
+    "line": 338,
+    "fields": [
+      "status",
+      "products",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/get-new-arrivals",
+    "endpointConst": "newArrivals",
+    "file": "controllers/home_controller.dart",
+    "line": 388,
+    "fields": [
+      "status",
+      "products",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/flash-sales",
+    "endpointConst": "flashSales",
+    "file": "controllers/home_controller.dart",
+    "line": 459,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/banners",
+    "endpointConst": "banners",
+    "file": "controllers/home_controller.dart",
+    "line": 511,
+    "fields": [
+      "success"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/products-price",
+    "endpointConst": "productsByPrice",
+    "file": "controllers/home_controller.dart",
+    "line": 540,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/products-by-variant",
+    "endpointConst": "productsByVariant",
+    "file": "controllers/home_controller.dart",
+    "line": 582,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/notification/get-notification",
+    "endpointConst": "getNotification",
+    "file": "controllers/notification_controller.dart",
+    "line": 31,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/notification/get-notification",
+    "endpointConst": "getNotification",
+    "file": "controllers/notification_controller.dart",
+    "line": 58,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/notification/mark-read",
+    "endpointConst": "markNotificationRead",
+    "file": "controllers/notification_controller.dart",
+    "line": 139,
+    "fields": [
+      "success"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/order/get-orders",
+    "endpointConst": "getOrders",
+    "file": "controllers/order_controller.dart",
+    "line": 22,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/order/get-orders",
+    "endpointConst": "getOrders",
+    "file": "controllers/order_controller.dart",
+    "line": 43,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/similar-products",
+    "endpointConst": "similarProducts",
+    "file": "controllers/product_details_controller.dart",
+    "line": 83,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/api/products/product-details",
+    "endpointConst": "productDetails",
+    "file": "controllers/product_details_controller.dart",
+    "line": 122,
+    "fields": [
+      "product",
+      "variantsData"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/api/products/products",
+    "endpointConst": "products",
+    "file": "controllers/products_controller.dart",
+    "line": 164,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/products-by-variant",
+    "endpointConst": "productsByVariant",
+    "file": "controllers/products_controller.dart",
+    "line": 216,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/search-product",
+    "endpointConst": "searchProduct",
+    "file": "controllers/products_controller.dart",
+    "line": 257,
+    "fields": [
+      "filteredProducts"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/feedback",
+    "endpointConst": "feedback",
+    "file": "controllers/profile_controller.dart",
+    "line": 209,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/products/add-review",
+    "endpointConst": "productReview",
+    "file": "controllers/review_controller.dart",
+    "line": 76,
+    "fields": []
+  },
+  {
+    "method": "?",
+    "url": "/api/products/user-review",
+    "endpointConst": "userProductReview",
+    "file": "controllers/review_controller.dart",
+    "line": 160,
+    "fields": [
+      "total",
+      "reviews"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/wishlist/get-wishlist",
+    "endpointConst": "getWishlist",
+    "file": "controllers/saved_items_controller.dart",
+    "line": 88,
+    "fields": [
+      "success"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/wishlist/add-to-wishlist",
+    "endpointConst": "addToWishlist",
+    "file": "controllers/saved_items_controller.dart",
+    "line": 114,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "?",
+    "url": "/api/wishlist/remove-to-wishlist",
+    "endpointConst": "removeFromWishlist",
+    "file": "controllers/saved_items_controller.dart",
+    "line": 138,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/api/auth/check-access-token",
+    "endpointConst": "checkAccessToken",
+    "file": "data/services/api_service.dart",
+    "line": 121,
+    "fields": [
+      "accessToken",
+      "refreshToken"
+    ]
+  }
+]

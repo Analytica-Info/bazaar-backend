@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
-const Notification = require('../models/Notification');
-const User = require('../models/User');
+const Notification = require('../repositories').notifications.rawModel();
+const User = require('../repositories').users.rawModel();
 const { logActivity } = require('../utilities/activityLogger');
 const { logBackendActivity } = require('../utilities/backendLogger');
 

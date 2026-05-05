@@ -1,0 +1,804 @@
+[
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/admins/me",
+    "dynamic": true,
+    "file": "AdminContext.jsx",
+    "line": 21,
+    "fields": [
+      "success",
+      "admin"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-cms-data",
+    "dynamic": true,
+    "file": "CmsContext.jsx",
+    "line": 12,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/analytics/products",
+    "dynamic": true,
+    "file": "components/Analytics/Analytics.jsx",
+    "line": 34,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/analytics/products/${productId}",
+    "dynamic": true,
+    "file": "components/Analytics/Analytics.jsx",
+    "line": 81,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/analytics/products/export",
+    "dynamic": true,
+    "file": "components/Analytics/Analytics.jsx",
+    "line": 110,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/bank-promo-codes",
+    "dynamic": true,
+    "file": "components/BankPromoCodes/BankPromoCodes.jsx",
+    "line": 37,
+    "fields": [
+      "promos"
+    ]
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/bank-promo-codes/${editingPromo.id}",
+    "dynamic": true,
+    "file": "components/BankPromoCodes/BankPromoCodes.jsx",
+    "line": 135,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/bank-promo-codes",
+    "dynamic": true,
+    "file": "components/BankPromoCodes/BankPromoCodes.jsx",
+    "line": 148,
+    "fields": []
+  },
+  {
+    "method": "PATCH",
+    "url": "${apiUrl}/admin/bank-promo-codes/${promo.id}/toggle-active",
+    "dynamic": true,
+    "file": "components/BankPromoCodes/BankPromoCodes.jsx",
+    "line": 170,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/about-cms",
+    "dynamic": true,
+    "file": "components/CMS/About.jsx",
+    "line": 54,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/brandsLogo-cms",
+    "dynamic": true,
+    "file": "components/CMS/BrandsLogo.jsx",
+    "line": 59,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/categoriesImages-cms",
+    "dynamic": true,
+    "file": "components/CMS/CategoriesImages.jsx",
+    "line": 57,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/contact-cms",
+    "dynamic": true,
+    "file": "components/CMS/Contact.jsx",
+    "line": 45,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/coupon-cms",
+    "dynamic": true,
+    "file": "components/CMS/CouponForm.jsx",
+    "line": 47,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/features-cms",
+    "dynamic": true,
+    "file": "components/CMS/Features.jsx",
+    "line": 45,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/footerInfo-cms",
+    "dynamic": true,
+    "file": "components/CMS/FooterInfo.jsx",
+    "line": 49,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/header-info-cms",
+    "dynamic": true,
+    "file": "components/CMS/HeaderInfo.jsx",
+    "line": 29,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/offerFilter-cms",
+    "dynamic": true,
+    "file": "components/CMS/OfferFilterImages.jsx",
+    "line": 38,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/offers-cms",
+    "dynamic": true,
+    "file": "components/CMS/OffersSection.jsx",
+    "line": 65,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/shop-cms",
+    "dynamic": true,
+    "file": "components/CMS/Shop.jsx",
+    "line": 20,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/slider-cms",
+    "dynamic": true,
+    "file": "components/CMS/Slider.jsx",
+    "line": 24,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/coupon",
+    "dynamic": true,
+    "file": "components/Coupons/Coupons.jsx",
+    "line": 56,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-coupon-count",
+    "dynamic": true,
+    "file": "components/Coupons/UpdateCouponUsersModal.jsx",
+    "line": 14,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/update-coupon-count",
+    "dynamic": true,
+    "file": "components/Coupons/UpdateCouponUsersModal.jsx",
+    "line": 30,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-coupon-count",
+    "dynamic": true,
+    "file": "components/Dashboard/Dashboard.jsx",
+    "line": 42,
+    "fields": [
+      "coupon"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/coupon",
+    "dynamic": true,
+    "file": "components/Dashboard/Dashboard.jsx",
+    "line": 56,
+    "fields": [
+      "coupons"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-newsletter-subscribers",
+    "dynamic": true,
+    "file": "components/Dashboard/Dashboard.jsx",
+    "line": 92,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/orders",
+    "dynamic": true,
+    "file": "components/Dashboard/Dashboard.jsx",
+    "line": 111,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/email-config",
+    "dynamic": true,
+    "file": "components/EmailManagement/EmailManagement.jsx",
+    "line": 23,
+    "fields": [
+      "success",
+      "emailConfig"
+    ]
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/email-config",
+    "dynamic": true,
+    "file": "components/EmailManagement/EmailManagement.jsx",
+    "line": 104,
+    "fields": [
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/email-config/sync-env",
+    "dynamic": true,
+    "file": "components/EmailManagement/EmailManagement.jsx",
+    "line": 138,
+    "fields": [
+      "success",
+      "emailConfig"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/users/live",
+    "dynamic": true,
+    "file": "components/LiveUsers/LiveUsers.jsx",
+    "line": 53,
+    "fields": [
+      "users",
+      "count"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/login",
+    "dynamic": true,
+    "file": "components/Login/Login.jsx",
+    "line": 37,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/forgot-password",
+    "dynamic": true,
+    "file": "components/Login/Login.jsx",
+    "line": 71,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/verify-code",
+    "dynamic": true,
+    "file": "components/Login/Login.jsx",
+    "line": 94,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/reset-password",
+    "dynamic": true,
+    "file": "components/Login/ResetPasswordModal.jsx",
+    "line": 14,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/monitoring/overview",
+    "dynamic": true,
+    "file": "components/Monitoring/Monitoring.jsx",
+    "line": 123,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/monitoring/webhooks",
+    "dynamic": true,
+    "file": "components/Monitoring/Monitoring.jsx",
+    "line": 124,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/monitoring/requests",
+    "dynamic": true,
+    "file": "components/Monitoring/Monitoring.jsx",
+    "line": 125,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/monitoring/discount-sync",
+    "dynamic": true,
+    "file": "components/Monitoring/Monitoring.jsx",
+    "line": 126,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/monitoring/errors",
+    "dynamic": true,
+    "file": "components/Monitoring/Monitoring.jsx",
+    "line": 127,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/send-bulk-mails",
+    "dynamic": true,
+    "file": "components/NewLetter/EmailForm.jsx",
+    "line": 124,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-newsletter-subscribers",
+    "dynamic": true,
+    "file": "components/NewLetter/NewsLetter.jsx",
+    "line": 48,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/notifications",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 109,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/notifications/users/search",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 129,
+    "fields": [
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/notifications/users/all",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 142,
+    "fields": [
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/notifications/${notificationId}",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 154,
+    "fields": [
+      "notification"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/notifications",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 221,
+    "fields": []
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/notifications/${selectedNotification._id}",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 383,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/notifications/users/all",
+    "dynamic": true,
+    "file": "components/NotificationManagement/NotificationManagement.jsx",
+    "line": 461,
+    "fields": [
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/orders",
+    "dynamic": true,
+    "file": "components/Orders/Orders.jsx",
+    "line": 267,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/flash-sale-data",
+    "dynamic": true,
+    "file": "components/Orders/Orders.jsx",
+    "line": 375,
+    "fields": [
+      "flashSale"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/store-flash-sales",
+    "dynamic": true,
+    "file": "components/Orders/Orders.jsx",
+    "line": 409,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/toggle-flash-sale-status",
+    "dynamic": true,
+    "file": "components/Orders/Orders.jsx",
+    "line": 445,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/order-status/${orderId}",
+    "dynamic": true,
+    "file": "components/Orders/Orders.jsx",
+    "line": 561,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/fetch-db-products",
+    "dynamic": true,
+    "file": "components/Products/Products.jsx",
+    "line": 53,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/export-products-to-sheet",
+    "dynamic": true,
+    "file": "components/Products/Products.jsx",
+    "line": 211,
+    "fields": [
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/products/gift",
+    "dynamic": true,
+    "file": "components/Products/Products.jsx",
+    "line": 229,
+    "fields": [
+      "success",
+      "giftProduct"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/fetch-db-products",
+    "dynamic": true,
+    "file": "components/Products/Products.jsx",
+    "line": 245,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/products/set-gift",
+    "dynamic": true,
+    "file": "components/Products/Products.jsx",
+    "line": 294,
+    "fields": [
+      "success",
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}${API_ENDPOINT}",
+    "dynamic": true,
+    "file": "components/Products/ProductsWithoutImages.jsx",
+    "line": 35,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/roles",
+    "dynamic": true,
+    "file": "components/RoleManagement/RoleManagement.jsx",
+    "line": 34,
+    "fields": [
+      "roles"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/permissions/by-module",
+    "dynamic": true,
+    "file": "components/RoleManagement/RoleManagement.jsx",
+    "line": 49,
+    "fields": [
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/roles",
+    "dynamic": true,
+    "file": "components/RoleManagement/RoleManagement.jsx",
+    "line": 82,
+    "fields": []
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/roles/${selectedRole._id}",
+    "dynamic": true,
+    "file": "components/RoleManagement/RoleManagement.jsx",
+    "line": 134,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "${apiUrl}/admin/roles/${roleId}",
+    "dynamic": true,
+    "file": "components/RoleManagement/RoleManagement.jsx",
+    "line": 178,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "${apiUrl}/admin/shipping-countries/${countryId}/cities/${cityId}/areas/${area._id}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 212,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "${apiUrl}/admin/shipping-countries/${countryId}/cities/${city._id}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 245,
+    "fields": []
+  },
+  {
+    "method": "PATCH",
+    "url": "${apiUrl}/admin/shipping-countries/${country._id}/toggle-active",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 296,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "${apiUrl}/admin/shipping-countries/${country._id}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 313,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/shipping-countries",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 426,
+    "fields": [
+      "countries"
+    ]
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/shipping-countries/${editingCountry._id}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 475,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/shipping-countries",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 477,
+    "fields": []
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/shipping-countries/${cityCountryId}/cities/${editingCityId}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 494,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/shipping-countries/${cityCountryId}/cities",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 496,
+    "fields": []
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/shipping-countries/${areaCountryId}/cities/${areaCityId}/areas/${editingArea._id}",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 512,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/shipping-countries/${areaCountryId}/cities/${areaCityId}/areas",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 514,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/shipping-countries/${bulkCitiesCountryId}/bulk-cities",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 529,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/shipping-countries/${bulkAreasCountryId}/cities/${bulkAreasCityId}/bulk-areas",
+    "dynamic": true,
+    "file": "components/ShippingManagement/ShippingManagement.jsx",
+    "line": 544,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/admins",
+    "dynamic": true,
+    "file": "components/SubAdminManagement/SubAdminManagement.jsx",
+    "line": 44,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/roles",
+    "dynamic": true,
+    "file": "components/SubAdminManagement/SubAdminManagement.jsx",
+    "line": 64,
+    "fields": [
+      "roles"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/admin/admins",
+    "dynamic": true,
+    "file": "components/SubAdminManagement/SubAdminManagement.jsx",
+    "line": 85,
+    "fields": []
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/admins/${selectedAdmin._id}",
+    "dynamic": true,
+    "file": "components/SubAdminManagement/SubAdminManagement.jsx",
+    "line": 148,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "${apiUrl}/admin/admins/${adminId}",
+    "dynamic": true,
+    "file": "components/SubAdminManagement/SubAdminManagement.jsx",
+    "line": 192,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/get-cron-logs",
+    "dynamic": true,
+    "file": "components/SyncLogs/SyncLogs.jsx",
+    "line": 12,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/logs",
+    "dynamic": true,
+    "file": "components/SystemLogs/ActivityLogs.jsx",
+    "line": 34,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/logs/activity/download",
+    "dynamic": true,
+    "file": "components/SystemLogs/ActivityLogs.jsx",
+    "line": 92,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/logs/backend",
+    "dynamic": true,
+    "file": "components/SystemLogs/BackendLogs.jsx",
+    "line": 36,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/logs/backend/download",
+    "dynamic": true,
+    "file": "components/SystemLogs/BackendLogs.jsx",
+    "line": 112,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/users",
+    "dynamic": true,
+    "file": "components/UserManagement/UserManagement.jsx",
+    "line": 67,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/users/${selectedUserId}",
+    "dynamic": true,
+    "file": "components/UserManagement/UserManagement.jsx",
+    "line": 98,
+    "fields": [
+      "user"
+    ]
+  },
+  {
+    "method": "PUT",
+    "url": "${apiUrl}/admin/users/${selectedUserId}",
+    "dynamic": true,
+    "file": "components/UserManagement/UserManagement.jsx",
+    "line": 531,
+    "fields": [
+      "user"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/admin/users/export",
+    "dynamic": true,
+    "file": "components/UserManagement/UserManagement.jsx",
+    "line": 574,
+    "fields": [
+      "users"
+    ]
+  }
+]

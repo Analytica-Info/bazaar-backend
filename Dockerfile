@@ -9,6 +9,7 @@ RUN npm install --omit=dev && chown -R bazaar:bazaar node_modules
 
 COPY --chown=bazaar:bazaar src/ ./src/
 COPY --chown=bazaar:bazaar server.js ./
+COPY --chown=bazaar:bazaar docs/openapi/ ./docs/openapi/
 
 # uploads/, logs/, .env, and Firebase creds are mounted at runtime
 RUN mkdir -p uploads logs temp && chown bazaar:bazaar . uploads logs temp

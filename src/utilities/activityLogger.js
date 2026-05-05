@@ -1,4 +1,4 @@
-const ActivityLog = require('../models/ActivityLog');
+const ActivityLog = require('../repositories').activityLogs.rawModel();
 
 const logger = require("./logger");
 /**

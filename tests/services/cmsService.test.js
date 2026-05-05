@@ -447,4 +447,187 @@ describe("cmsService", () => {
       }
     });
   });
+
+  // ── updateCouponCms ──────────────────────────────────────────────────
+  describe("updateCouponCms", () => {
+    const validCouponData = {
+      discountText: "20% OFF",
+      discountTextExtra: "use code SAVE20",
+      description: "Get 20% off",
+      facebookLink: "https://fb.com",
+      instagramLink: "https://ig.com",
+      tikTokLink: "https://tiktok.com",
+      youtubeLink: "https://yt.com",
+    };
+
+    it("should create coupon CMS with both logo files provided", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const result = await cmsService.updateCouponCms(validCouponData, {
+        logo: { filename: "logo.png" },
+        mrBazaarLogo: { filename: "mr-logo.png" },
+      });
+
+      expect(result.message).toMatch(/success/i);
+
+      const CouponCms = require("../../src/models/CouponCms");
+      const saved = await CouponCms.findOne();
+      expect(saved.discountText).toBe("20% OFF");
+      expect(saved.logo).toContain("logo.png");
+      expect(saved.mrBazaarLogo).toContain("mr-logo.png");
+    });
+
+    it("should update existing coupon CMS", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+      const CouponCms = require("../../src/models/CouponCms");
+      await CouponCms.create({
+        ...validCouponData,
+        logo: "http://localhost:3000/logo.png",
+        mrBazaarLogo: "http://localhost:3000/mr.png",
+      });
+
+      await cmsService.updateCouponCms(
+        { ...validCouponData, discountText: "New Text" },
+        {
+          logo: { filename: "logo2.png" },
+          mrBazaarLogo: { filename: "mr2.png" },
+        }
+      );
+
+      const updated = await CouponCms.findOne();
+      expect(updated.discountText).toBe("New Text");
+    });
+
+    it("should append cache-busting query when logo file is provided", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      await cmsService.updateCouponCms(validCouponData, {
+        logo: { filename: "logo3.png" },
+        mrBazaarLogo: { filename: "mr3.png" },
+      });
+
+      const CouponCms = require("../../src/models/CouponCms");
+      const saved = await CouponCms.findOne();
+      expect(saved.logo).toContain("?v=");
+    });
+  });
+
+  // ── updateShop ─────────────────────────────────────────────────────
+  describe("updateShop", () => {
+    it("should create shop CMS when both image files are provided", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const result = await cmsService.updateShop(
+        {},
+        { Image1: { filename: "shop1.jpg" }, Image2: { filename: "shop2.jpg" } }
+      );
+      expect(result.message).toBeDefined();
+    });
+
+    it("should update existing shop CMS Image1", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const ShopCms = require("../../src/models/Shop");
+      await ShopCms.create({
+        Image1: "http://localhost:3000/old1.jpg",
+        Image2: "http://localhost:3000/old2.jpg",
+      });
+
+      await cmsService.updateShop({}, { Image1: { filename: "new1.jpg" } });
+
+      const saved = await ShopCms.findOne();
+      expect(saved.Image1).toContain("new1.jpg");
+    });
+  });
+
+  // ── updateBrandsLogo ──────────────────────────────────────────────
+  describe("updateBrandsLogo", () => {
+    it("should create brands logo CMS when none exists", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const result = await cmsService.updateBrandsLogo(
+        {},
+        { logo0: { filename: "brand0.png" }, logo1: { filename: "brand1.png" } }
+      );
+
+      expect(result.message).toBeDefined();
+
+      const BrandsLogoCms = require("../../src/models/BrandsLogo");
+      const saved = await BrandsLogoCms.findOne();
+      expect(saved.images[0]).toContain("brand0.png");
+      expect(saved.images[1]).toContain("brand1.png");
+    });
+
+    it("should add to existing images array without overwriting untouched slots", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const BrandsLogoCms = require("../../src/models/BrandsLogo");
+      await BrandsLogoCms.create({ images: ["http://old.com/img0.png"] });
+
+      await cmsService.updateBrandsLogo({}, { logo2: { filename: "brand2.png" } });
+
+      const saved = await BrandsLogoCms.findOne();
+      expect(saved.images[0]).toBe("http://old.com/img0.png");
+      expect(saved.images[2]).toContain("brand2.png");
+    });
+  });
+
+  // ── updateCategoryImages ─────────────────────────────────────────
+  describe("updateCategoryImages", () => {
+    it("should update category images when existing record is present", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const CategoriesCms = require("../../src/models/CategoriesCms");
+      // Seed a record with all required fields so upsert path updates rather than create
+      await CategoriesCms.create({
+        Electronics: "http://localhost:3000/elec_old.jpg",
+        Home: "http://localhost:3000/home_old.jpg",
+        Sports: "http://localhost:3000/sports_old.jpg",
+        Toys: "http://localhost:3000/toys_old.jpg",
+        Home_Improvement: "http://localhost:3000/home_imp_old.jpg",
+      });
+
+      const result = await cmsService.updateCategoryImages(
+        {},
+        { Electronics: { filename: "elec_new.jpg" } }
+      );
+      expect(result.message).toBeDefined();
+
+      const saved = await CategoriesCms.findOne();
+      expect(saved.Electronics).toContain("elec_new.jpg");
+    });
+  });
+
+  // ── updateOfferFilter ────────────────────────────────────────────
+  describe("updateOfferFilter", () => {
+    it("should create offer filter CMS when valid price range provided", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+
+      const result = await cmsService.updateOfferFilter(
+        { MinPrice1: "0", MaxPrice1: "100", MinPrice2: "100", MaxPrice2: "500" },
+        {}
+      );
+      expect(result.message).toBeDefined();
+    });
+
+    it("should throw 400 when MinPrice > MaxPrice", async () => {
+      try {
+        await cmsService.updateOfferFilter(
+          { MinPrice1: "200", MaxPrice1: "100", MinPrice2: "0", MaxPrice2: "500" },
+          {}
+        );
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid price/i);
+      }
+    });
+  });
+
+  // ── invalidateCmsCache ───────────────────────────────────────────
+  describe("invalidateCmsCache", () => {
+    it("should run without error", async () => {
+      await expect(cmsService.invalidateCmsCache()).resolves.toBeUndefined();
+    });
+  });
 });

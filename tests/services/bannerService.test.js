@@ -47,4 +47,50 @@ describe("bannerService", () => {
       }
     });
   });
+
+  describe("updateBanner", () => {
+    it("should update name only (no filePath)", async () => {
+      const banner = await bannerService.createBanner("Old Name", "uploads/old.jpg");
+      const updated = await bannerService.updateBanner(banner._id.toString(), "New Name", null);
+      expect(updated.name).toBe("New Name");
+      expect(updated.image).toBe("http://localhost:3000/uploads/old.jpg");
+    });
+
+    it("should update image when filePath provided (old file doesn't exist on disk)", async () => {
+      const banner = await bannerService.createBanner("My Banner", "uploads/img.jpg");
+      const updated = await bannerService.updateBanner(banner._id.toString(), null, "uploads/new.jpg");
+      expect(updated.image).toBe("http://localhost:3000/uploads/new.jpg");
+    });
+
+    it("should throw 404 when banner not found", async () => {
+      const mongoose = require("mongoose");
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await bannerService.updateBanner(fakeId, "Name", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  describe("deleteBanner", () => {
+    it("should delete banner by id", async () => {
+      const banner = await bannerService.createBanner("Del Banner", "uploads/del.jpg");
+      await bannerService.deleteBanner(banner._id.toString());
+      const found = await BannerImages.findById(banner._id);
+      expect(found).toBeNull();
+    });
+
+    it("should throw 404 when banner not found", async () => {
+      const mongoose = require("mongoose");
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await bannerService.deleteBanner(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
 });

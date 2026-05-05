@@ -1,0 +1,491 @@
+# Bugs Surfaced by Test Coverage Work
+
+Living tracker of production bugs discovered while writing tests across PR1–PR9. Status legend: `OPEN`, `FIXED`, `WONTFIX`, `DUPLICATE`.
+
+---
+
+## HIGH severity
+
+### BUG-001 — StripeProvider.refund() returns 500 instead of 400 on missing payment_intent
+- **File:** `src/services/payments/StripeProvider.js`
+- **Status:** **FIXED** (PR3)
+- **Symptom:** Null guard `throw { status: 400, ... }` was inside the `try` block; the outer `catch` rewrapped using `error.statusCode || 500`, masking the 400.
+- **Fix applied:** Moved the guard before the `try` block.
+- **Source:** PR2 finding, PR3 fix.
+
+### BUG-002 — checkoutService.processCheckout throws ValidationError on every call
+- **File:** `src/services/checkoutService.js`, `exports.processCheckout` (~line 1545)
+- **Route:** `POST /checkout` (`src/routes/ecommerce/publicRoutes.js:98`, no auth)
+- **Status:** **FIXED** (PR8)
+- **Symptom:** `Order.create()` called without required schema fields: `txn_id`, `status`, `amount_subtotal`, `amount_total`, `discount_amount`, `payment_method`. Every call hit Mongoose `ValidationError` → re-thrown as 500.
+- **Fix applied:** Populate the missing fields with reasonable defaults (txn_id=paymentIntent.id, status="pending", payment_method="stripe", etc.).
+- **Source:** PR7 finding, PR8 fix.
+
+### BUG-003 — tabbyWebhook reads `req.user._id` unguarded on a public route
+- **File:** `src/controllers/ecommerce/publicController.js` (~line 857)
+- **Route:** Tabby webhook endpoint (public — no auth middleware)
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** `const user_id = req.user._id;` on a route that may be called without authentication. Threw `TypeError: Cannot read properties of undefined (reading '_id')`. Error was swallowed by surrounding try/catch and the webhook returned a generic 500 to Tabby — orders paid via Tabby webhook were silently lost.
+- **Fix applied:** `req.user?._id` (optional chain). Service resolves the user from the payment record. Lock-in test in `tests/controllers/ecommerce/publicController.test.js` ("does not crash when req.user is undefined (Tabby calling webhook)").
+- **Source:** PR9 finding; fixed in Tier-1 fix PR.
+
+### BUG-004 — verifyTabbyPayment reads `req.user._id` unguarded
+- **File:** `src/controllers/ecommerce/publicController.js` (~line 792)
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Fix applied:** `req.user?._id` (optional chain). Lock-in test in `tests/controllers/ecommerce/publicController.test.js` ("does not crash when req.user is undefined").
+- **Source:** PR9 finding; fixed in Tier-1 fix PR.
+
+---
+
+## MEDIUM severity
+
+### BUG-005 — couponService expiry uses strict `<` instead of `<=`
+- **File:** `src/services/couponService.js`, `checkCouponCode()`
+- **Status:** **OPEN** (product decision)
+- **Symptom:** `if (expiry < now)` accepts a coupon at exactly the expiry timestamp. Off-by-one at millisecond resolution.
+- **Impact:** Low — millisecond window — but ops/finance may expect strict expiry semantics.
+- **Recommended fix:** Change to `<=`. Confirm with product first; existing test pins current behavior.
+- **Source:** PR4 finding.
+
+### BUG-006 — contactUs validation message has stray suffix "123"
+- **File:** `src/controllers/ecommerce/publicController.js` (~line 1010)
+- **Status:** **FIXED** (resolved in flight during modularization; verified by grep on 2026-05-04 — string "Email is required123" no longer present in `src/`)
+- **Symptom:** Validation error message read `"Email is required123"`.
+- **Source:** PR9 finding; cleaned up incidentally by a refactor pass.
+- **Source:** PR9 finding.
+
+### BUG-007 — productDetails vs fetchProductDetails use divergent API response shapes
+- **File:** `src/controllers/ecommerce/publicController.js`
+- **Status:** **OPEN**
+- **Symptom:** Public `productDetails` reads `response.data`; private `fetchProductDetails` reads `response.data.data`. Two implementations against (probably) different Lightspeed API versions.
+- **Impact:** Silent breakage if Lightspeed ships a unifying version change. One handler will start returning empty or undefined data.
+- **Recommended fix:** Pick one shape, normalize at a single boundary, write a contract test pinning the expected envelope.
+- **Source:** PR9 finding.
+
+---
+
+## LOW severity
+
+### BUG-008 — Duplicate Mongoose index `{id:1}` warning at startup
+- **Files:** Unknown (not Cart, not PendingPayment — those were fixed in PR3)
+- **Status:** **OPEN**
+- **Symptom:** Mongoose emits `[DEP0173]` duplicate-index warning on every test run. Source not yet identified.
+- **Recommended fix:** Run with `node --trace-warnings` to locate, then remove the redundant `.index()` call.
+- **Source:** PR3 follow-up note.
+
+### BUG-009 — pino thread-stream worker leaks across tests
+- **File:** `src/utilities/logger.js`
+- **Status:** **OPEN** (masked by `--forceExit`)
+- **Symptom:** Pino's `thread-stream` keeps a worker alive after every test process. `--forceExit` masks it.
+- **Impact:** None at runtime; only test hygiene noise.
+- **Recommended fix:** Use sync transport in test env, or call `logger.flush()` + dispose in a Jest globalTeardown.
+- **Source:** PR1 note, persists.
+
+---
+
+### BUG-010 — orderService/checkoutService ENVIRONMENT=true gated blocks uncoverable in shared test context
+- **File:** `src/services/orderService.js` (lines 1000-1037, 2041-2553), `src/services/checkoutService.js` (lines 756-779, 1367-1385)
+- **Status:** **OPEN** (by design — not a runtime bug)
+- **Symptom:** `const ENVIRONMENT = process.env.ENVIRONMENT` is captured at module-import time. Jest runs multiple test files sharing the same Node process; files that set `ENVIRONMENT=test` are already loaded before tests run. The ENVIRONMENT=true blocks cannot be reached within a test file that imported the service before setting the env var.
+- **Impact:** Branch/line coverage gap (~119 lines in checkoutService, ~88 lines in orderService). Runtime is unaffected.
+- **Recommended fix:** Either (a) refactor to read `process.env.ENVIRONMENT` inline at call-time instead of module-scope, or (b) maintain separate `*.env.test.js` files that set the var before importing (as done for checkoutService.env.test.js in PR11).
+- **Source:** Discovered during PR11 coverage push.
+
+### BUG-012 — checkSpelling function in productService is dead code (never called)
+- **File:** `src/services/productService.js:242`
+- **Status:** OPEN
+- **Symptom:** `checkSpelling(word)` is defined at line 242 but has zero call sites in the file. No function in `productService.js` ever invokes it. The function references the module-level `dictionary` (typo-js) and `spellingCache` (NodeCache). Its 28 lines (242-269) are permanently uncovered.
+- **Impact:** Dead code: ~28 lines of untestable coverage debt, plus a misleading API surface. Any consumer expecting spelling-correction suggestions in search results gets none silently.
+- **Recommended fix:** Either (a) call `checkSpelling` from `searchProducts` when `filteredProducts.length === 0` to surface spelling suggestions in the API response, or (b) delete the function if the feature is deferred.
+- **Source:** PR12 finding.
+
+### BUG-013 — logStatusFalseItems in productService has unreachable branches
+- **File:** `src/services/productService.js:101-108`
+- **Status:** OPEN
+- **Symptom:** `logStatusFalseItems` has branches for `responseData.data.products` (line 102) and `responseData.data` as array (lines 104-108). No call site in the file passes a responseData with either of these shapes — all callers pass shapes with `.products`, `.filteredProducts`, or `.product + .id`. The branches are permanently uncovered.
+- **Impact:** Dead branch coverage debt (~7 lines). Not a runtime risk, but the defensive checks are misleading.
+- **Recommended fix:** Remove unused branches, or add a caller that exercises those shapes.
+- **Source:** PR12 finding.
+
+### BUG-014 — shared/productController.js: /v2/products/similar masked by /v2/products/:id route
+- **File:** `src/routes/v2/shared/index.js` (line 23) and `src/controllers/v2/shared/productController.js` (lines 73-80)
+- **Status:** **OPEN**
+- **Symptom:** `router.get('/products/similar', ...)` is registered AFTER `router.get('/products/:id', ...)`. Express matches `/products/similar` to the `:id` route first, so `similarProducts` handler is never reached. Any request to `GET /v2/products/similar` calls `getProductDetails("similar")` instead of `getSimilarProducts(...)`.
+- **Impact:** The similar-products endpoint silently calls the wrong handler. If a product with id="similar" doesn't exist, the caller receives a 404 from `getProductDetails` rather than similar-product data.
+- **Recommended fix:** Move the `/products/similar` route registration before `/products/:id` in the shared router.
+- **Source:** PR13 coverage work — `similarProducts` function (lines 73-80) cannot be covered because the route is unreachable.
+
+### BUG-015 — couponService.fetchCouponDetails uses console.error instead of logger
+- **File:** `src/services/couponService.js` (lines 59-62)
+- **Status:** **OPEN** (low severity)
+- **Symptom:** The catch block in `fetchCouponDetails` uses `console.error(...)` instead of the `logger` utility used elsewhere in the file (lines 56, 242, etc.). This bypasses the structured logging pipeline.
+- **Impact:** Lightspeed API failures for UAE10 coupon lookups won't appear in the structured log stream. Ops teams monitoring the logger won't see these errors.
+- **Recommended fix:** Replace `console.error(...)` with `logger.error({ err: error, id }, 'Error fetching coupon details:')`.
+- **Source:** PR13 — observed during couponService test coverage pass.
+
+### BUG-011 — verifyTabbyPayment in orderService calls axios.post for capture but no post mock guard
+- **File:** `src/services/orderService.js` (line 1540)
+- **Status:** **OPEN** (test isolation only)
+- **Symptom:** When `verifyTabbyPayment` receives AUTHORIZED status, it calls `axios.post(...)` for the capture. Tests that mock `axios.get` but not `axios.post` can get undefined behavior if the post mock isn't set.
+- **Impact:** None at runtime. Tests must explicitly mock `axios.post` when testing the AUTHORIZED→capture path.
+- **Source:** Discovered during PR11 test writing.
+
+---
+
+## How to use
+
+When a new bug is found:
+1. Add a new `BUG-NNN` entry under the right severity.
+2. Note source PR.
+3. When fixed, mark `FIXED` and reference the fix PR/commit.
+
+When a bug is fixed:
+- Don't delete — keep it as historical record. Status field tracks current state.
+
+---
+
+## PR14 — Cross-client API map findings
+
+The bugs below were surfaced by the PR14 audit (`docs/api-map/MAP.md`,
+`docs/api-map/backend-routes.json`, and the per-client JSON files).
+All entries are extractor-confirmed: regex-based, ~5% noise tolerance. See
+`scripts/api-map/` for the extraction code.
+
+### BUG-016 — bazaar-web calls /v2/recommendations/* but no backend routes exist (ORPHAN)
+- **Severity:** HIGH (web side)
+- **Backend file:** n/a (no route registered under `/v2/recommendations`)
+- **Client(s) affected:** web (`bazaar-web/src/services/recommendations.js`)
+- **Status:** OPEN — **client side, not backend.** Per project policy v2 is dev-only and clients should NOT be calling v2 yet. This file in `bazaar-web` is shipping prematurely (or is dead code that still imports). Either remove it from web, feature-flag it off, or confirm it's unreferenced.
+- **Symptom:** `recommendationsApi` calls five endpoints under `/v2/recommendations/*`. None are registered anywhere in the backend. v2 is intentionally dev-only (see BUG-026), so this client code shouldn't be live.
+- **Impact:** If any web page mounts these widgets in production, every recommendation request 404s. If the file is unreferenced, no runtime impact — just dead code carrying a false "uses v2" signal.
+- **Recommended action:** Web team — verify whether `recommendations.js` is imported by any rendered component. If yes, gate behind a feature flag and disable until v2 ships. If no, delete the file. Backend should NOT add these routes ahead of the broader v2 rollout.
+- **Source:** PR14 audit, `docs/api-map/MAP.md` ORPHAN row; reclassified per project owner.
+
+### BUG-017 — bazaar-web calls POST /redeem-coupon without leading slash (works, but fragile)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/publicRoutes.js:109`
+- **Client(s) affected:** web (`bazaar-web/src/components/Checkout/Checkout.jsx:552`)
+- **Status:** OPEN
+- **Symptom:** `axiosInstance.post("redeem-coupon", ...)` (no leading `/`). Works because axios resolves relative to baseURL, but is inconsistent with every other call in the codebase and breaks if baseURL ever lacks a trailing slash.
+- **Impact:** Latent fragility; not a current outage.
+- **Recommended fix:** Change to `axiosInstance.post("/redeem-coupon", ...)`.
+- **Source:** PR14 audit.
+
+### BUG-018 — Web reads `flashSale` field from /flash-sale-data but backend returns differently named keys (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/controllers/ecommerce/publicController.js` (search for `flash-sale-data`)
+- **Client(s) affected:** web
+- **Status:** OPEN (extractor-suspected; confirm by reading both ends)
+- **Symptom:** Client destructures `flashSale` from `response.data`, but the v1 controller (regex-extracted) does not show that key in any `res.json({...})` literal. Likely the controller returns `data.flashSale` nested, or the field name has drifted. Needs manual confirmation.
+- **Impact:** If the field is genuinely absent, the flash-sale section renders blank.
+- **Recommended fix:** Either rename the backend response key to `flashSale` for consistency, or fix the client to read the actual returned key. Add a v1 contract test to lock the chosen shape.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-019 — Web reads `shippingCost` and `freeShippingThreshold` from /shipping-cost but those fields are not in the controller's res.json literal (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** Search `src/controllers/**/*.js` for `shipping-cost` handler
+- **Client(s) affected:** web
+- **Status:** OPEN
+- **Symptom:** Client expects `response.data.shippingCost` and `response.data.freeShippingThreshold`. The model has `freeShippingThreshold` (`src/models/ShippingCountry.js:21`), but the route's response shape (regex-extracted) does not surface those keys directly; they may be nested inside a Mongoose document spread.
+- **Impact:** Free-shipping threshold UI on storefront may not render when expected.
+- **Recommended fix:** Verify the controller, then either flatten the response or update the client. Pin with a v1 contract test.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-020 — Web reads `total_orders / shipped_orders / delivered_orders / canceled_orders` from /user/user-orders, fields not present in res.json literal (CLIENT-ONLY)
+- **Severity:** HIGH
+- **Backend file:** `src/routes/ecommerce/userRoutes.js:31` → `orders` controller
+- **Client(s) affected:** web (account dashboard summary)
+- **Status:** OPEN
+- **Symptom:** Account-page header shows order counts (total / shipped / delivered / canceled). Client destructures those four fields from `response.data`. Backend handler (`orders` in ecommerce userController/orderController) returns the orders array but does not appear to return aggregate counts in `res.json({...})`.
+- **Impact:** All four counters likely render as `undefined` (or 0 after defaulting). User-facing dashboard summary is wrong.
+- **Recommended fix:** Add aggregate counts to the backend response, or move counting to the client. There is a `/v2/user/dashboard` route (`src/controllers/v2/web/userController.js`) — migrate the client to that and pin the shape with a contract test.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-021 — Web reads `randomProducts` from /random-products/:id but field name not in extracted shape (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/controllers/ecommerce/publicController.js` (search `random-products`)
+- **Client(s) affected:** web
+- **Status:** OPEN (suspected)
+- **Symptom:** Client destructures `randomProducts` from `response.data`. Backend route returns a list of products under a different key (or directly as the `data` array).
+- **Impact:** "You may also like" sections may not populate.
+- **Recommended fix:** Confirm by reading the controller and align names.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-022 — Web /user/user-review reads `products` but route returns reviews (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/routes/ecommerce/userRoutes.js` user-review handler
+- **Client(s) affected:** web
+- **Status:** OPEN
+- **Symptom:** Client destructures `products` from response. The route serves user reviews — likely returns `reviews` or `data: [...]`. Field name drift.
+- **Impact:** "Your reviews" page on the account section may render empty.
+- **Recommended fix:** Confirm and align. v2 has `/v2/user/reviews` — migrate.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-023 — Admin /admin/coupon reads `coupons` but extracted shape lacks the key (CLIENT-ONLY)
+- **Severity:** MEDIUM
+- **Backend file:** `src/routes/ecommerce/adminRoutes.js` admin coupon list handler
+- **Client(s) affected:** admin (Bazaar-Admin-Dashboard)
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin dashboard expects `response.data.coupons`. Backend response shape (regex-extracted) does not surface that key.
+- **Impact:** Coupon list page in admin may render empty until the shape mismatch is confirmed/fixed.
+- **Recommended fix:** Confirm controller. Likely the regex missed a nested ternary; or the response is `{ data: [...] }` and the admin should read `data` instead of `coupons`.
+- **Source:** PR14 audit, CLIENT-ONLY row.
+
+### BUG-024 — Admin /admin/email-config response shape mismatch (CLIENT-ONLY)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/emailRoutes.js`
+- **Client(s) affected:** admin
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin reads `emailConfig` field from both GET and POST sync-env responses. Backend res.json literal lacks the key.
+- **Impact:** Email-config admin page may misrender.
+- **Recommended fix:** Confirm and align.
+- **Source:** PR14 audit.
+
+### BUG-025 — Admin /admin/notifications/:id reads `notification` field; backend likely returns flat object (CLIENT-ONLY)
+- **Severity:** LOW
+- **Backend file:** `src/routes/ecommerce/adminRoutes.js` notifications detail handler
+- **Client(s) affected:** admin
+- **Status:** OPEN (suspected)
+- **Symptom:** Admin expects `response.data.notification`. Backend likely returns the notification object directly.
+- **Impact:** Notification detail page may not render.
+- **Recommended fix:** Confirm and align.
+- **Source:** PR14 audit.
+
+### BUG-026 — All v2 routes are UNUSED by every shipping client (expected during dev)
+- **Severity:** N/A (intended state)
+- **Backend file:** `src/routes/v2/**`
+- **Client(s) affected:** web, admin, mobile
+- **Status:** **WONTFIX-FOR-NOW** — v2 is in active development. Client integration is intentionally deferred until backend modularization, scalability, and performance work is complete.
+- **Symptom:** PR14 cross-reference confirms 0 calls from `bazaar-web`, `Bazaar-Admin-Dashboard`, or `Bazaar-Mobile-App` to any `/v2/*` route. The 60 v2 routes exist only for the contract test suite.
+- **Impact:** None today — this is the planned phase. v1 remains the production surface during v2 hardening. The contract test suite locks the v2 shape so it doesn't drift while awaiting integration.
+- **Recommended action:** Do NOT route real client traffic to v2 yet. When backend modernization is complete, schedule client migration sprints — web (auth + cart + orders + user) and mobile auth first — and burn down v1 only after each client is confirmed off it.
+- **Source:** PR14 audit summary; reclassified per project owner.
+
+### BUG-028 — fetchProductDetails price field divergence: tax_inclusive (checkout) vs tax_exclusive (order/mobile)
+- **Files:** `src/services/shared/lightspeedClient.js` (canonical), formerly `src/services/checkoutService.js` and `src/services/order/adapters/lightspeedClient.js`
+- **Severity:** Was HIGH; **revised: NO PRODUCTION IMPACT**
+- **Status:** **RESOLVED — VERIFIED NO-OP** (2026-05-04)
+- **Symptom (original concern):** Two copies of `fetchProductDetails` existed with different price fields. The dedup'd version uses `tax_inclusive`. Concern was that mobile may have relied on `tax_exclusive` and would now display the wrong price.
+- **Verification (2026-05-04):**
+  - `Bazaar-Mobile-App` `main` branch (commit `b5e76a3`) was inspected. Every price-display call site reads `priceStandard.taxInclusive` (`flash_sale_widget.dart:39`, `product_detail_screen.dart:749`, `similar_products_widget.dart:65,70`, `products_card.dart:284`, `product_details_controller.dart:43`). **Zero** `.taxExclusive` reads in any UI or controller. The model parses both fields from JSON but never reads `.taxExclusive`.
+  - The dedup'd `fetchProductDetails` is used **only by post-checkout inventory diagnostic helpers** (`order/shared/quantities.js`, `checkout/shared/inventory.js`). It does **not** populate the canonical `Product.price` document that clients read.
+  - The canonical product price visible to all clients comes from `src/services/product/sync/domain/lightspeedFetchers.js`, which has always used `tax_inclusive` (lines 108, 121, 277, 295, 384).
+  - Stripe/Tabby/Nomod checkout amounts are computed from cart-line prices the client already saw — not from `fetchProductDetails`.
+- **Outcome:** The dedupe is byte-equivalent for every user-facing flow. The only behavior that genuinely changed is which value appears in an internal "inventory updated" admin email — cosmetic, internal-only.
+- **Source:** PR-MOD-3 dedup analysis; verified against `Bazaar-Mobile-App` `main` 2026-05-04.
+
+### BUG-029 — updateQuantityMail admin email resolution divergence: dynamic (checkout) vs static env var (order/mobile)
+- **Files:** `src/services/checkoutService.js` and `src/services/order/shared/quantities.js`
+- **Severity:** MEDIUM
+- **Status:** OPEN
+- **Symptom:** Two copies of `updateQuantityMail` with different admin email resolution:
+  - `checkoutService.js` calls `getAdminEmail()` (dynamic DB lookup) and includes a logo `<img>` tag
+  - `order/shared/quantities.js` reads `process.env.ADMIN_EMAIL` directly (static) and has no logo
+  These functions are NOT merged into shared/ because they serve different platforms and have meaningfully different behaviour.
+- **Impact:** Mobile inventory-update emails have no logo and use a static email address that may diverge from the DB-stored admin email. If the admin email is changed in the DB but not in the env var, mobile emails go to the old address.
+- **Recommended fix:** Migrate `order/shared/quantities.js::updateQuantityMail` to also use `getAdminEmail()` from `src/utilities/emailHelper.js`. Add the logo img tag for consistency.
+- **Source:** PR-MOD-3 dedup analysis.
+
+### BUG-027 — 150+ v1 backend routes have no client caller (UNUSED)
+- **Severity:** MEDIUM (cleanup)
+- **Backend file:** various, see `docs/api-map/MAP.md` UNUSED rows
+- **Client(s) affected:** none
+- **Status:** OPEN
+- **Symptom:** 146 (method, path) backend rows have zero matching client calls. Many are admin endpoints whose dashboard counterpart was removed; some are obsolete v1 mobile endpoints; some are the v2 BFF (separately tracked in BUG-026).
+- **Impact:** Coverage debt; dead-code surface area; security review burden.
+- **Recommended fix:** Audit `docs/api-map/MAP.md` UNUSED list. For each, classify: keep (admin tool), deprecate (warn for one release), or delete. Land in a follow-up "v1 dead route reaper" PR.
+- **Source:** PR14 audit summary.
+
+---
+
+### BUG-031 — Global errorHandler case #8 maps err.status to code `'ERROR'` instead of semantic codes
+- **Severity:** MEDIUM (observability, client code correctness)
+- **File:** `src/middleware/errorHandler.js` line 108–115 (case #8: legacy plain-object throws)
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** When a service layer throws `{ status: 404, message: '...' }` and the error reaches the global `errorHandler` without being converted to a `DomainError`, case #8 emits `{ error: { code: 'ERROR', ... } }` instead of `{ error: { code: 'NOT_FOUND', ... } }`. The v2 `_shared/errors.js::handleError` helper and the new `toDomainError` function both do the correct HTTP→code mapping; the global handler does not.
+- **Impact:** Any future controller that lets a plain-object service error reach `next(err)` (e.g. via `asyncHandler` without a `toDomainError` bridge) will emit `code: 'ERROR'` for 4xx errors instead of the semantic code clients expect. The current migration works around this with `toDomainError`, but the root cause in errorHandler remains.
+- **Recommended fix:** In errorHandler case #8, apply the same `HTTP_CODE_MAP` lookup that `handleError` uses: `code = HTTP_CODE_MAP[err.status] || 'ERROR'`. One-line change, low risk.
+- **Source:** PR15 asyncHandler migration — discovered while ensuring contract test error codes matched after migrating v2 controllers.
+
+### BUG-032 — `mobile/productController.js::addReview` uses `console.error` instead of logger
+- **Severity:** LOW (observability)
+- **File:** `src/controllers/mobile/productController.js` (addReview and categoryImages handlers)
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** Two catch blocks call `console.error(error)` instead of `logger.error(...)`. In production, this bypasses the structured JSON logging pipeline.
+- **Impact:** Errors in review submission and category image upload are invisible in log aggregators.
+- **Recommended fix:** Replace `console.error(error)` with `logger.error({ err: error }, 'Error in addReview:')` (and similarly for `categoryImages`).
+- **Source:** PR15 code audit during asyncHandler migration.
+
+### BUG-033 — Widespread `console.error` usage in mobile and ecommerce controllers bypasses structured logging
+- **Severity:** LOW (observability)
+- **Files:** `src/controllers/mobile/authController.js` (3 calls), `src/controllers/mobile/orderController.js` (3 calls), `src/controllers/mobile/smartCategoriesController.js` (4 calls), `src/controllers/ecommerce/adminController.js` (2 calls), `src/controllers/ecommerce/publicController.js` (7 calls), `src/controllers/ecommerce/smartCategoriesController.js` (4 calls), `src/controllers/ecommerce/userController.js` (7 calls)
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** 30 `console.error(...)` calls scattered across mobile and ecommerce controllers bypassed the structured pino logger. Errors were invisible in log aggregators and structured log streams.
+- **Fix applied:** All 30 occurrences replaced with `logger.error({ err: error }, 'descriptive message:')` matching the project-standard pino structured logging style.
+- **Source:** PR15 sweep during errorHandler migration workstream.
+
+---
+
+### BUG-035 — Access token expiry inconsistency between login and refresh paths
+- **Severity:** LOW (security hygiene / documentation gap)
+- **Files:** `src/services/auth/use-cases/refresh.js`, `src/services/auth/use-cases/checkAccessToken.js`, `src/services/auth/domain/tokenIssuer.js`
+- **Status:** **DOCUMENTED** (feat/v2-api-unification)
+- **Symptom:** `refresh.js` issues new access tokens with `expiresIn: '2m'` (2 minutes). `checkAccessToken.js` and `tokenIssuer.js` use `'1h'`. The two paths intentionally produce tokens with different lifetimes.
+- **Resolution:** The `'2m'` value on the refresh path is treated as intentional security behaviour — short-lived access tokens after rotation reduce blast-radius of leaked tokens. Both expiries are now surfaced as named config knobs in `src/config/runtime.js`:
+  - `auth.accessTokenExpiry` (default `'1h'`) — controlled by `JWT_ACCESS_EXPIRY`
+  - `auth.accessTokenRefreshExpiry` (default `'2m'`) — controlled by `JWT_ACCESS_REFRESH_EXPIRY`
+  Both are documented in `.env.example`. If the short refresh expiry is found to be a bug, set `JWT_ACCESS_REFRESH_EXPIRY=1h` via env to align without a code change.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-036 — INVENTORY_CONCURRENCY = 5 duplicated across three independent files
+- **Severity:** LOW (maintenance)
+- **Files:** `src/services/order/shared/quantities.js`, `src/services/order/use-cases/validateInventoryBeforeCheckout.js`, `src/services/product/sync/domain/lightspeedFetchers.js`
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** Each file independently defines `const INVENTORY_CONCURRENCY = 5`. If ops needs to tune concurrency (e.g., to reduce Lightspeed API rate-limit pressure), all three must be changed in sync.
+- **Impact:** Low — all three happen to agree on 5. Risk is drift if one is changed during a future refactor.
+- **Recommended fix:** Consolidate into `src/config/constants/business.js` as `INVENTORY_CONCURRENCY = 5` and import from there.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-037 — scripts/updateProductsNew.js has its own MAX_DISCOUNT_TTL independent of helpers/productDiscountSync.js
+- **Severity:** LOW (config drift)
+- **Files:** `src/scripts/updateProductsNew.js`, `src/helpers/productDiscountSync.js`
+- **Status:** **FIXED** (feat/v2-api-unification)
+- **Symptom:** The nightly product-update script (`updateProductsNew.js`) defines its own `MAX_DISCOUNT_TTL = 60 * 60 * 6` separately from `productDiscountSync.js`. Both resolved to the same value (21600 s) during this audit, so they agree today.
+- **Impact:** If `CACHE_TTL_MAX_DISCOUNT` is changed via env, the script does not pick it up — it always uses its hardcoded 6-hour value. The runtime cache will expire at the configured TTL while the script re-populates it at 6 hours.
+- **Recommended fix:** In `updateProductsNew.js`, replace `MAX_DISCOUNT_TTL = 60 * 60 * 6` with `require('../config/runtime').cache.maxDiscountTtl`.
+- **Source:** Magic-numbers audit (feat/v2-api-unification).
+
+### BUG-038 — PENDING_PAYMENT_EXPIRY_MINUTES env var is misleading (Mongo TTL index gotcha)
+- **Severity:** LOW (operational footgun)
+- **Files:** `src/config/runtime.js`, `src/models/PendingPayment.js`, `.env.example`
+- **Status:** OPEN
+- **Symptom:** `PENDING_PAYMENT_EXPIRY_MINUTES` is exposed as a tunable env var, but Mongoose TTL indexes are baked into MongoDB at index-creation time (`expireAfterSeconds: 1800`). Changing the env var changes only what `runtime.js` returns; the live Mongo TTL index is unchanged.
+- **Impact:** Setting `PENDING_PAYMENT_EXPIRY_MINUTES=60` does NOT extend pending-payment lifetime. Mongo continues to delete docs after 30 minutes regardless. Ops would need to drop and recreate the index.
+- **Recommended fix:** Either (a) demote to a constant in `src/config/constants/business.js` with a clear comment that it must match the Mongoose `expireAfterSeconds`, OR (b) add a startup script that reconciles the index TTL with the env value via `db.collection('pendingpayments').dropIndex(...)` + recreate.
+- **Source:** Magic-numbers env-vs-constant evaluation (2026-05-04).
+
+### BUG-039 — Mobile checkAccessToken response-shape mismatch (pre-existing, not a v2-unification regression)
+- **Severity:** MEDIUM (silent logout)
+- **Files:** `Bazaar-Mobile-App/lib/data/services/api_service.dart:126-145`, `bazaar-backend/src/services/auth/use-cases/checkAccessToken.js:16,45-50`
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** Mobile expected `accessToken` in every `check-access-token` response. Backend returned `{ valid: true, message, userId }` when the token was still valid; only included `accessToken` on the refresh branch. Mobile read "no accessToken" as "auth failed" and logged the user out.
+- **Fix applied:** Backend now echoes the still-valid token back in the response (`accessToken: accessTokenValue`) on the valid path. Strictly additive — web ignores the extra field. Lock-in test added to `tests/services/authService.test.js`.
+- **Source:** Login-flow audit (2026-05-04); fixed in Tier-1 fix PR.
+
+### BUG-040 — Google OAuth requires three client IDs; missing any breaks one platform silently
+- **Severity:** MEDIUM (deploy-time configuration risk)
+- **Files:** `src/services/auth/adapters/googleVerifier.js:27-44`, `.env.example`
+- **Status:** OPEN (operational checklist item)
+- **Symptom:** `googleVerifier` switches the audience by User-Agent: Android UA → `ANDROID_GOOGLE_CLIENT_ID`, iOS UA → `IOS_GOOGLE_CLIENT_ID`, web → `GOOGLE_CLIENT_ID`. Mobile sets the UA correctly. If any of the three env vars is unset in production, that platform's Google login fails with an opaque "Invalid token" error.
+- **Impact:** Silent failure for one platform if env is incomplete. Hard to diagnose because the other platforms continue working.
+- **Recommended fix:** Add all three to the `validateEnv.js` REQUIRED list (or at least flag them as "required for Google OAuth" in the warning section). Pre-deploy checklist must verify all three are populated.
+- **Source:** Login-flow audit (2026-05-04).
+
+### BUG-041 — Mobile coupon validation gates on missing `success` key
+- **Severity:** MEDIUM (customer-visible — coupons unusable on mobile)
+- **Files:** `bazaar-backend/src/services/coupon/use-cases/checkCouponCode.js:45,51,77-83`, `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:1097-1117`
+- **Status:** **FIXED** (feat/v2-api-unification, 2026-05-04)
+- **Symptom:** Mobile `applyCoupon` branched on `data['success'] == true`. Backend response had no `success` field on the 200 path. Every valid coupon (FIRST15, UAE10, bank promos) failed silently on mobile; web was unaffected because it gates on HTTP 2xx.
+- **Fix applied:** Added `success: true` to all three return paths in `checkCouponCode` (UAE10 success, generic coupon, bank promo). Strictly additive. Lock-in test added to `tests/integration/couponService.usageLimit.test.js`.
+- **Source:** Critical-flows audit (2026-05-01, docs/CRITICAL-FLOWS-AUDIT.md, Flow 2); fixed in Tier-1 fix PR.
+
+### BUG-042 — Cart mutation endpoints omit gift-logic enrichment fields
+- **Severity:** LOW (transient UI flicker)
+- **Files:** `bazaar-backend/src/services/cart/use-cases/modifyCart.js:83,106,126,154,178`, `bazaar-backend/src/services/cart/use-cases/getCart.js:48-55,87-93`, `Bazaar-Mobile-App/lib/data/models/cart_response.dart:91-115`
+- **Status:** OPEN
+- **Symptom:** `getCart` (with `includeGiftLogic: true`) enriches each cart line with `category_id`, `category_name`, `price`, `isGiftWithPurchase`. `modifyCart` use-cases (`addToCart` / `increaseQty` / `decreaseQty` / `removeFromCart`) return raw `cart.items` from the Mongoose schema with none of those fields.
+- **Impact:** Mobile UI consuming `addToCart` / `increase` / `decrease` responses transiently sees nulls for category and `isGiftWithPurchase` until the next full `get-cart` refresh. Null-tolerant on mobile today, but latent if either client begins gating on these fields.
+- **Recommended fix:** Have `modifyCart` use-cases return the same enrichment as `getCart({ includeGiftLogic: true })` — extract a shared `enrichCartItems(cart, options)` helper in `services/cart/domain/`.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-043 — Per-item price precision drifts between web (rounded) and mobile (raw double)
+- **Severity:** LOW (latent; AED-only catalogue today)
+- **Files:** `bazaar-web/src/components/Checkout/Checkout.jsx:616,686,747`, `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:489,628`, `bazaar-backend/src/services/checkout/use-cases/createStripeCheckout.js:49,73,85`
+- **Status:** OPEN
+- **Symptom:** Web sends `price: Math.round(item.variantPrice)` for every cart line on the checkout payload. Mobile sends `double.tryParse(product.variantPrice ?? '0')`. Backend `createStripeCheckout` then does its own `Math.round(Number(item.price) * 100)` for cents.
+- **Impact:** For non-integer AED prices, web orders charge integer AED while mobile orders charge full precision — same SKU, different totals across platforms. Currently no fractional-AED prices in the catalogue, but this becomes a real-money divergence the day fractional pricing is enabled or a non-AED currency is added.
+- **Recommended fix:** Consolidate price rounding on the backend; never trust client `price`. Either (a) re-derive unit price server-side from the cart in DB, or (b) pin client behavior to send raw `Number(variantPrice)` and let backend do all rounding.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-044 — Mobile reads `data['freeShipping']` from /api/shipping-cost which backend never emits
+- **Severity:** LOW (drift; fallback covers it)
+- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:265`, `bazaar-backend/src/services/shipping/use-cases/calculateShippingCost.js:14-22,46-52`
+- **Status:** OPEN (pre-existing)
+- **Symptom:** Mobile sets `isFreeShippingEligible.value = data['freeShipping'] == true`. Backend response is `{ shippingCost, ratePerKm, baseRate, freeShippingThreshold, currency }` — no `freeShipping` boolean.
+- **Impact:** `isFreeShippingEligible` is always false on mobile. Mobile compensates because the same response includes `freeShippingThreshold`, which mobile compares against `discountedProductsTotal` to decide free shipping locally (`shippingCost` getter). Two-source-of-truth risk: when backend decides free shipping for a region not driven by threshold (e.g. promo code), mobile won't render it as free.
+- **Recommended fix:** Either backend adds `freeShipping: bool` to the response (single line in `calculateShippingCost.js`), or mobile drops the `freeShipping` read and trusts `shippingCost === 0`.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-045 — Mobile bypasses backend Stripe init and ships Stripe secret key in `.env`
+- **Severity:** HIGH (security — Stripe best-practice violation; pre-existing)
+- **Files:** `Bazaar-Mobile-App/lib/controllers/checkout_controller.dart:44,710-810`, `bazaar-backend/src/routes/mobile/orderRoutes.js:11`, `bazaar-backend/src/controllers/mobile/orderController.js:168-184`
+- **Status:** OPEN (pre-existing; surfaced by critical-flows audit)
+- **Symptom:** Mobile imports `STRIPE_SECRET_KEY` via `dotenv.env['STRIPE_SECRET_KEY']` and calls `https://api.stripe.com/v1/customers`, `/v1/ephemeral_keys`, and `/v1/payment_intents` directly. Backend exposes `/api/order/stripe/init` which is intended for this exact purpose and is never invoked.
+- **Impact:** Stripe explicitly forbids client-side use of secret keys. Anyone reverse-engineering the mobile app gets full Stripe API write access (refund any charge, list any customer, create payments). PCI / Stripe compliance issue regardless of the v2 unification work.
+- **Recommended fix:** Mobile must call `POST /api/order/stripe/init` for PaymentIntent creation and remove `STRIPE_SECRET_KEY` from the mobile bundle. Rotate the existing key after the change ships.
+- **Source:** Critical-flows audit (2026-05-01).
+
+### BUG-046 — iOS Google login resolves to wrong audience (web client ID instead of iOS)
+- **Severity:** Was MEDIUM; **revised: NOT BROKEN for mobile**
+- **Files:** `src/services/auth/adapters/googleVerifier.js:39`, `src/controllers/mobile/authController.js:75-82`
+- **Status:** **RESOLVED — VERIFIED NOT BROKEN for mobile** (2026-05-04). One latent edge case (iOS Safari web) acknowledged but rare; not a fix priority.
+- **Re-verification (2026-05-04):** Re-read `src/controllers/mobile/authController.js:75-82` carefully. Mobile **does** pass `platform: 'mobile'` to `authService.googleLogin(...)` (line 80). Earlier audit conclusion was wrong — I read up to line 81 but missed `platform` on line 80. The verifier's explicit `if (platform === 'mobile')` branch correctly handles `userAgent === 'ios'` and resolves to `IOS_GOOGLE_CLIENT_ID`. Mobile iOS Google login works correctly.
+- **Remaining (low-priority) edge case:** iOS Safari users on the **web** flow can have their UA string include `"iphone"` substring → routes to `IOS_GOOGLE_CLIENT_ID` even though Google Sign-In's web button issues tokens for `GOOGLE_CLIENT_ID`. Tiny user pool; would only matter if iOS Safari users report being unable to sign in on the website. Defer.
+- **Source:** OAuth flow verification (2026-05-04); resolved during Tier-1 fix PR with corrected re-read of the mobile controller.
+
+### BUG-052 — MIN_SUPPORTED_MOBILE_VERSION env var exists but is never enforced
+- **Severity:** HIGH (safety valve is non-functional)
+- **Files:** `.env.example`, `src/routes/mobile/configRoutes.js:10`, **no middleware exists**
+- **Status:** FIXED (deployed inert) — `src/middleware/versionGate.js` implemented. `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE` defaults to `false`; the middleware observes (logs warn) but does not reject requests until the flag is flipped to `'true'`. Actual cutover is a separate ops step after BUG-053 mobile adoption reaches ≥80%.
+- **Symptom:** `MIN_SUPPORTED_MOBILE_VERSION=1.0.35` is set in `.env.example` and exposed via `/api/mobile/config`. However, **no backend middleware compares an incoming `X-App-Version` header against this value**. The env var is purely informational — it's echoed back to clients via the config endpoint and used in admin activity log displays, but it never blocks a request.
+- **Impact:** The safety-valve mechanism for forcing old mobile app versions to update doesn't exist. Any breaking change to a v1 endpoint (or an inadvertent shape drift) will silently affect every previously-released app version, with no force-update prompt. Tens of thousands of users on stale versions could get logged out / shown broken UI / fail to checkout, with no graceful degradation path.
+- **Recommended fix:** Add `src/middleware/versionGate.js` that runs early in the request pipeline, reads `X-App-Version` header (if present), and returns `426 Upgrade Required` when `clientVersion < MIN_SUPPORTED_MOBILE_VERSION`. Skip when header is absent (web/admin). Add a `MIN_SUPPORTED_MOBILE_VERSION_ENFORCE=false` flag for staged rollout.
+- **Source:** Mobile-version-compatibility audit (2026-05-04).
+
+### BUG-053 — Mobile app does not send X-App-Version header and does not consume /api/mobile/config
+- **Severity:** HIGH (companion to BUG-052; blocks the version-gate from ever working)
+- **Files:** `Bazaar-Mobile-App/lib/**` — no version-check code path exists
+- **Status:** OPEN (mobile-side fix, tracked here for backend awareness)
+- **Symptom:** A grep of `Bazaar-Mobile-App/lib/` for `minSupportedVersion`, `forceUpdate`, `package_info`, `in_app_update`, `upgrader`, `X-App-Version`, `versionGate` returned zero matches. The only `app_version` reference is a hardcoded string `"1.0.33"` in `lib/core/utils/payment_error_logger.dart:28` used in one error-log payload. Mobile does not call `/api/mobile/config` at startup, does not read its own version from `package_info_plus` or equivalent, does not send `X-App-Version` on any request, and has no force-update dialog.
+- **Impact:** Even if the backend implements BUG-052's middleware, mobile clients will never trigger it. Backend must default to "skip when header absent" or all mobile traffic returns 426.
+- **Recommended fix (mobile):** Add `package_info_plus` dependency. On app launch, call `/api/mobile/config`. If `appVersion < minSupportedVersion`, show non-dismissable update prompt with App Store / Play Store deep link. Add `X-App-Version: <currentVersion>` header to all backend requests (Dio interceptor or `ApiService` base headers).
+- **Source:** Mobile-version-compatibility audit (2026-05-04).
+
+### BUG-054 — Cron and refresh paths derive `status` from `totalQty>0`, silently re-publishing in-store-only products online
+- **Severity:** **CRITICAL** (catalog leak; merchant intent overridden)
+- **Files:** `src/scripts/updateProductsNew.js:115` (cron `updateParkedDetails`), `src/services/product/sync/use-cases/refreshSingleProductById.js:38` (admin refresh-by-id)
+- **Status:** **FIXED on both branches.** Modular branch fix in `feat/v2-api-unification` (commit `b072e6c`); equivalent fix on `main` (commit `c010ae0`, PR #7). Both shipped 2026-05-04. Merge confirmed parity 2026-05-04 (commit `7cb6374`).
+- **Symptom:** Both code paths set `status: totalQty > 0`, ignoring Lightspeed's `ecwid_enabled_webstore` flag. Lightspeed API 3.0 (used by these paths' fetcher) does not expose `ecwid_enabled_webstore`; only API 2.0 does. The webhook handler `handleProductUpdate.js:144` reads it correctly from 2.0, but the cron and refresh paths shortcut to qty as a proxy for online-status — two unrelated concepts. Result: any product the merchant sets to in-store-only via Lightspeed POS gets silently flipped back online whenever (a) the cron processes a parked sale referencing it, or (b) admin clicks "Refresh Product."
+- **Reproduced on:** SKU `123456789` ("Dell4455", itemId `977e2b4a-f3f4-4ca5-82c4-171cf270c569`). Lightspeed 2.0 returned `ecwid_enabled_webstore: false`; Mongo had `status: true` because the cron re-stamped it.
+- **Audit:** of 4929 products, 1801 are `status: true`; 1643 of those were last written by a code path with the bug. True authorship is masked because `productDiscountSync.js` clobbers the `webhook` audit field on every run (filed as BUG-055).
+- **Impact:** Catalog leak — products the merchant intended to sell only in-store appear on the storefront and mobile app. Customers can order items the merchant wasn't ready to ship online.
+- **Fix applied:**
+  - `updateProductsNew.js`: removed `status` from the qty-update `$set`. Status is now owned exclusively by the `product.update` webhook handler (which uses 2.0 correctly).
+  - `refreshSingleProductById.js`: split create/update paths. Create path consults Lightspeed 2.0 directly via new `fetchOnlineStatusFromV2()` helper (fail-safe to `undefined → false` on lookup error). Update path no longer touches `status` — preserves merchant's setting.
+  - Lock-in tests updated in `tests/services/productSyncService.pr12.test.js` and `tests/scripts/updateParkedDetails.test.js` to assert status preservation.
+- **Followups still needed:**
+  - One-time reconciliation script: for every product with `status: true`, query Lightspeed 2.0 and flip to `false` if `ecwid_enabled_webstore !== true`. Estimated ~5000 API calls; rate-limit with `mapLimit`. Not run yet — needs explicit approval.
+  - Long-term: collapse `fetchProductDetailsForRefresh` and `fetchProductDetails` into one fetcher with explicit options.
+- **Source:** User-reported "Dell4455 shows two variants and quantity mismatch" investigation (2026-05-04).
+
+### BUG-055 — productDiscountSync overwrites the `webhook` audit field on every run, masking authorship of qty/status changes
+- **Severity:** MEDIUM (observability; turns every "why is this stale" investigation blind)
+- **File:** `src/helpers/productDiscountSync.js:128, 92` — both `fastSync` and `fullScanAndSync` write `webhook: 'updateProductDiscounts'` and `webhookTime` into every target/leader doc.
+- **Status:** OPEN
+- **Symptom:** The `webhook` field is supposed to record which job last *substantively* modified a product. The discount sync runs frequently and overwrites this field even though it only mutates `discount`, `originalPrice`, `discountedPrice`, `isHighest`. Authorship of the actual `variantsData`/`totalQty`/`status` change is destroyed within minutes of any other write.
+- **Impact:** Forensic — postmortems on stale-data bugs cannot determine which writer is at fault. Surfaced during BUG-054 investigation: 1643/1801 affected products show `webhook: 'updateProductDiscounts'`, leaving the true buggy-path attribution unrecoverable.
+- **Recommended fix:** Either (a) drop `webhook`/`webhookTime` from the discount-sync `$set`, or (b) introduce a separate `lastDiscountSyncAt` field. Prefer (a) since the discount sync is a derived/projection job, not a primary writer.
+- **Source:** BUG-054 investigation (2026-05-04).
+
+### BUG-056 — Cart mutation endpoints return unpopulated items, breaking web's optimistic state update
+- **Severity:** **HIGH** (web users can't delete a second item without refresh; checkout friction)
+- **Files:**
+  - `src/services/cartService.js` (pre-modular layout, now on `main`) — `addToCart`, `removeFromCart`, `increaseQty`, `decreaseQty`
+  - `src/services/cart/use-cases/modifyCart.js` (modular layout, on `feat/v2-api-unification`) — same four functions, via `reloadCartShape()` helper
+- **Status:** **FIXED on both branches.** Modular branch fix in `feat/v2-api-unification` (commit `20a46ad`); equivalent fix on `main` (commit `6422251`, PR #8). Both shipped 2026-05-04. Merge confirmed parity 2026-05-04 (commit `7cb6374`).
+- **Symptom:** All four cart mutation endpoints return `{ cart: cart.items }` from a `Cart.findOne()` without `.populate("items.product")`. The serialized response has each item's `product` field as a bare ObjectId string instead of a populated Product object. The web's `CartContext.handleRemoveItem` does `setCartItems(response.data.cart)` after a successful mutation, which puts these unpopulated items into React state. The next mutation sends `handleRemoveItem(item?.product?._id)` — but `item.product` is a string, so `_id` is `undefined`. Backend rejects with 400 "product_id is required". User sees "Failed to remove item from cart" toast.
+- **Reproduction:** authenticated user → load cart → delete first item (works) → delete second item (fails). Page refresh restores normal behavior.
+- **Latent since:** 2026-04-09 (`c2f24d1`, unified backend) — masked because the web always re-fetched after mutations.
+- **User-visible since:** 2026-04-26 (`d97cd3d` in bazaar-web, "perf: eliminate redundant API calls") — web optimization removed the safety re-fetch and started trusting the mutation response shape, exposing the latent backend bug.
+- **Fix applied:** All four mutation endpoints now return `getCart(userId, { includeGiftLogic: false })` instead of raw `cart.items`. `decreaseQty` preserves its `message` by spreading `getCart`'s shape and appending `message`. Lock-in test in `tests/services/cartService.test.js` ("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)") asserts the surviving item's `product` field is a populated object with `_id`.
+- **Source:** User-reported "web user can't delete from cart" investigation (2026-05-04).

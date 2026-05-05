@@ -1,0 +1,80 @@
+'use strict';
+
+const Product = require('../../../repositories').products.rawModel();
+const OrderDetail = require('../../../repositories').orderDetails.rawModel();
+const cache = require('../../../utilities/cache');
+const clock = require('../../../utilities/clock');
+const { LIST_EXCLUDE_PROJECTION, LIST_EXCLUDE_SELECT } = require('../domain/projections');
+
+const runtimeConfig = require('../../../config/runtime');
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
+const { MS_PER_HOUR } = require('../../../config/constants/time');
+
+/**
+ * Get today's deal products.
+ */
+async function todayDeal() {
+    return cache.getOrSet(cache.key('catalog', 'today-deal', 'v1'), SMART_CAT_TTL, async () => {
+        const nowDubaiUTC = clock.now();
+        const seventyTwoHoursAgoUTC = new Date(nowDubaiUTC.getTime() - 72 * MS_PER_HOUR);
+
+        const soldProducts = await OrderDetail.aggregate([
+            { $match: { createdAt: { $gte: seventyTwoHoursAgoUTC } } },
+            {
+                $group: {
+                    _id: "$product_id",
+                    totalSold: { $sum: "$quantity" },
+                },
+            },
+            { $match: { totalSold: { $gte: 1 } } },
+        ]);
+
+        const soldProductIds = soldProducts.map(p => p._id);
+        let trendingProducts = [];
+        if (soldProductIds.length) {
+            trendingProducts = await Product.find({
+                'product.id': { $in: soldProductIds },
+                totalQty: { $gt: 0 }
+            })
+                .select(LIST_EXCLUDE_SELECT)
+                .lean();
+
+            trendingProducts = trendingProducts.filter(product =>
+                product.product?.images &&
+                Array.isArray(product.product.images) &&
+                product.product.images.length > 0
+            );
+
+            const soldMap = Object.fromEntries(soldProducts.map(s => [s._id.toString(), s.totalSold]));
+            trendingProducts.sort((a, b) => {
+                const soldA = soldMap[a._id.toString()] || 0;
+                const soldB = soldMap[b._id.toString()] || 0;
+                if (b.discount !== a.discount) return b.discount - a.discount;
+                return soldB - soldA;
+            });
+        }
+
+        const products = await Product.aggregate([
+            { $match: { status: true, totalQty: { $gt: 0 } } },
+            {
+                $match: {
+                    $expr: { $gt: [{ $size: { $ifNull: ["$product.images", []] } }, 0] }
+                }
+            },
+            { $sample: { size: 10 } },
+            { $project: LIST_EXCLUDE_PROJECTION }
+        ]);
+
+        const finalData = [...new Map([...trendingProducts, ...products].map(item => [item._id.toString(), item])).values()]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 10);
+
+        return {
+            status: finalData.length > 0,
+            count: finalData.length,
+            products: finalData
+        };
+    });
+}
+
+module.exports = { todayDeal };

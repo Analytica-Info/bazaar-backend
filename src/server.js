@@ -16,7 +16,9 @@ require("dotenv").config();
 
 const logger = require("./utilities/logger");
 const JWT_SECRET = require("./config/jwtSecret.js");
+const runtimeConfig = require("./config/runtime");
 const authMiddleware = require("./middleware/authMiddleware");
+const { requestContext, notFound, errorHandler, versionGate } = require("./middleware");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const Coupon = require("./models/Coupon.js");
 const Cronjoblog = require("./models/Cronjoblog.js");
@@ -71,6 +73,11 @@ const mobileBannerImages = require("./routes/mobile/bannerImages.js");
 const mobileConfigRoutes = require("./routes/mobile/configRoutes.js");
 
 // ==========================================
+// V2 UNIFIED API ROUTES (BFF — gated by V2_ENABLED env flag)
+// ==========================================
+const v2Router = require("./routes/v2/index.js");
+
+// ==========================================
 // APP SETUP
 // ==========================================
 const app = express();
@@ -98,8 +105,8 @@ app.use(
 
 // Rate limiting on auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per window
+  windowMs: runtimeConfig.rateLimit.authWindowMs,
+  max: runtimeConfig.rateLimit.authMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: "Too many attempts, please try again later." },
@@ -109,16 +116,25 @@ app.use("/user/register", authLimiter);
 app.use("/admin/login", authLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+app.use("/v2/auth/login", authLimiter);
+app.use("/v2/auth/register", authLimiter);
+app.use("/v2/auth/google-login", authLimiter);
+app.use("/v2/auth/apple-login", authLimiter);
+app.use("/v2/auth/refresh-token", authLimiter);
 
 // Stricter rate limit for password reset
 const passwordResetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: runtimeConfig.rateLimit.passwordResetWindowMs,
+  max: runtimeConfig.rateLimit.passwordResetMax,
   message: { success: false, message: "Too many password reset attempts, please try again later." },
 });
 app.use("/user/forgot-password", passwordResetLimiter);
 app.use("/admin/forgot-password", passwordResetLimiter);
 app.use("/api/auth/forgot-password", passwordResetLimiter);
+app.use("/v2/auth/forgot-password", passwordResetLimiter);
+app.use("/v2/auth/reset-password", passwordResetLimiter);
+app.use("/v2/auth/verify-code", passwordResetLimiter);
+app.use("/v2/auth/resend-recovery-code", passwordResetLimiter);
 
 // ==========================================
 // CORE MIDDLEWARE
@@ -131,8 +147,31 @@ app.post("/tabby/webhook", bodyParser.raw({ type: "*/*" }), (req, res, next) => 
 
 app.use(cookieParser());
 
-// CORS — open (same as old Mobile API)
-app.use(cors({ credentials: true, origin: true }));
+// CORS — allowlist when ALLOWED_ORIGINS is set, fall back to open (legacy mobile API).
+// V2 web cookies require an allowlist; mixed mode lets us roll out gradually.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+if (ALLOWED_ORIGINS.length > 0) {
+  app.use(
+    cors({
+      credentials: true,
+      origin: (origin, cb) => {
+        // Allow requests with no Origin (mobile apps, curl, server-to-server)
+        if (!origin) return cb(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(new Error("Not allowed by CORS"));
+      },
+    })
+  );
+} else {
+  if (isProduction) {
+    logger.warn("ALLOWED_ORIGINS not set — CORS is open. This is unsafe for v2 web cookie sessions.");
+  }
+  app.use(cors({ credentials: true, origin: true }));
+}
 
 // Body parsing with size limits (Express 5 has built-in parsers)
 app.use(express.json({ limit: "10mb" }));
@@ -141,6 +180,12 @@ app.use(compression());
 
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Correlation ID + child logger — must come before any route-level logging
+app.use(requestContext);
+
+// Mobile version gate — must come after requestContext so req.log is available
+app.use(versionGate);
 
 // Request logging — duration + response size
 app.use((req, res, next) => {
@@ -189,6 +234,59 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Liveness probe — always 200 if the process is up and Express is responding.
+// Load balancers use this to decide whether to route traffic to the pod.
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// Readiness probe — 200 only when the process is fully ready to serve traffic.
+// Returns 503 when MongoDB is not connected (readyState !== 1).
+app.get("/readyz", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const ready = dbState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ready" : "not ready",
+    checks: {
+      mongodb: { state: dbState, connected: ready },
+    },
+  });
+});
+
+// ==========================================
+// V2 OPENAPI SPEC + SWAGGER UI (public, no auth, no platform middleware)
+// Mounted before connectAndRun so the router is available immediately on boot.
+// ==========================================
+{
+  const yaml = require("js-yaml");
+  const swaggerUi = require("swagger-ui-express");
+  const specPath = path.join(__dirname, "../docs/openapi/v2.yaml");
+
+  let specJson = null;
+  try {
+    specJson = yaml.load(fs.readFileSync(specPath, "utf8"));
+  } catch (err) {
+    logger.warn({ err }, "Could not load OpenAPI spec — /v2/openapi.json and /v2/docs will be unavailable");
+  }
+
+  if (specJson) {
+    app.get("/v2/openapi.json", (req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.json(specJson);
+    });
+
+    app.use(
+      "/v2/docs",
+      swaggerUi.serve,
+      swaggerUi.setup(specJson, {
+        customSiteTitle: "Bazaar v2 API Docs",
+        swaggerOptions: { persistAuthorization: true },
+      })
+    );
+    logger.info("OpenAPI spec served at /v2/openapi.json and /v2/docs");
+  }
+}
 
 // ==========================================
 // INLINE ROUTES FROM ECOMMERCE SERVER.JS
@@ -266,32 +364,17 @@ const connectAndRun = async () => {
   app.use("/api", requestMetrics("user-api"), mobileBannerImages);
   app.use("/api/mobile", requestMetrics("user-api"), mobileConfigRoutes);
 
+  // --- V2 Unified API (gated by V2_ENABLED env flag) ---
+  if (process.env.V2_ENABLED === 'true') {
+    app.use("/v2", requestMetrics("v2-api"), v2Router);
+    logger.info("V2 API routes mounted at /v2");
+  }
+
   // ==========================================
-  // GLOBAL ERROR HANDLER (must be after all routes)
+  // 404 + GLOBAL ERROR HANDLER (must be after all routes)
   // ==========================================
-  app.use((err, req, res, _next) => {
-    // CORS errors
-    if (err.message === "Not allowed by CORS") {
-      return res.status(403).json({ success: false, message: "CORS not allowed" });
-    }
-
-    logger.error({
-      err: err,
-      method: req.method,
-      url: req.originalUrl,
-      body: req.method === "GET" ? undefined : "[redacted]",
-    }, "Unhandled error");
-
-    res.status(err.status || 500).json({
-      success: false,
-      message: isProduction ? "Internal server error" : err.message,
-    });
-  });
-
-  // 404 handler
-  app.use((req, res) => {
-    res.status(404).json({ success: false, message: "Route not found" });
-  });
+  app.use(notFound);
+  app.use(errorHandler);
 };
 
 connectAndRun();

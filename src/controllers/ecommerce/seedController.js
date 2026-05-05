@@ -1,6 +1,6 @@
-const Role = require('../../models/Role');
-const Permission = require('../../models/Permission');
-const Admin = require('../../models/Admin');
+const Role = require('../../repositories').roles.rawModel();
+const Permission = require('../../repositories').permissions.rawModel();
+const Admin = require('../../repositories').admins.rawModel();
 
 const logger = require("../../utilities/logger");
 const permissions = [

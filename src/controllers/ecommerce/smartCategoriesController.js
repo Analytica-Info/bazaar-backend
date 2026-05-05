@@ -1,6 +1,6 @@
 const smartCategoriesService = require("../../services/smartCategoriesService");
-const FlashSale = require("../../models/FlashSale");
-const Product = require("../../models/Product");
+const FlashSale = require('../../repositories').flashSales.rawModel();
+const Product = require('../../repositories').products.rawModel();
 
 const logger = require("../../utilities/logger");
 exports.hotOffers = async (req, res) => {
@@ -8,7 +8,7 @@ exports.hotOffers = async (req, res) => {
         const result = await smartCategoriesService.getHotOffers({ priceField: "tax_inclusive" });
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -39,7 +39,7 @@ exports.getTopRatedProducts = async (req, res) => {
         const result = await smartCategoriesService.getTopRatedProducts();
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -49,7 +49,7 @@ exports.trendingProducts = async (req, res) => {
         const result = await smartCategoriesService.getTrendingProducts({ timeWindowHours: 72 });
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -77,7 +77,7 @@ exports.getNewArrivals = async (req, res) => {
         });
         res.status(200).json(result);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'smartCategories handler error:');
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
