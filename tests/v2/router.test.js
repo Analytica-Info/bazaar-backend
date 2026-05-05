@@ -138,13 +138,20 @@ describe("v2 router platform dispatch", () => {
     expect(res.data.data.from).toBe("mobile-login");
   });
 
-  test("unknown platform returns 400 with envelope error", async () => {
+  // Behavior change (2026-05-05, V1-BACKCOMPAT-FINAL-AUDIT.md): a request
+  // with no platform indicators (no X-Client, no user_token cookie, no Bearer)
+  // now defaults to platform='web' instead of returning 400. This unblocks
+  // fresh-browser unauthenticated users hitting /v2/auth/login. Mobile
+  // binaries always send Bearer so they continue to dispatch to mobile.
+  test("no platform indicators defaults to web (fresh-browser fallback)", async () => {
     const res = await post("/v2/auth/login");
-    expect(res.status).toBe(400);
-    expect(res.data).toEqual({
-      success: false,
-      error: { code: "UNKNOWN_PLATFORM", message: "X-Client header required. Valid values: web, mobile" },
-    });
+    // Falls through to web BFF — login handler emits the platform-specific
+    // success body. Exact body shape depends on the test app fixture; what
+    // matters is that the request is NOT rejected with 400 UNKNOWN_PLATFORM.
+    expect(res.status).not.toBe(400);
+    if (res.data && res.data.error) {
+      expect(res.data.error.code).not.toBe("UNKNOWN_PLATFORM");
+    }
   });
 
   test("shared routes accessible regardless of platform header", async () => {

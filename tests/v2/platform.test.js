@@ -32,9 +32,11 @@ describe("v2 platform middleware", () => {
     expect(p).toBe("mobile");
   });
 
-  test("unknown when no signal", () => {
+  // Behavior change 2026-05-05 (V1-BACKCOMPAT-FINAL-AUDIT.md): no signal
+  // now defaults to 'web' (fresh-browser fallback) instead of 'unknown'.
+  test("defaults to web when no signal (fresh-browser fallback)", () => {
     const { platform: p } = run({ headers: {}, cookies: {} });
-    expect(p).toBe("unknown");
+    expect(p).toBe("web");
   });
 
   test("invalid X-Client value falls through to other detection", () => {
