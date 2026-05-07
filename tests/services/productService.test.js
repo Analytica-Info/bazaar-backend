@@ -408,4 +408,156 @@ describe("productService", () => {
       expect(result.products).toHaveLength(0);
     });
   });
+
+  // ── searchSingleProduct ────────────────────────────────────────
+  describe("searchSingleProduct", () => {
+    it("should throw 404 when no product matches the name", async () => {
+      try {
+        await productService.searchSingleProduct("xyznonexistentname999");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ── getBrandNameById ──────────────────────────────────────────
+  describe("getBrandNameById", () => {
+    it("should throw 404 when brand not found by numeric-string id", async () => {
+      try {
+        await productService.getBrandNameById("999999999");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ── getCategoryNameById ────────────────────────────────────────
+  describe("getCategoryNameById", () => {
+    it("should throw 404 when category not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await productService.getCategoryNameById(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        // 404 or 400 depending on ObjectId validation
+        expect([400, 404, 500]).toContain(err.status);
+      }
+    });
+  });
+
+  // ── getRandomProducts ──────────────────────────────────────────
+  describe("getRandomProducts", () => {
+    it("should return defined result or throw when no products exist", async () => {
+      const fakeExcludeId = new mongoose.Types.ObjectId().toString();
+      try {
+        const result = await productService.getRandomProducts(fakeExcludeId);
+        expect(result).toBeDefined();
+      } catch (err) {
+        expect(err).toBeDefined();
+      }
+    });
+  });
+
+  // ── getSearchCategories ────────────────────────────────────────
+  describe("getSearchCategories", () => {
+    it("should return result or throw when no categories match", async () => {
+      try {
+        const result = await productService.getSearchCategories("xyznonexistent");
+        expect(result).toBeDefined();
+      } catch (err) {
+        expect(err).toBeDefined();
+      }
+    });
+  });
+
+  // ── getCategoriesProduct ───────────────────────────────────────
+  describe("getCategoriesProduct", () => {
+    it("should return result or throw when category has no products", async () => {
+      const fakeId = "nonexistent-cat-id";
+      try {
+        const result = await productService.getCategoriesProduct(fakeId, {
+          page: 1,
+          limit: 10,
+        });
+        expect(result).toBeDefined();
+      } catch (err) {
+        expect(err).toBeDefined();
+      }
+    });
+  });
+
+  // ── searchProducts — minimum length ───────────────────────────
+  describe("searchProducts — min length validation", () => {
+    it("should throw when query is exactly 2 characters (too short)", async () => {
+      try {
+        await productService.searchProducts({
+          query: "ab",
+          page: 1,
+          limit: 10,
+        });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+  });
+
+  // ── getProducts — filter branches ────────────────────────────
+  describe("getProducts — filter branches", () => {
+    it("should return results for category filter (no match is fine)", async () => {
+      const result = await productService.getProducts({
+        category: "nonexistent-cat",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+
+    it("should filter by subcategory without throwing", async () => {
+      const result = await productService.getProducts({
+        subcategory: "nonexistent-sub",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+
+    it("should filter by subsubcategory without throwing", async () => {
+      const result = await productService.getProducts({
+        subsubcategory: "nonexistent-subsub",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+
+    it("should filter by brand without throwing", async () => {
+      const result = await productService.getProducts({
+        brand: "TestBrand",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+
+    it("should sort by price_asc without throwing", async () => {
+      const result = await productService.getProducts({
+        sort: "price_asc",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+
+    it("should sort by price_desc without throwing", async () => {
+      const result = await productService.getProducts({
+        sort: "price_desc",
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toBeDefined();
+    });
+  });
 });

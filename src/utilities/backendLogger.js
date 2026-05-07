@@ -1,4 +1,4 @@
-const BackendLog = require('../models/BackendLog');
+const BackendLog = require('../repositories').backendLogs.rawModel();
 
 const logger = require("./logger");
 /**

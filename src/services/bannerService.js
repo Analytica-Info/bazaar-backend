@@ -1,6 +1,6 @@
 const path = require("path");
 const fs = require("fs");
-const { BannerImages } = require("../models/BannerImages");
+const BannerImages = require('../repositories').bannerImages.rawModel();
 
 async function createBanner(name, filePath) {
   if (!name) {

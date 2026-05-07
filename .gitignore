@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.production
+.env.test
 
 # Logs
 *.log
@@ -37,3 +38,4 @@ coverage/
 # Build artifacts
 dist/
 build/
+src/status_false_log.md

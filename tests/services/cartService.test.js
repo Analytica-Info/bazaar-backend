@@ -156,6 +156,7 @@ describe("cartService", () => {
     });
 
     it("returns populated items so the web optimistic update can read item.product._id (BUG-056 lock-in)", async () => {
+      // Seed two items so we can verify the surviving item's product is populated.
       const otherProduct = await Product.create({
         product: { id: "lsB", name: "Product B" },
         variantsData: [{ id: "vB", qty: 5, price: "20.00" }],

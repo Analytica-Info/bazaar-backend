@@ -1,4 +1,4 @@
-const EmailConfig = require("../models/EmailConfig");
+const EmailConfig = require('../repositories').emailConfigs.rawModel();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

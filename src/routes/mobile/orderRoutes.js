@@ -13,7 +13,10 @@ router.get('/get-orders', authMiddleware, orderController.getOrders);
 router.post('/validate-inventory', authMiddleware, orderController.validateInventoryBeforeCheckout);
 router.post('/checkout-session', authMiddleware, orderController.checkoutSession);
 router.post('/checkout-session-tabby', authMiddleware, orderController.checkoutSessionTabby);
+router.post('/create-tabby-session', authMiddleware, orderController.createTabbySession);
 router.get('/verify-tabby-status', authMiddleware, orderController.verifyTabbyPayment);
+// Mobile constant uses /check-tabby-status; alias to keep both naming variants
+router.get('/check-tabby-status', authMiddleware, orderController.verifyTabbyPayment);
 router.post('/checkout-session-nomod', authMiddleware, orderController.checkoutSessionNomod);
 router.get('/verify-nomod-payment', authMiddleware, orderController.verifyNomodPayment);
 router.get('/address', authMiddleware, orderController.address);

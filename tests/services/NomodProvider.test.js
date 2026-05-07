@@ -192,4 +192,188 @@ describe('NomodProvider', () => {
             expect(result).toMatchObject({ event: 'unknown', sessionId: null, status: null });
         });
     });
+
+    // ─── 429 retry with exponential backoff ───────────────────────────
+
+    describe('429 retry', () => {
+        // Speed up tests: override delay to 0ms during tests
+        beforeEach(() => {
+            // Patch _getRetryDelayMs to return 0 for tests
+            jest.spyOn(provider, '_getRetryDelayMs').mockReturnValue(0);
+        });
+
+        it('retries once on 429 and succeeds — exactly 2 underlying axios calls', async () => {
+            const successData = { id: 'chk_123', status: 'paid', amount: '150.00', currency: 'AED', charges: [] };
+            mockClient.get
+                .mockRejectedValueOnce({ response: { status: 429, headers: {} } })
+                .mockResolvedValueOnce({ data: successData });
+
+            const result = await provider.getCheckout('chk_123');
+
+            expect(mockClient.get).toHaveBeenCalledTimes(2);
+            expect(result.paid).toBe(true);
+        });
+
+        it('exhausts 3 attempts on repeated 429 and throws with status 429', async () => {
+            const err429 = { response: { status: 429, headers: {} } };
+            mockClient.get
+                .mockRejectedValueOnce(err429)
+                .mockRejectedValueOnce(err429)
+                .mockRejectedValueOnce(err429);
+
+            await expect(provider.getCheckout('chk_429')).rejects.toMatchObject({
+                status: 429,
+            });
+            expect(mockClient.get).toHaveBeenCalledTimes(3);
+        });
+
+        it('respects Retry-After header value over exponential schedule', async () => {
+            const retryAfterSpy = jest.spyOn(provider, '_getRetryDelayMs').mockRestore();
+            // Restore real implementation then spy on sleep
+            const sleepSpy = jest.spyOn(provider, '_sleep').mockResolvedValue();
+
+            const successData = { id: 'chk_ra', status: 'paid', amount: '50.00', currency: 'AED', charges: [] };
+            mockClient.get
+                .mockRejectedValueOnce({ response: { status: 429, headers: { 'retry-after': '3' } } })
+                .mockResolvedValueOnce({ data: successData });
+
+            await provider.getCheckout('chk_ra');
+
+            // Should have slept for 3000ms (from header), not 1000ms (first backoff slot)
+            expect(sleepSpy).toHaveBeenCalledWith(3000);
+        });
+
+        it('does NOT retry on 400 — throws immediately with 1 axios call', async () => {
+            mockClient.get.mockRejectedValueOnce({
+                response: { status: 400, data: { message: 'Bad request' } },
+            });
+
+            await expect(provider.getCheckout('chk_bad')).rejects.toBeDefined();
+            expect(mockClient.get).toHaveBeenCalledTimes(1);
+        });
+
+        it('does NOT retry on 5xx — throws immediately (avoid double-processing)', async () => {
+            mockClient.get.mockRejectedValueOnce({
+                response: { status: 500, data: {} },
+            });
+
+            await expect(provider.getCheckout('chk_5xx')).rejects.toBeDefined();
+            expect(mockClient.get).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // ─── getCheckout — charges array ──────────────────────────────────
+
+    describe('getCheckout charges', () => {
+        it('maps charges array from Nomod response', async () => {
+            mockClient.get.mockResolvedValue({
+                data: {
+                    id: 'chk_chg',
+                    status: 'paid',
+                    amount: '200.00',
+                    currency: 'AED',
+                    reference_id: 'ref-xyz',
+                    charges: [
+                        {
+                            id: 'chg_001',
+                            amount: 200,
+                            payment_time: '2026-05-01T10:00:00Z',
+                            payment_method: 'card',
+                            status: 'paid',
+                        },
+                    ],
+                },
+            });
+
+            const result = await provider.getCheckout('chk_chg');
+
+            expect(result.charges).toHaveLength(1);
+            expect(result.charges[0]).toMatchObject({
+                id: 'chg_001',
+                amount: 200,
+                paymentTime: '2026-05-01T10:00:00Z',
+                paymentMethod: 'card',
+                status: 'paid',
+            });
+            expect(result.reference_id).toBe('ref-xyz');
+        });
+
+        it('returns empty charges array when response omits charges field', async () => {
+            mockClient.get.mockResolvedValue({
+                data: { id: 'chk_nochg', status: 'created', amount: '50.00', currency: 'AED' },
+            });
+
+            const result = await provider.getCheckout('chk_nochg');
+            expect(result.charges).toEqual([]);
+        });
+
+        it('returns empty charges array when charges is not an array (malformed)', async () => {
+            mockClient.get.mockResolvedValue({
+                data: { id: 'chk_bad', status: 'created', amount: '50.00', currency: 'AED', charges: 'invalid' },
+            });
+
+            const result = await provider.getCheckout('chk_bad');
+            expect(result.charges).toEqual([]);
+        });
+
+        it('does not break existing paid/status fields', async () => {
+            mockClient.get.mockResolvedValue({
+                data: { id: 'chk_compat', status: 'paid', amount: '75.00', currency: 'AED', charges: [] },
+            });
+
+            const result = await provider.getCheckout('chk_compat');
+            expect(result.paid).toBe(true);
+            expect(result.status).toBe('paid');
+        });
+    });
+
+    // ─── refundCharge ─────────────────────────────────────────────────
+
+    describe('refundCharge', () => {
+        it('happy path: returns { message } from Nomod', async () => {
+            mockClient.post.mockResolvedValue({ data: { message: 'Successfully refunded' } });
+
+            const result = await provider.refundCharge('chg_001', { amount: '50.00' });
+            expect(result).toMatchObject({ message: 'Successfully refunded' });
+            expect(mockClient.post).toHaveBeenCalledWith(
+                '/v1/charges/chg_001/refund',
+                expect.objectContaining({ amount: '50.00' }),
+            );
+        });
+
+        it('throws 400 when chargeId is missing', async () => {
+            await expect(provider.refundCharge(null, { amount: '50.00' })).rejects.toMatchObject({ status: 400 });
+        });
+
+        it('throws 400 when amount is missing', async () => {
+            await expect(provider.refundCharge('chg_001', {})).rejects.toMatchObject({ status: 400 });
+        });
+
+        it('throws 500 when API key not configured', async () => {
+            const savedKey = provider.apiKey;
+            provider.apiKey = undefined;
+            await expect(provider.refundCharge('chg_001', { amount: '10.00' })).rejects.toMatchObject({ status: 500 });
+            provider.apiKey = savedKey;
+        });
+
+        it('maps Nomod 404 to 404 error', async () => {
+            mockClient.post.mockRejectedValue({ response: { status: 404, data: { message: 'Charge not found' } } });
+            await expect(provider.refundCharge('chg_bad', { amount: '10.00' })).rejects.toMatchObject({ status: 404 });
+        });
+
+        it('preserves refund_amount_exceeds semantic code in error message', async () => {
+            mockClient.post.mockRejectedValue({
+                response: {
+                    status: 400,
+                    data: { message: 'Refund amount exceeds', code: 'refund_amount_exceeds' },
+                },
+            });
+
+            await expect(provider.refundCharge('chg_001', { amount: '9999.00' }))
+                .rejects.toMatchObject({
+                    status: 400,
+                    message: expect.stringContaining('refund_amount_exceeds'),
+                });
+        });
+    });
 });

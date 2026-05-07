@@ -1,9 +1,10 @@
 'use strict';
 
-const Product = require("../models/Product");
+const Product = require('../repositories').products.rawModel();
 const metrics = require("../services/metricsService");
 const cache = require("../utilities/cache");
 const logger = require("../utilities/logger");
+const runtimeConfig = require("../config/runtime");
 
 const eligibleDiscountProductFilter = {
   $or: [{ status: { $exists: false } }, { status: true }],
@@ -14,7 +15,7 @@ const eligibleDiscountProductFilter = {
 // TTL is intentionally long — it gets invalidated explicitly whenever the
 // leaderboard changes, and refreshed by the nightly cron in any case.
 const MAX_DISCOUNT_CACHE_KEY = "metrics:discount:max-discount";
-const MAX_DISCOUNT_TTL = 60 * 60 * 6; // 6 hours
+const MAX_DISCOUNT_TTL = runtimeConfig.cache.maxDiscountTtl; // 6 hours default
 
 function calculateDiscount(product) {
   const originalPrice = Math.round(

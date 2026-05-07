@@ -15,9 +15,14 @@ const couponSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  status: { 
+  status: {
     type: String,
     default: 'unused', // Default value set to 'unused'
+  },
+  capAED: {
+    type: Number,
+    default: null,
+    min: 0,
   },
 });
  
