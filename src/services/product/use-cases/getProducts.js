@@ -3,9 +3,64 @@
 const Product = require('../../../repositories').products.rawModel();
 const logger = require('../../../utilities/logger');
 const { LIST_EXCLUDE_PROJECTION } = require('../domain/projections');
+const { fetchAndCacheCategories } = require('../adapters/cache');
 
 /**
- * Paginated product listing (based on mobile version, enhanced with web version features)
+ * Build a deterministic sort spec from the sort query param.
+ * @param {string|undefined} sortParam
+ * @returns {{ [key: string]: 1 | -1 }}
+ */
+function buildSortSpec(sortParam) {
+  switch (sortParam) {
+    case 'price_asc':
+      return { discountedPrice: 1, _id: 1 };
+    case 'price_desc':
+      return { discountedPrice: -1, _id: -1 };
+    case 'newest':
+    default:
+      return { createdAt: -1, _id: -1 };
+  }
+}
+
+/**
+ * Resolve all descendant category ids (including the root) from the cached
+ * category tree for a given categoryId string.
+ * @param {string} categoryId
+ * @returns {Promise<string[]>} uniqueCategoryIds — may be empty if not found
+ */
+async function resolveCategoryDescendants(categoryId) {
+  const categories = await fetchAndCacheCategories();
+  const categoryIds = [];
+
+  categories.forEach((category) => {
+    if (
+      category.category_path &&
+      category.category_path[0] &&
+      category.category_path[0].id === categoryId
+    ) {
+      category.category_path.forEach((path) => {
+        categoryIds.push(path.id);
+      });
+    }
+  });
+
+  return [...new Set(categoryIds)];
+}
+
+/**
+ * Paginated product listing — unified endpoint.
+ *
+ * Query params:
+ *   page        {number}  default 1
+ *   limit       {number}  default 54
+ *   filter      {string}  JSON array of variant-word prefixes, e.g. '["Brand New"]'
+ *   minPrice    {number}
+ *   maxPrice    {number}
+ *   sort        {string}  'price_asc' | 'price_desc' | 'newest' (default)
+ *   categoryId  {string}  filter to category + all descendants
+ *
+ * Response shape (unchanged for backward compat):
+ *   { success, pagination: { currentPage, totalPages, totalProducts, productsPerPage }, products }
  */
 async function getProducts(query) {
   const page = parseInt(query.page) || 1;
@@ -13,7 +68,34 @@ async function getProducts(query) {
   const filter = query.filter;
   const minPrice = parseFloat(query.minPrice);
   const maxPrice = parseFloat(query.maxPrice);
+  const sortSpec = buildSortSpec(query.sort);
+  const categoryId = query.categoryId;
 
+  // ── categoryId resolution ─────────────────────────────────────────────────
+  let uniqueCategoryIds = null; // null means "no filter"; [] means "resolved to nothing"
+  if (categoryId) {
+    try {
+      uniqueCategoryIds = await resolveCategoryDescendants(categoryId);
+    } catch (err) {
+      logger.error({ err }, 'Error resolving category descendants:');
+      uniqueCategoryIds = [];
+    }
+
+    if (uniqueCategoryIds.length === 0) {
+      return {
+        success: true,
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalProducts: 0,
+          productsPerPage: limit,
+        },
+        products: [],
+      };
+    }
+  }
+
+  // ── base match stage ──────────────────────────────────────────────────────
   let matchStage = {
     totalQty: { $gt: 0 },
     $or: [{ status: { $exists: false } }, { status: true }],
@@ -58,6 +140,14 @@ async function getProducts(query) {
     }
   }
 
+  // ── category filter ───────────────────────────────────────────────────────
+  if (uniqueCategoryIds !== null && uniqueCategoryIds.length > 0) {
+    aggregationPipeline.push({
+      $match: { 'product.product_type_id': { $in: uniqueCategoryIds } },
+    });
+  }
+
+  // ── count + paginate ──────────────────────────────────────────────────────
   try {
     const countPipeline = [...aggregationPipeline, { $count: 'total' }];
     const countResult = await Product.aggregate(countPipeline);
@@ -65,9 +155,7 @@ async function getProducts(query) {
 
     const productsPipeline = [
       ...aggregationPipeline,
-      { $addFields: { randomSort: { $rand: {} } } },
-      { $sort: { randomSort: 1 } },
-      { $project: { randomSort: 0 } },
+      { $sort: sortSpec },
       { $skip: (page - 1) * limit },
       { $limit: limit },
       { $project: LIST_EXCLUDE_PROJECTION },

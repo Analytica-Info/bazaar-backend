@@ -8,6 +8,11 @@ const { logStatusFalseItems } = require('../domain/statusLogger');
 
 /**
  * Products by category (with pagination)
+ *
+ * @deprecated Use GET /api/products/products?categoryId=:id instead.
+ * The unified endpoint accepts the same page/limit params plus sort,
+ * filter, minPrice, and maxPrice. This route remains mounted for
+ * backward compatibility; migrate callers at your own pace.
  */
 async function getCategoriesProduct(categoryId, query) {
   const page = parseInt(query?.page) || 1;
