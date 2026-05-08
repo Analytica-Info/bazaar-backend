@@ -139,9 +139,31 @@ class NomodProvider extends PaymentProvider {
             logger.info({ checkoutId: res.data.id, referenceId }, 'Nomod checkout created');
             return { id: res.data.id, redirectUrl: res.data.url, raw: res.data };
         } catch (error) {
-            const msg = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to create Nomod checkout';
-            logger.error({ err: error.response?.data, referenceId, status: error.response?.status }, 'Nomod createCheckout failed');
-            throw { status: error.response?.status || error.status || 500, message: msg };
+            // Surface Nomod's full response body to the caller so the mobile
+            // app can show an actionable error instead of the opaque
+            // "Request failed with status code 400". Falls back to the
+            // generic message if the response body is empty.
+            const data = error.response?.data;
+            const msg =
+                data?.message ||
+                data?.detail ||
+                data?.error ||
+                (Array.isArray(data?.errors)
+                    ? data.errors
+                        .map((e) => e.message || e.detail || JSON.stringify(e))
+                        .join('; ')
+                    : null) ||
+                (data ? JSON.stringify(data) : null) ||
+                error.message ||
+                'Failed to create Nomod checkout';
+            logger.error(
+                { err: data, referenceId, status: error.response?.status },
+                'Nomod createCheckout failed',
+            );
+            throw {
+                status: error.response?.status || error.status || 500,
+                message: msg,
+            };
         }
     }
 

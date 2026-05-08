@@ -78,12 +78,15 @@ module.exports = async function createNomodCheckoutSession(userId, bodyData, met
                 price: item.price,
             })),
             shippingCost: Number(shippingCost) || 0,
-            // Redirect URLs: HTTPS pattern so the mobile WebView's NavigationDelegate
-            // can intercept them regardless of whether Nomod follows custom schemes.
-            // The mobile WebView also intercepts bazaaruae:// as a fallback.
-            successUrl: `${RETURN_URL_BASE}?status=success&payment_id={CHECKOUT_ID}`,
-            failureUrl: `${RETURN_URL_BASE}?status=failure&payment_id={CHECKOUT_ID}`,
-            cancelledUrl: `${RETURN_URL_BASE}?status=cancelled&payment_id={CHECKOUT_ID}`,
+            // Redirect URLs: clean HTTPS URLs without inline placeholders.
+            // Nomod URL-validates these fields and `{` / `}` are not valid
+            // RFC 3986 characters, so the previous `?payment_id={CHECKOUT_ID}`
+            // pattern caused all three URLs to fail validation → 400 from
+            // Nomod. The mobile WebView intercepts these on `status` alone,
+            // and Nomod appends `&checkout_id=…` itself when redirecting.
+            successUrl: `${RETURN_URL_BASE}?status=success`,
+            failureUrl: `${RETURN_URL_BASE}?status=failure`,
+            cancelledUrl: `${RETURN_URL_BASE}?status=cancelled`,
             metadata: {
                 user_id: String(userId),
                 orderfrom: 'Mobile App',
