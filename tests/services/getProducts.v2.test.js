@@ -293,3 +293,193 @@ describe('backward compatibility', () => {
     await expect(getProducts({ page: '1', limit: '5' })).resolves.toMatchObject({ success: true });
   });
 });
+
+// ── multi-categoryId (comma-separated) ───────────────────────────────────────
+
+// Extended CATEGORY_TREE with a second root for multi-id tests
+const CATEGORY_TREE_MULTI = [
+  {
+    category_path: [
+      { id: 'cat-root', name: 'Electronics' },
+      { id: 'cat-child-1', name: 'Phones' },
+      { id: 'cat-child-2', name: 'Tablets' },
+    ],
+  },
+  {
+    category_path: [
+      { id: 'cat-other', name: 'Clothing' },
+      { id: 'cat-other-child', name: 'Tops' },
+    ],
+  },
+  {
+    category_path: [
+      { id: 'cat-second-root', name: 'Sports' },
+      { id: 'cat-second-child', name: 'Footwear' },
+    ],
+  },
+];
+
+describe('multi-categoryId: comma-separated two ids', () => {
+  beforeEach(() => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE_MULTI);
+  });
+
+  it('returns products from both subtrees when two ids are supplied', async () => {
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-second-child', discountedPrice: 200 },
+      { product_type_id: 'cat-other-child', discountedPrice: 300 },
+    ]);
+
+    const result = await getProducts({
+      page: '1',
+      limit: '10',
+      categoryId: 'cat-root,cat-second-root',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+    const typeIds = result.products.map((p) => p.product.product_type_id);
+    expect(typeIds).toContain('cat-child-1');
+    expect(typeIds).toContain('cat-second-child');
+    expect(typeIds).not.toContain('cat-other-child');
+  });
+});
+
+describe('multi-categoryId: three ids with one invalid', () => {
+  beforeEach(() => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE_MULTI);
+  });
+
+  it('unions valid ids and ignores the unresolvable one without error', async () => {
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-second-child', discountedPrice: 200 },
+    ]);
+
+    const result = await getProducts({
+      page: '1',
+      limit: '10',
+      categoryId: 'cat-root,GARBAGE_ID,cat-second-root',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+  });
+});
+
+describe('multi-categoryId: whitespace handling', () => {
+  beforeEach(() => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE_MULTI);
+  });
+
+  it('trims whitespace around each id', async () => {
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-second-child', discountedPrice: 200 },
+    ]);
+
+    const result = await getProducts({
+      page: '1',
+      limit: '10',
+      categoryId: '  cat-root , cat-second-root  ',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+  });
+});
+
+describe('multi-categoryId: empty entries dropped', () => {
+  beforeEach(() => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE_MULTI);
+  });
+
+  it('drops empty segments from comma-separated input', async () => {
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-second-child', discountedPrice: 200 },
+    ]);
+
+    const result = await getProducts({
+      page: '1',
+      limit: '10',
+      categoryId: 'cat-root,,cat-second-root',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+  });
+});
+
+describe('multi-categoryId: all ids resolve to nothing', () => {
+  beforeEach(() => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE_MULTI);
+  });
+
+  it('returns empty page (totalPages 0) without a 500 error', async () => {
+    await seed([{ discountedPrice: 100 }]);
+
+    const result = await getProducts({
+      page: '1',
+      limit: '10',
+      categoryId: 'NONE_1,NONE_2',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.products).toEqual([]);
+    expect(result.pagination.totalPages).toBe(0);
+    expect(result.pagination.totalProducts).toBe(0);
+  });
+});
+
+describe('multi-categoryId: single id regression', () => {
+  it('single id behavior is identical to before this change', async () => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE);
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-child-2', discountedPrice: 110 },
+      { product_type_id: 'cat-other', discountedPrice: 120 },
+    ]);
+
+    const result = await getProducts({ page: '1', limit: '10', categoryId: 'cat-root' });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+    const typeIds = result.products.map((p) => p.product.product_type_id);
+    expect(typeIds).not.toContain('cat-other');
+  });
+});
+
+describe('multi-categoryId: empty string behaves as no filter', () => {
+  it('returns full results when categoryId is an empty string', async () => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE);
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-other', discountedPrice: 200 },
+    ]);
+
+    const result = await getProducts({ page: '1', limit: '10', categoryId: '' });
+
+    expect(result.success).toBe(true);
+    expect(result.pagination.totalProducts).toBe(2);
+  });
+});
+
+describe('multi-categoryId: dedup (same id twice)', () => {
+  it('treats categoryId=ID_A,ID_A identically to categoryId=ID_A', async () => {
+    mockFetchAndCacheCategories.mockResolvedValue(CATEGORY_TREE);
+    await seed([
+      { product_type_id: 'cat-child-1', discountedPrice: 100 },
+      { product_type_id: 'cat-other', discountedPrice: 200 },
+    ]);
+
+    const singleResult = await getProducts({ page: '1', limit: '10', categoryId: 'cat-root' });
+    const dedupResult = await getProducts({ page: '1', limit: '10', categoryId: 'cat-root,cat-root' });
+
+    expect(dedupResult.pagination.totalProducts).toBe(singleResult.pagination.totalProducts);
+    const singleIds = singleResult.products.map((p) => p._id.toString()).sort();
+    const dedupIds = dedupResult.products.map((p) => p._id.toString()).sort();
+    expect(dedupIds).toEqual(singleIds);
+  });
+});

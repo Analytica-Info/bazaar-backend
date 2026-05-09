@@ -69,17 +69,25 @@ async function getProducts(query) {
   const minPrice = parseFloat(query.minPrice);
   const maxPrice = parseFloat(query.maxPrice);
   const sortSpec = buildSortSpec(query.sort);
-  const categoryId = query.categoryId;
+  // Parse comma-separated categoryId(s): "ID_A,ID_B" → ['ID_A', 'ID_B']
+  const rawCategoryId = query.categoryId;
+  const rootCategoryIds = rawCategoryId
+    ? rawCategoryId.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
 
   // ── categoryId resolution ─────────────────────────────────────────────────
   let uniqueCategoryIds = null; // null means "no filter"; [] means "resolved to nothing"
-  if (categoryId) {
-    try {
-      uniqueCategoryIds = await resolveCategoryDescendants(categoryId);
-    } catch (err) {
-      logger.error({ err }, 'Error resolving category descendants:');
-      uniqueCategoryIds = [];
+  if (rootCategoryIds.length > 0) {
+    const unionSet = new Set();
+    for (const rootId of rootCategoryIds) {
+      try {
+        const descendants = await resolveCategoryDescendants(rootId);
+        descendants.forEach((id) => unionSet.add(id));
+      } catch (err) {
+        logger.error({ err }, 'Error resolving category descendants:');
+      }
     }
+    uniqueCategoryIds = [...unionSet];
 
     if (uniqueCategoryIds.length === 0) {
       return {
