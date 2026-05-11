@@ -789,7 +789,10 @@ exports.verifyCardPayment = async (req, res) => {
 exports.verifyTabbyPayment = async (req, res) => {
   try {
     const { paymentId, bankPromoId } = req.body;
-    const user_id = req.user._id;
+    // BUG-004: req.user may be undefined when customer returns from Tabby
+    // after session expiry. Optional-chain prevents the TypeError that
+    // would 500 the verify endpoint and orphan the order.
+    const user_id = req.user?._id;
     const result = await checkoutService.verifyTabbyPayment(paymentId, user_id, bankPromoId);
     return res.json(result);
   } catch (error) {
@@ -854,7 +857,13 @@ exports.checkout = async (req, res) => {
 
 exports.tabbyWebhook = async (req, res) => {
   try {
-    const user_id = req.user._id;
+    // BUG-003: Tabby webhook is called by Tabby's server, not by an
+    // authenticated user — req.user is undefined. Optional-chain prevents
+    // a TypeError that 500s the webhook and causes Tabby to give up on
+    // delivering payment confirmations. Downstream createOrderAndSendEmails
+    // has a fallback that uses payment.buyer.name/email when user_id is
+    // undefined, so the order is still created from Tabby's payment record.
+    const user_id = req.user?._id;
     const forwardedIps = (req.headers["x-forwarded-for"] || "").split(",");
     const clientIP = forwardedIps[0]?.trim() || req.socket.remoteAddress;
     const secret = req.headers["x-webhook-secret"];
