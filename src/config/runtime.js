@@ -220,6 +220,44 @@ const config = Object.freeze({
   },
 
   /**
+   * Nomod staging amount override — triple-gated, NEVER active in production.
+   *
+   * Nomod has no sandbox environment. This override lets the staging team test
+   * the full Nomod checkout end-to-end by charging a fixed small amount (e.g.
+   * 1 AED) regardless of cart value, avoiding real money waste on every test.
+   *
+   * ALL THREE gates must hold simultaneously for the override to activate:
+   *   1. NOMOD_ALLOW_AMOUNT_OVERRIDE === 'true'  (literal string, not truthy)
+   *   2. NODE_ENV !== 'production'               (unconditional production lock)
+   *   3. NOMOD_STAGING_AMOUNT_OVERRIDE_AED is a positive finite number
+   *
+   * If any single gate fails, stagingAmountOverrideAed resolves to null and
+   * the code path is entirely bypassed — production behaviour is unchanged.
+   *
+   * Readability over DRY: the multi-gate logic is deliberately explicit so each
+   * gate is independently verifiable in code review and in the test suite.
+   */
+  nomodOverride: {
+    stagingAmountOverrideAed: (() => {
+      // Gate 1: explicit opt-in flag — must be the literal string 'true'.
+      // 'false', '1', 'yes', 'TRUE', or any other truthy value does NOT activate.
+      const allowFlag = process.env.NOMOD_ALLOW_AMOUNT_OVERRIDE === 'true';
+
+      // Gate 2: production lock — unconditional. Even if gate 1 is true,
+      // NODE_ENV=production always resolves to null. This cannot be overridden
+      // by any other env var combination.
+      const notProd = process.env.NODE_ENV !== 'production';
+
+      if (!allowFlag || !notProd) return null;
+
+      // Gate 3: amount must parse to a positive finite number.
+      // NaN, Infinity, 0, and negatives are all rejected.
+      const parsed = Number(process.env.NOMOD_STAGING_AMOUNT_OVERRIDE_AED);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    })(),
+  },
+
+  /**
    * Mobile version gate.
    * Read by src/middleware/versionGate.js.
    */

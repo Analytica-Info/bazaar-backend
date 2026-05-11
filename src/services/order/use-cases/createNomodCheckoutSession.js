@@ -13,6 +13,7 @@ const PendingPayment = require('../../../repositories').pendingPayments.rawModel
 const { logBackendActivity } = require('../../../utilities/backendLogger');
 const logger = require('../../../utilities/logger');
 const clock = require('../../../utilities/clock');
+const runtimeConfig = require('../../../config/runtime');
 
 const RETURN_URL_BASE =
     process.env.NOMOD_RETURN_URL_BASE ||
@@ -63,20 +64,48 @@ module.exports = async function createNomodCheckoutSession(userId, bodyData, met
 
     const referenceId = `mobile-${userId}-${clock.nowMs()}`;
 
+    // ── Staging amount override (triple-gated — see src/config/runtime.js) ────
+    // overrideAed is null in production and when the override gates are not met.
+    // When non-null, we charge a fixed small amount instead of the real cart total
+    // so the team can test Nomod end-to-end on staging without burning real money.
+    // CRITICAL: when overrideAed is null, every variable below is identical to
+    // what existed before this change — byte-for-byte same provider call and DB doc.
+    const overrideAed = runtimeConfig.nomodOverride.stagingAmountOverrideAed;
+    const realTotal = Number(total);
+    const chargeAmount = overrideAed != null ? overrideAed : realTotal;
+
+    if (overrideAed != null) {
+        // Structured warn so ops can grep for "OVERRIDE" in the log stream.
+        await logBackendActivity({
+            platform: 'Mobile App Backend',
+            activity_name: 'Nomod Staging OVERRIDE',
+            status: 'warning',
+            message: `[Nomod] STAGING AMOUNT OVERRIDE active — real cart total: ${realTotal} AED → charging ${overrideAed} AED instead`,
+            execution_path: 'orderService.createNomodCheckoutSession (staging-override)',
+        });
+    }
+
+    // When the override is active, send a single synthetic line item so that
+    // Nomod's server-side line-item sum reconciles with the charged amount.
+    // When the override is inactive, the original cart items are used unchanged.
+    const checkoutItems = overrideAed != null
+        ? [{ id: 'staging-test', name: 'Staging test charge', quantity: 1, price: overrideAed }]
+        : cartData.map((item, idx) => ({
+            id: item.variantId || item.id || `item-${idx + 1}`,
+            name: item.name || 'Product',
+            quantity: item.qty ?? 1,
+            price: item.price,
+          }));
+
     const provider = PaymentProviderFactory.create('nomod');
     let checkout;
     try {
         checkout = await provider.createCheckout({
             referenceId,
-            amount: Number(total),
+            amount: chargeAmount,
             currency: (currency || 'AED').toUpperCase(),
             discount: Number(discountAmount) || 0,
-            items: cartData.map((item, idx) => ({
-                id: item.variantId || item.id || `item-${idx + 1}`,
-                name: item.name || 'Product',
-                quantity: item.qty ?? 1,
-                price: item.price,
-            })),
+            items: checkoutItems,
             shippingCost: Number(shippingCost) || 0,
             // Redirect URLs: clean HTTPS URLs without inline placeholders.
             // Nomod URL-validates these fields and `{` / `}` are not valid
@@ -116,7 +145,15 @@ module.exports = async function createNomodCheckoutSession(userId, bodyData, met
         payment_method: 'nomod',
         order_data: {
             cartData,
-            total,
+            // Store the charged amount as `total` so verifyNomodPayment can compare
+            // Nomod's reported amount against what was actually sent to the provider.
+            // When the override is active this is the override amount; when inactive
+            // it is the real cart total — identical to the previous behaviour.
+            total: chargeAmount,
+            // Preserve the original cart total for audit and ops dashboards.
+            real_total_at_creation: realTotal,
+            // Boolean flag so ops / support can identify override-affected records.
+            staging_amount_override: overrideAed != null,
             sub_total,
             currency,
             discountAmount,

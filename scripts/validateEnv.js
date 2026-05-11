@@ -84,6 +84,10 @@ const TUNABLE_GROUPS = {
     'RECONCILER_BATCH_SIZE',
     'RECONCILER_LOCK_TTL_SECONDS',
   ],
+  'nomod-staging-override': [
+    'NOMOD_ALLOW_AMOUNT_OVERRIDE',
+    'NOMOD_STAGING_AMOUNT_OVERRIDE_AED',
+  ],
 };
 
 // ── Pure validation function ──────────────────────────────────────────────────
@@ -126,6 +130,20 @@ function validate(env) {
       }
     }
   }
+
+  // Nomod staging override — resolved state report.
+  // Ops can run `node scripts/validateEnv.js` to confirm the override is active
+  // or inactive without restarting the backend. All three gates are shown.
+  lines.push('# Nomod staging override');
+  const allowFlag = env.NOMOD_ALLOW_AMOUNT_OVERRIDE === 'true';
+  const notProd = env.NODE_ENV !== 'production';
+  const parsedAmount = Number(env.NOMOD_STAGING_AMOUNT_OVERRIDE_AED);
+  const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const overrideActive = allowFlag && notProd && validAmount;
+  lines.push(`  gate-1 NOMOD_ALLOW_AMOUNT_OVERRIDE === 'true' : ${allowFlag ? 'PASS' : 'FAIL'} (value: ${env.NOMOD_ALLOW_AMOUNT_OVERRIDE ?? 'unset'})`);
+  lines.push(`  gate-2 NODE_ENV !== 'production'              : ${notProd ? 'PASS' : 'FAIL'} (value: ${env.NODE_ENV ?? 'unset'})`);
+  lines.push(`  gate-3 NOMOD_STAGING_AMOUNT_OVERRIDE_AED > 0  : ${validAmount ? 'PASS' : 'FAIL'} (value: ${env.NOMOD_STAGING_AMOUNT_OVERRIDE_AED ?? 'unset'})`);
+  lines.push(`  => override ACTIVE: ${overrideActive ? `YES — every Nomod checkout will charge ${parsedAmount} AED` : 'NO — normal cart totals used'}`);
 
   return { ok, lines };
 }

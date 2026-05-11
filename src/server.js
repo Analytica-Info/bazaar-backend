@@ -38,6 +38,19 @@ for (const key of REQUIRED_ENV) {
   }
 }
 
+// Nomod staging override — warn loudly at boot so the state is visible before
+// any request is served. Monitoring should alert if this is true in production
+// (it cannot be, given the triple-gate, but belt-and-suspenders alerting helps).
+if (runtimeConfig.nomodOverride.stagingAmountOverrideAed != null) {
+  logger.warn(
+    {
+      override: runtimeConfig.nomodOverride.stagingAmountOverrideAed,
+      nodeEnv: process.env.NODE_ENV,
+    },
+    `[Nomod] STAGING AMOUNT OVERRIDE ACTIVE: every Nomod checkout will be charged ${runtimeConfig.nomodOverride.stagingAmountOverrideAed.toFixed(2)} AED regardless of cart value`
+  );
+}
+
 // Ecommerce server controllers (inline routes)
 const { tabbyWebhook: ecommerceTabbyWebhook } = require("./controllers/ecommerce/publicController");
 const stripeWebhookController = require("./controllers/webhooks/stripeWebhookController");
@@ -252,6 +265,10 @@ app.get("/healthz", (req, res) => {
 
 // Readiness probe — 200 only when the process is fully ready to serve traffic.
 // Returns 503 when MongoDB is not connected (readyState !== 1).
+// nomodStagingOverride: true means every Nomod checkout charges a fixed staging
+// amount. Monitoring should alert if this is true in production (the triple-gate
+// makes it structurally impossible, but the flag provides belt-and-suspenders
+// observability for SREs).
 app.get("/readyz", (req, res) => {
   const dbState = mongoose.connection.readyState;
   const ready = dbState === 1;
@@ -260,6 +277,7 @@ app.get("/readyz", (req, res) => {
     checks: {
       mongodb: { state: dbState, connected: ready },
     },
+    nomodStagingOverride: runtimeConfig.nomodOverride.stagingAmountOverrideAed != null,
   });
 });
 

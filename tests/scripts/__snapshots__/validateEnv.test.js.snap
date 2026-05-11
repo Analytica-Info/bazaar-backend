@@ -54,5 +54,13 @@ exports[`validate() — representative output snapshot matches snapshot for a ty
   "  . RECONCILER_LOOKBACK_MINUTES = default",
   "  . RECONCILER_BATCH_SIZE = default",
   "  . RECONCILER_LOCK_TTL_SECONDS = default",
+  "# Tunables — nomod-staging-override",
+  "  . NOMOD_ALLOW_AMOUNT_OVERRIDE = default",
+  "  . NOMOD_STAGING_AMOUNT_OVERRIDE_AED = default",
+  "# Nomod staging override",
+  "  gate-1 NOMOD_ALLOW_AMOUNT_OVERRIDE === 'true' : FAIL (value: unset)",
+  "  gate-2 NODE_ENV !== 'production'              : PASS (value: unset)",
+  "  gate-3 NOMOD_STAGING_AMOUNT_OVERRIDE_AED > 0  : FAIL (value: unset)",
+  "  => override ACTIVE: NO — normal cart totals used",
 ]
 `;
