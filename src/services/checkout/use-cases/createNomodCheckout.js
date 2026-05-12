@@ -15,6 +15,7 @@ const PaymentProviderFactory = require('../../payments/PaymentProviderFactory');
 const { resolveCheckoutDiscountAED } = require('../domain/discountResolver');
 const logger = require('../../../utilities/logger');
 const clock = require('../../../utilities/clock');
+const runtimeConfig = require('../../../config/runtime');
 
 /**
  * @param {object} req - Express request object
@@ -38,26 +39,46 @@ async function createNomodCheckout(req) {
       cartData, bankPromoId, discountPercent, discountAmount, capAED,
     });
 
-    const totalAmount = Math.round((subtotalAmount - discountAED + Number(shippingCost || 0)) * 100) / 100;
+    const realTotalAmount = Math.round((subtotalAmount - discountAED + Number(shippingCost || 0)) * 100) / 100;
+
+    // ── Staging amount override (triple-gated — see src/config/runtime.js) ────
+    // Null in production and when gates are not met. When non-null, charge a
+    // fixed small amount instead of the real cart total so the team can test
+    // Nomod end-to-end on staging without burning real money.
+    const overrideAed = runtimeConfig.nomodOverride.stagingAmountOverrideAed;
+    const totalAmount = overrideAed != null ? overrideAed : realTotalAmount;
+
+    if (overrideAed != null) {
+      logger.warn(
+        { realTotalAmount, chargeAmount: overrideAed, userId },
+        '[Nomod] STAGING AMOUNT OVERRIDE active (website) — charging override AED instead of real cart total',
+      );
+    }
 
     const cartDataEntry = await CartData.create({ cartData });
     const cartDataId = cartDataEntry._id;
 
     const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || process.env.URL || 'https://bazaar-uae.com';
 
+    // When the override is active, send a single synthetic line item so Nomod's
+    // server-side line-item sum reconciles with the charged amount.
+    const checkoutItems = overrideAed != null
+      ? [{ id: 'staging-test', name: 'Staging test charge', quantity: 1, price: overrideAed }]
+      : cartData.map(item => ({
+          id: item.variantId || item.id || item.product_id,
+          name: item.name || 'Product',
+          quantity: item.qty || 1,
+          price: item.price,
+        }));
+
     const provider = PaymentProviderFactory.create('nomod');
     const checkout = await provider.createCheckout({
       referenceId: `${userId}-${clock.nowMs()}`,
       amount: totalAmount,
       currency,
-      discount: discountAED,
-      items: cartData.map(item => ({
-        id: item.variantId || item.id || item.product_id,
-        name: item.name || 'Product',
-        quantity: item.qty || 1,
-        price: item.price,
-      })),
-      shippingCost: Number(shippingCost || 0),
+      discount: overrideAed != null ? 0 : discountAED,
+      items: checkoutItems,
+      shippingCost: overrideAed != null ? 0 : Number(shippingCost || 0),
       customer: { name, phone },
       successUrl: successUrl || `${FRONTEND_BASE_URL}/success`,
       failureUrl: failureUrl || `${FRONTEND_BASE_URL}/failed`,
@@ -93,7 +114,15 @@ async function createNomodCheckout(req) {
         buildingName, floorNo, apartmentNo, landmark, currency,
         discountPercent, discountAmount: discountAED, couponCode,
         mobileNumber, saved_total, bankPromoId,
-        subtotalAmount, totalAmount, cartDataId: String(cartDataId),
+        subtotalAmount,
+        // When the staging override is active, totalAmount stores the charged
+        // amount so verifyNomodPayment reconciliation matches what was sent to
+        // Nomod. real_total_at_creation preserves the original cart total for
+        // audit. staging_amount_override flags affected records for ops.
+        totalAmount,
+        real_total_at_creation: realTotalAmount,
+        staging_amount_override: overrideAed != null,
+        cartDataId: String(cartDataId),
       },
       status: 'pending',
       orderfrom: 'Website',
