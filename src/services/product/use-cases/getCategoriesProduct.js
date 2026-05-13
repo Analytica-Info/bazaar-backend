@@ -2,9 +2,13 @@
 
 const Product = require('../../../repositories').products.rawModel();
 const logger = require('../../../utilities/logger');
+const cache = require('../../../utilities/cache');
+const runtimeConfig = require('../../../config/runtime');
 const { fetchAndCacheCategories, fetchCategoriesType } = require('../adapters/cache');
 const { LIST_EXCLUDE_SELECT } = require('../domain/projections');
 const { logStatusFalseItems } = require('../domain/statusLogger');
+
+const SMART_CAT_TTL = runtimeConfig.cache.smartCategoryTtl;
 
 /**
  * Products by category (with pagination)
@@ -18,8 +22,23 @@ async function getCategoriesProduct(categoryId, query) {
   const page = parseInt(query?.page) || 1;
   const limit = parseInt(query?.limit) || 20;
 
+  // Do not cache when categoryId is absent — the result depends on a required discriminator.
+  if (!categoryId) {
+    return _fetchCategoriesProduct(categoryId, page, limit);
+  }
+
+  const cacheKey = cache.key('catalog', 'categories-product', categoryId, `p${page}`, `l${limit}`, 'v1');
+  return cache.getOrSet(cacheKey, SMART_CAT_TTL, () => _fetchCategoriesProduct(categoryId, page, limit));
+}
+
+/**
+ * Inner implementation — executes the Mongo queries.
+ * Called directly when caching is bypassed, or via cache.getOrSet otherwise.
+ */
+async function _fetchCategoriesProduct(categoryId, page, limit) {
   try {
     let categories = await fetchAndCacheCategories();
+
     const categoriesTypes = await fetchCategoriesType(categoryId);
 
     // Build the list of category IDs that are descendants of `categoryId`
