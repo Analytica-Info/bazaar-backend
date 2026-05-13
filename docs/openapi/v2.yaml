@@ -96,6 +96,47 @@ components:
 # ─────────────────────────────────────────────────────────────────────────────
   schemas:
 
+    # ── Home manifest ────────────────────────────────────────────────────────
+
+    HomeRail:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, empty, error]
+        data:
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        ttl:
+          type: integer
+
+    HomeManifest:
+      type: object
+      properties:
+        version:
+          type: integer
+        platform:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        rails:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeRail'
+
+    HomeManifestResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/HomeManifest'
+
     # ── Envelope ────────────────────────────────────────────────────────────
 
     Envelope:
@@ -2439,6 +2480,43 @@ paths:
           $ref: '#/components/responses/404NotFound'
         '422':
           $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Home manifest — single ETag-cached round-trip replacing 8–10 parallel reqs
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /home:
+    get:
+      operationId: homeGetManifest
+      tags: [Home]
+      summary: Home screen manifest
+      description: >
+        Returns all home-screen rails in a single cacheable response.
+        Supports `If-None-Match` / ETag conditional GETs for 304 Not Modified.
+      parameters:
+        - name: rails
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated list of rail names to include. Defaults to all enabled for the platform.
+        - name: params
+          in: query
+          required: false
+          schema:
+            type: string
+          description: JSON-encoded per-rail param overrides, e.g. `{"new-arrivals":{"limit":20}}`.
+      responses:
+        '200':
+          description: Home manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeManifestResponse'
+        '304':
+          description: Not Modified — client cache is still valid
         '500':
           $ref: '#/components/responses/500Internal'
 

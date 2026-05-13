@@ -9,8 +9,12 @@ const createUpload = require('../../../utilities/fileUpload');
 
 const productCtrl = require('../../../controllers/v2/shared/productController');
 const wishlistCtrl = require('../../../controllers/v2/shared/wishlistController');
+const homeCtrl = require('../../../controllers/v2/shared/homeController');
 
 const reviewUpload = createUpload(/jpeg|jpg|png|pdf/, 'uploads/users');
+
+// ── Home manifest ──────────────────────────────────────────────────
+router.get('/home', homeCtrl.getHomeManifest);
 
 // ── Products ──────────────────────────────────────────────────────
 router.get('/products/categories', productCtrl.getCategories);

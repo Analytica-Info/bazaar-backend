@@ -72,6 +72,9 @@ const config = Object.freeze({
     /** Max-discount metric cached after a full product sync */
     maxDiscountTtl:     envInt('CACHE_TTL_MAX_DISCOUNT',    21600),  // 6 h
 
+    /** Home manifest endpoint — single-blob cache for all rails combined */
+    homeManifestTtl:    envInt('CACHE_TTL_HOME_MANIFEST',       60),
+
     /** Webhook dedup lock — short, prevents double-processing a burst */
     webhookDedupTtl:    envInt('CACHE_TTL_WEBHOOK_DEDUP',       3),
 
