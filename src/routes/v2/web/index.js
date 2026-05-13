@@ -49,6 +49,8 @@ router.post('/orders/address', auth.required(), orderCtrl.storeAddress);
 router.delete('/orders/address/:addressId', auth.required(), orderCtrl.deleteAddress);
 router.patch('/orders/address/:addressId/set-primary', auth.required(), orderCtrl.setPrimaryAddress);
 router.post('/orders/validate-inventory', auth.required(), orderCtrl.validateInventory);
+router.post('/orders/checkout/nomod', auth.required(), orderCtrl.checkoutNomod);
+router.post('/orders/verify/nomod', auth.required(), orderCtrl.verifyNomod);
 
 // ── Cart ──────────────────────────────────────────────────────────
 router.get('/cart', auth.required(), cartCtrl.getCart);

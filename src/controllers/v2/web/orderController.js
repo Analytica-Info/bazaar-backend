@@ -2,6 +2,7 @@
  * V2 Web Order Controller (BFF layer)
  */
 const orderService = require('../../../services/orderService');
+const checkoutService = require('../../../services/checkoutService');
 const { wrap } = require('../_shared/responseEnvelope');
 const { asyncHandler } = require('../../../middleware');
 
@@ -37,4 +38,20 @@ exports.validateInventory = asyncHandler(async (req, res) => {
     const { products } = req.body;
     const result = await orderService.validateInventoryBeforeCheckout(products, req.user, 'Web');
     return res.status(200).json(wrap({ isValid: result.isValid, results: result.results }, result.message));
+});
+
+exports.checkoutNomod = asyncHandler(async (req, res) => {
+    const result = await checkoutService.createNomodCheckout(req);
+    return res.status(200).json(wrap(
+        { checkoutId: result.checkout_id, checkoutUrl: result.checkout_url, status: result.status },
+        'Checkout session created'
+    ));
+});
+
+exports.verifyNomod = asyncHandler(async (req, res) => {
+    const result = await checkoutService.verifyNomodPayment(req);
+    return res.status(200).json(wrap(
+        { orderId: result.orderId || null },
+        result.message
+    ));
 });

@@ -2226,6 +2226,56 @@ paths:
           $ref: '#/components/responses/401Unauthorized'
         '500':
           $ref: '#/components/responses/500Internal'
+    post:
+      operationId: ordersVerifyNomodWeb
+      tags: [Orders]
+      summary: Verify Nomod payment and create order (web)
+      description: |
+        Called after the user returns from the Nomod payment page.
+        **Web-only** — send `X-Client: web`. Reads `paymentId` from the request body.
+        On success creates the order and returns the new `orderId`. Returns
+        `orderId: null` with message `"Order already created"` if the payment was
+        already processed (dedup).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientWeb'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentId]
+              properties:
+                paymentId:
+                  type: string
+                  description: Nomod checkout/payment ID returned by the checkout session
+      responses:
+        '200':
+          description: Payment verified and order created (or already existed).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderId:
+                            type: string
+                            nullable: true
+                      message:
+                        type: string
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
 
   /orders/stripe/init:
     post:

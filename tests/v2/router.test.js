@@ -62,7 +62,7 @@ jest.mock("../../src/controllers/v2/mobile/orderController", () =>
   stubAll(["getOrders", "validateInventory", "checkoutStripe", "checkoutTabby", "verifyTabby", "checkoutNomod", "verifyNomod", "initStripePayment", "getPaymentMethods", "getAddress", "storeAddress", "deleteAddress", "setPrimaryAddress", "updateOrderStatus"])
 );
 jest.mock("../../src/controllers/v2/web/orderController", () =>
-  stubAll(["getAddress", "storeAddress", "deleteAddress", "setPrimaryAddress", "validateInventory"])
+  stubAll(["getAddress", "storeAddress", "deleteAddress", "setPrimaryAddress", "validateInventory", "checkoutNomod", "verifyNomod"])
 );
 jest.mock("../../src/controllers/v2/mobile/cartController", () =>
   stubAll(["getCart", "addToCart", "removeFromCart", "increaseQty", "decreaseQty"])
