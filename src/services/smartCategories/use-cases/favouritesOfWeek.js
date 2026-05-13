@@ -2,9 +2,9 @@
 
 const cache = require('../../../utilities/cache');
 const runtimeConfig = require('../../../config/runtime');
-const { buildOrderDerivedRail } = require('./buildOrderDerivedRail');
+const { buildOrderDerivedList } = require('./buildOrderDerivedList');
 
-// 7 days expressed in hours so buildOrderDerivedRail can use the shared MS_PER_HOUR constant
+// 7 days expressed in hours so buildOrderDerivedList can use the shared MS_PER_HOUR constant
 const SEVEN_DAYS_IN_HOURS = 7 * 24;
 
 /**
@@ -19,7 +19,7 @@ const SEVEN_DAYS_IN_HOURS = 7 * 24;
  * Early exit  : returns { status:false, count:0, products:[] } when no sold products found
  */
 async function favouritesOfWeek() {
-    return buildOrderDerivedRail({
+    return buildOrderDerivedList({
         cacheKey: cache.key('catalog', 'favourites-of-week', 'v1'),
         ttlSeconds: runtimeConfig.cache.smartCategoryTtl,
         windowHours: SEVEN_DAYS_IN_HOURS,
@@ -27,8 +27,8 @@ async function favouritesOfWeek() {
         primarySort: 'sold-desc',
         secondarySort: 'discount-desc',
         productMatch: { totalQty: { $gt: 0 } },
-        preSliceCount: 20,
-        requireSoldProducts: true,
+        maxOrderDerivedCandidates: 20,
+        failWhenNoSales: true,
     });
 }
 

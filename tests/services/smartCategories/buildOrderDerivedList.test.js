@@ -1,5 +1,5 @@
 /**
- * tests/services/smartCategories/buildOrderDerivedRail.test.js
+ * tests/services/smartCategories/buildOrderDerivedList.test.js
  *
  * Integration tests for the parameterised order-derived rail builder.
  * Uses MongoMemoryServer (via tests/setup.js) so every test gets a clean DB.
@@ -19,7 +19,7 @@ jest.mock('../../../src/utilities/cache', () => ({
     key: (...parts) => parts.join(':'),
 }));
 
-const { buildOrderDerivedRail } = require('../../../src/services/smartCategories/use-cases/buildOrderDerivedRail');
+const { buildOrderDerivedList } = require('../../../src/services/smartCategories/use-cases/buildOrderDerivedList');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,7 +68,7 @@ afterEach(() => clock.resetClock());
 // windowHours — OrderDetail time filter
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — windowHours filters OrderDetails', () => {
+describe('buildOrderDerivedList — windowHours filters OrderDetails', () => {
     it('excludes orders older than windowHours', async () => {
         const product = await makeProduct();
         const productId = product.product.id;
@@ -80,7 +80,7 @@ describe('buildOrderDerivedRail — windowHours filters OrderDetails', () => {
         const oldDate = new Date(now.getTime() - 200 * 60 * 60 * 1000);
         await makeOrderDetail(productId, 5, oldDate);
 
-        const result = await buildOrderDerivedRail({ ...BASE_OPTS, windowHours: 72 });
+        const result = await buildOrderDerivedList({ ...BASE_OPTS, windowHours: 72 });
 
         // The old order should NOT pull the product into the order-derived list.
         // Result still defined (random fallback may include it), but the test
@@ -101,13 +101,13 @@ describe('buildOrderDerivedRail — windowHours filters OrderDetails', () => {
         const recentDate = new Date(now.getTime() - 10 * 60 * 60 * 1000);
         await makeOrderDetail(productId, 3, recentDate);
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
             windowHours: 72,
-            requireSoldProducts: true,
+            failWhenNoSales: true,
         });
 
-        // requireSoldProducts=true would return early if nothing matched — so
+        // failWhenNoSales=true would return early if nothing matched — so
         // a non-empty (or even empty-but-status-false) result proves the branch ran.
         expect(result).toBeDefined();
         // products is always an array
@@ -116,14 +116,14 @@ describe('buildOrderDerivedRail — windowHours filters OrderDetails', () => {
 });
 
 // ---------------------------------------------------------------------------
-// requireSoldProducts — early exit
+// failWhenNoSales — early exit
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — requireSoldProducts early exit', () => {
+describe('buildOrderDerivedList — failWhenNoSales early exit', () => {
     it('returns { status:false, count:0, products:[] } when no orders in window', async () => {
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
-            requireSoldProducts: true,
+            failWhenNoSales: true,
         });
 
         expect(result.status).toBe(false);
@@ -131,10 +131,10 @@ describe('buildOrderDerivedRail — requireSoldProducts early exit', () => {
         expect(result.products).toEqual([]);
     });
 
-    it('does NOT early-exit when requireSoldProducts is false', async () => {
-        const result = await buildOrderDerivedRail({
+    it('does NOT early-exit when failWhenNoSales is false', async () => {
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
-            requireSoldProducts: false,
+            failWhenNoSales: false,
         });
 
         // Falls through to $sample — may return empty or non-empty depending on DB
@@ -147,7 +147,7 @@ describe('buildOrderDerivedRail — requireSoldProducts early exit', () => {
 // primarySort + secondarySort ordering
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — sort ordering', () => {
+describe('buildOrderDerivedList — sort ordering', () => {
     it('sorts discount-desc when primarySort=discount-desc', async () => {
         const now = new Date('2026-05-01T12:00:00Z');
         clock.setClock({ now: () => now, nowMs: () => now.getTime() });
@@ -161,7 +161,7 @@ describe('buildOrderDerivedRail — sort ordering', () => {
         await makeOrderDetail(pHigh.product.id, 1, recentDate);
         await makeOrderDetail(pLow.product.id, 1, recentDate);
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
             windowHours: 24,
             primarySort: 'discount-desc',
@@ -192,7 +192,7 @@ describe('buildOrderDerivedRail — sort ordering', () => {
         await makeOrderDetail(pMostSold.product.id, 10, recentDate);
         await makeOrderDetail(pLeastSold.product.id, 1, recentDate);
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
             windowHours: 24,
             primarySort: 'sold-desc',
@@ -208,15 +208,15 @@ describe('buildOrderDerivedRail — sort ordering', () => {
 // $sample fallback
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — $sample fallback', () => {
-    it('falls back to random products when no orders exist and requireSoldProducts=false', async () => {
+describe('buildOrderDerivedList — $sample fallback', () => {
+    it('falls back to random products when no orders exist and failWhenNoSales=false', async () => {
         // No orders — but there are products in DB
         await makeProduct({ totalQty: 5, status: true });
         await makeProduct({ totalQty: 3, status: true });
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
-            requireSoldProducts: false,
+            failWhenNoSales: false,
             sliceCount: 10,
         });
 
@@ -236,10 +236,10 @@ describe('buildOrderDerivedRail — $sample fallback', () => {
 
         await makeOrderDetail(product.product.id, 2, recentDate);
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
             windowHours: 24,
-            requireSoldProducts: false,
+            failWhenNoSales: false,
             sliceCount: 10,
         });
 
@@ -254,14 +254,14 @@ describe('buildOrderDerivedRail — $sample fallback', () => {
 // cacheKey is respected (passed through to cache.getOrSet)
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — cacheKey', () => {
+describe('buildOrderDerivedList — cacheKey', () => {
     it('uses the provided cacheKey', async () => {
         // The module-level jest.mock already wraps cache.getOrSet with a transparent
         // pass-through.  We spy on the mocked module to capture the key argument.
         const cacheModule = require('../../../src/utilities/cache');
         const spy = jest.spyOn(cacheModule, 'getOrSet');
 
-        await buildOrderDerivedRail({
+        await buildOrderDerivedList({
             cacheKey: 'catalog:my-custom-key:v2',
             ttlSeconds: 300,
             windowHours: 48,
@@ -276,16 +276,16 @@ describe('buildOrderDerivedRail — cacheKey', () => {
 // sliceCount — respects final length cap
 // ---------------------------------------------------------------------------
 
-describe('buildOrderDerivedRail — sliceCount', () => {
+describe('buildOrderDerivedList — sliceCount', () => {
     it('never returns more products than sliceCount', async () => {
         // Create many products to populate $sample fallback
         for (let i = 0; i < 20; i++) {
             await makeProduct({ totalQty: 3, status: true });
         }
 
-        const result = await buildOrderDerivedRail({
+        const result = await buildOrderDerivedList({
             ...BASE_OPTS,
-            requireSoldProducts: false,
+            failWhenNoSales: false,
             sliceCount: 5,
         });
 

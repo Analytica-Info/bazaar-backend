@@ -2,7 +2,7 @@
 
 const cache = require('../../../utilities/cache');
 const runtimeConfig = require('../../../config/runtime');
-const { buildOrderDerivedRail } = require('./buildOrderDerivedRail');
+const { buildOrderDerivedList } = require('./buildOrderDerivedList');
 
 /**
  * Get today's deal products.
@@ -14,7 +14,7 @@ const { buildOrderDerivedRail } = require('./buildOrderDerivedRail');
  * Cache key   : catalog:today-deal:v1
  */
 async function todayDeal() {
-    return buildOrderDerivedRail({
+    return buildOrderDerivedList({
         cacheKey: cache.key('catalog', 'today-deal', 'v1'),
         ttlSeconds: runtimeConfig.cache.smartCategoryTtl,
         windowHours: 72,
@@ -22,7 +22,7 @@ async function todayDeal() {
         primarySort: 'discount-desc',
         secondarySort: 'sold-desc',
         productMatch: { totalQty: { $gt: 0 } },
-        requireSoldProducts: false,
+        failWhenNoSales: false,
     });
 }
 

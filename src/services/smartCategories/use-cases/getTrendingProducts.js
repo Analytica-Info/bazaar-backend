@@ -2,7 +2,7 @@
 
 const cache = require('../../../utilities/cache');
 const runtimeConfig = require('../../../config/runtime');
-const { buildOrderDerivedRail } = require('./buildOrderDerivedRail');
+const { buildOrderDerivedList } = require('./buildOrderDerivedList');
 
 /**
  * Get trending products based on recent sales.
@@ -17,14 +17,14 @@ const { buildOrderDerivedRail } = require('./buildOrderDerivedRail');
  * @param {number} opts.timeWindowHours - 72 for ecommerce, 100 for mobile
  */
 async function getTrendingProducts({ timeWindowHours }) {
-    return buildOrderDerivedRail({
+    return buildOrderDerivedList({
         cacheKey: cache.key('catalog', 'trending', `w${timeWindowHours}`, 'v1'),
         ttlSeconds: runtimeConfig.cache.smartCategoryTtl,
         windowHours: timeWindowHours,
         sliceCount: 10,
         primarySort: 'sold-desc',
         secondarySort: null,
-        requireSoldProducts: true,
+        failWhenNoSales: true,
     });
 }
 

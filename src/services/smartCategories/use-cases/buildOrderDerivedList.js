@@ -15,7 +15,7 @@ const { MS_PER_HOUR } = require('../../../config/constants/time');
  *   2. Product.find by those IDs (with optional productMatch filter).
  *   3. Filter to products that have images.
  *   4. Sort by [primarySort, secondarySort].
- *   5. Optionally pre-slice (preSliceCount) before merging with $sample fallback.
+ *   5. Optionally pre-slice (maxOrderDerivedCandidates) before merging with $sample fallback.
  *   6. $sample fallback: fetch random in-stock products with images.
  *   7. JS dedup by _id → random shuffle → slice(0, sliceCount).
  *   8. Return { status, count, products }.
@@ -31,16 +31,16 @@ const { MS_PER_HOUR } = require('../../../config/constants/time');
  *   Tie-breaking sort applied after the primary.
  * @param {object}  [opts.productMatch={}]
  *   Extra Mongo $match clauses merged with the base `{ 'product.id': { $in: ... } }` filter.
- * @param {number}  [opts.preSliceCount]
+ * @param {number}  [opts.maxOrderDerivedCandidates]
  *   If set, the order-derived list is sliced to this length before being merged
  *   with the random fallback (e.g. favouritesOfWeek pre-slices to 20).
- * @param {boolean} [opts.requireSoldProducts=false]
+ * @param {boolean} [opts.failWhenNoSales=false]
  *   If true, return early with { status:false, count:0, products:[] }
  *   when no sold products are found (getTrendingProducts behaviour).
  *
  * @returns {Promise<{ status: boolean, count: number, products: object[] }>}
  */
-async function buildOrderDerivedRail({
+async function buildOrderDerivedList({
     cacheKey,
     ttlSeconds,
     windowHours,
@@ -48,8 +48,8 @@ async function buildOrderDerivedRail({
     primarySort = 'sold-desc',
     secondarySort = null,
     productMatch = {},
-    preSliceCount,
-    requireSoldProducts = false,
+    maxOrderDerivedCandidates,
+    failWhenNoSales = false,
 }) {
     const ttl = ttlSeconds != null ? ttlSeconds : runtimeConfig.cache.smartCategoryTtl;
     const Product = repositories.products.rawModel();
@@ -74,7 +74,7 @@ async function buildOrderDerivedRail({
         const soldProductIds = soldProducts.map(p => p._id);
 
         // ── 2. Early-exit guard (getTrendingProducts behaviour) ────────────────
-        if (requireSoldProducts && !soldProductIds.length) {
+        if (failWhenNoSales && !soldProductIds.length) {
             return { status: false, count: 0, products: [] };
         }
 
@@ -114,8 +114,8 @@ async function buildOrderDerivedRail({
             });
 
             // ── 5. Optional pre-slice (favouritesOfWeek slices to 20 first) ───
-            if (preSliceCount != null) {
-                orderDerivedProducts = orderDerivedProducts.slice(0, preSliceCount);
+            if (maxOrderDerivedCandidates != null) {
+                orderDerivedProducts = orderDerivedProducts.slice(0, maxOrderDerivedCandidates);
             }
         }
 
@@ -169,4 +169,4 @@ function _compare(a, b, soldA, soldB, sortKey) {
     return 0;
 }
 
-module.exports = { buildOrderDerivedRail };
+module.exports = { buildOrderDerivedList };
