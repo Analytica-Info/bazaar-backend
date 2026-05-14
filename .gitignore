@@ -39,3 +39,4 @@ coverage/
 dist/
 build/
 src/status_false_log.md
+.claude/
