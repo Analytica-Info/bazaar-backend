@@ -3555,6 +3555,246 @@ paths:
         '500':
           $ref: '#/components/responses/500Internal'
 
+  /products/categories/search:
+    get:
+      operationId: productsCategoriesSearch
+      tags: [Products]
+      summary: Search categories by name
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          categories:
+                            type: array
+                            items: { type: object }
+        '400': { $ref: '#/components/responses/400ValidationError' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /products/{id}/reviews:
+    get:
+      operationId: productReviewsList
+      tags: [Products]
+      summary: List reviews for a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: string }
+                          total: { type: integer }
+                          reviews: { type: array, items: { type: object } }
+        '500': { $ref: '#/components/responses/500Internal' }
+    post:
+      operationId: productReviewsCreate
+      tags: [Products]
+      summary: Submit a review for a product (multipart)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                title: { type: string }
+                quality_rating: { type: number }
+                value_rating: { type: number }
+                price_rating: { type: number }
+                image: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          reviews: { type: array, items: { type: object } }
+        '400': { $ref: '#/components/responses/400ValidationError' }
+        '401': { $ref: '#/components/responses/401Unauthorized' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /products/{id}/my-review:
+    get:
+      operationId: productReviewsMine
+      tags: [Products]
+      summary: Current user's review on a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: string }
+                          total: { type: integer }
+                          reviews: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/401Unauthorized' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /shipping/countries:
+    get:
+      operationId: shippingCountries
+      tags: [Shipping]
+      summary: List active shipping countries
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          countries: { type: array, items: { type: object } }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /shipping/countries/{code}/cities:
+    get:
+      operationId: shippingCities
+      tags: [Shipping]
+      summary: List cities for a shipping country
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          country: { type: string }
+                          cities: { type: array, items: { type: object } }
+        '404': { $ref: '#/components/responses/404NotFound' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /shipping/cost:
+    get:
+      operationId: shippingCost
+      tags: [Shipping]
+      summary: Calculate shipping cost for an order
+      parameters:
+        - in: query
+          name: country
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: area
+          schema: { type: string }
+        - in: query
+          name: subtotal
+          schema: { type: number }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cost: { type: number }
+                          currency: { type: string }
+                          currencySymbol: { type: string }
+                          countryName: { type: string }
+                          freeShipping: { type: boolean }
+                          freeShippingThreshold: { type: number }
+        '400': { $ref: '#/components/responses/400ValidationError' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /config:
+    get:
+      operationId: mobileConfig
+      tags: [MobileConfig]
+      summary: Mobile app startup config (min version + payment methods)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          minSupportedVersion: { type: string }
+                          nomodEnabled: { type: boolean }
+                          paymentMethods:
+                            type: array
+                            items: { type: string }
+        '500': { $ref: '#/components/responses/500Internal' }
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Reusable Parameters
 # ─────────────────────────────────────────────────────────────────────────────

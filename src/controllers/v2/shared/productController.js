@@ -3,7 +3,7 @@
  * Same for mobile and web — no platform-specific divergence.
  */
 const productService = require('../../../services/productService');
-const { wrap } = require('../_shared/responseEnvelope');
+const { wrap, wrapError } = require('../_shared/responseEnvelope');
 const { asyncHandler } = require('../../../middleware');
 
 exports.getCategories = asyncHandler(async (req, res) => {
@@ -45,4 +45,17 @@ exports.subSubCategoriesProduct = asyncHandler(async (req, res) => {
 exports.similarProducts = asyncHandler(async (req, res) => {
     const result = await productService.getSimilarProducts(req.query.product_type_id, req.query.id);
     return res.status(200).json(wrap(result));
+});
+
+/**
+ * GET /v2/products/categories/search?q=<term>
+ * Auth: optional — category name search for PDP and search surfaces.
+ */
+exports.searchCategories = asyncHandler(async (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+        return res.status(400).json(wrapError('VALIDATION_ERROR', 'Query parameter "q" is required'));
+    }
+    const result = await productService.getSearchCategories({ category_name: q });
+    return res.status(200).json(wrap({ categories: result.side_bar_categories }));
 });

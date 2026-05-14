@@ -12,6 +12,7 @@ const userCtrl = require('../../../controllers/v2/mobile/userController');
 const orderCtrl = require('../../../controllers/v2/mobile/orderController');
 const cartCtrl = require('../../../controllers/v2/mobile/cartController');
 const notifCtrl = require('../../../controllers/v2/mobile/notificationController');
+const configCtrl = require('../../../controllers/v2/mobile/configController');
 
 const avatarUpload = createUpload(/jpeg|jpg|png|pdf/, 'uploads/users');
 const orderUpload = createUpload(/jpeg|jpg|png/, 'uploads/orders');
@@ -70,5 +71,8 @@ router.post('/cart/decrease', auth.required(), cartCtrl.decreaseQty);
 router.get('/notifications', auth.required(), notifCtrl.getNotifications);
 router.post('/notifications/mark-read', auth.required(), notifCtrl.markRead);
 router.post('/notifications/track-click', auth.required(), notifCtrl.trackClick);
+
+// ── Config ────────────────────────────────────────────────────────
+router.get('/config', configCtrl.getConfig);
 
 module.exports = router;
