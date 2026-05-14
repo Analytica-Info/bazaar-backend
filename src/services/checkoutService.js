@@ -713,7 +713,9 @@ async function createOrderAndSendEmails(payment, user_id) {
     amount_subtotal: formatted_subtotal_amount,
     amount_total: formatted_total_amount,
     discount_amount: formattedDiscountAmount,
-    phone: payment.buyer.phone,
+    // BUG-057: prefer Tabby buyer.phone, fall back to meta.phone (app-sent orderData.phone)
+    // so the order keeps a phone even if Tabby normalizes/strips the buyer field.
+    phone: payment.buyer.phone || payment.meta?.phone || '-',
     shipping: formattedshippingCost,
     txn_id: payment.id,
     status: "confirmed",
@@ -1131,7 +1133,10 @@ exports.createTabbyCheckout = async (cartData, userId, metadata) => {
         currency: String(payment.currency).toUpperCase(),
         description: String(payment.description),
         buyer: {
-          name: String(payment.buyer.name), phone: String(payment.buyer.phone),
+          name: String(payment.buyer.name),
+          // BUG-057: prefer caller's buyer.phone, but fall back to orderData.phone
+          // so we never send an empty phone to Tabby when the app provided one.
+          phone: String(payment.buyer.phone || phone || ""),
           email: String(payment.buyer.email), dob: String(payment.buyer.dob || ""),
         },
         shipping_address: {
