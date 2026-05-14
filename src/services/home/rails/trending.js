@@ -1,7 +1,7 @@
 'use strict';
 
 const registry = require('../registry');
-const getTrendingProducts = require('../../smartCategories/use-cases/getTrendingProducts');
+const { getTrendingProducts } = require('../../smartCategories/use-cases/getTrendingProducts');
 
 registry.register({
   name: 'trending',

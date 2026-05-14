@@ -1,7 +1,7 @@
 'use strict';
 
 const registry = require('../registry');
-const getNewArrivals = require('../../smartCategories/use-cases/getNewArrivals');
+const { getNewArrivals } = require('../../smartCategories/use-cases/getNewArrivals');
 
 registry.register({
   name: 'new-arrivals',

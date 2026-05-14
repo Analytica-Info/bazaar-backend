@@ -1,7 +1,7 @@
 'use strict';
 
 const registry = require('../registry');
-const getTopRatedProducts = require('../../smartCategories/use-cases/getTopRatedProducts');
+const { getTopRatedProducts } = require('../../smartCategories/use-cases/getTopRatedProducts');
 
 registry.register({
   name: 'top-rated',
