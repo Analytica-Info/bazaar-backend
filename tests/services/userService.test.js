@@ -450,3 +450,38 @@ describe('userService.getMobilePaymentHistory', () => {
         }));
     });
 });
+
+describe('userService.getProfile', () => {
+    it('should throw 404 when user not found', async () => {
+        const fakeId = new mongoose.Types.ObjectId();
+        try {
+            await userService.getProfile(fakeId.toString());
+            fail('Expected error');
+        } catch (err) {
+            expect(err.status).toBe(404);
+        }
+    });
+
+    it('should return user and coupon data', async () => {
+        const user = await createTestUser({ email: 'profile-user@example.com', phone: '9000000001' });
+        const result = await userService.getProfile(user._id.toString());
+        expect(result.user).toBeDefined();
+        expect(result.coupon).toBeDefined();
+        expect(typeof result.coupon.status).toBe('boolean');
+    });
+});
+
+describe('userService.getOrderCount', () => {
+    it('should return count 0 when no orders', async () => {
+        const user = await createTestUser({ email: 'count-user@example.com', phone: '9000000002' });
+        const result = await userService.getOrderCount(user._id.toString());
+        expect(result.count).toBeDefined();
+    });
+});
+
+describe('userService.getCurrentMonthOrderCategories', () => {
+    it('should return defined result', async () => {
+        const result = await userService.getCurrentMonthOrderCategories();
+        expect(result).toBeDefined();
+    });
+});

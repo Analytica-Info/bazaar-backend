@@ -357,3 +357,464 @@ describe("getUserNotifications — pagination (v2)", () => {
     expect(result.notifications.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// getNotificationDetails
+// ---------------------------------------------------------------------------
+describe("notificationService.getNotificationDetails", () => {
+  let adminId;
+  let userId;
+
+  beforeEach(async () => {
+    const admin = await Admin.create({
+      firstName: "Det",
+      lastName: "Admin",
+      phone: "5550000001",
+      email: `det-admin-${Date.now()}@test.com`,
+      password: "hashed",
+    });
+    adminId = admin._id;
+
+    const user = await User.create({
+      name: "Detail User",
+      email: `det-user-${Date.now()}@test.com`,
+      phone: "5550000002",
+      password: "hashed",
+    });
+    userId = user._id;
+  });
+
+  it("should throw 404 for non-existent notification", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await notificationService.getNotificationDetails(fakeId);
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+      expect(err.message).toMatch(/not found/i);
+    }
+  });
+
+  it("should return details for a sendToAll notification", async () => {
+    const notif = await Notification.create({
+      title: "All Users",
+      message: "Broadcast",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+    });
+
+    const result = await notificationService.getNotificationDetails(notif._id.toString());
+
+    expect(result.title).toBe("All Users");
+    expect(result.sendToAll).toBe(true);
+    expect(typeof result.totalTargetUsers).toBe("number");
+    expect(result.clickedUsers).toBeDefined();
+    expect(result.notClickedUsers).toBeDefined();
+  });
+
+  it("should return details for a targeted notification", async () => {
+    const notif = await Notification.create({
+      title: "Targeted",
+      message: "For you",
+      sendToAll: false,
+      targetUsers: [userId],
+      clickedUsers: [userId],
+      createdBy: adminId,
+    });
+
+    const result = await notificationService.getNotificationDetails(notif._id.toString());
+
+    expect(result.title).toBe("Targeted");
+    expect(result.totalTargetUsers).toBe(1);
+    expect(result.totalClickedUsers).toBe(1);
+    expect(result.totalNotClickedUsers).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateNotification
+// ---------------------------------------------------------------------------
+describe("notificationService.updateNotification", () => {
+  let adminId;
+  let userId;
+
+  beforeEach(async () => {
+    const admin = await Admin.create({
+      firstName: "Upd",
+      lastName: "Admin",
+      phone: "5560000001",
+      email: `upd-admin-${Date.now()}@test.com`,
+      password: "hashed",
+    });
+    adminId = admin._id;
+
+    const user = await User.create({
+      name: "Upd User",
+      email: `upd-user-${Date.now()}@test.com`,
+      phone: "5560000002",
+      password: "hashed",
+    });
+    userId = user._id;
+  });
+
+  it("should throw 404 for non-existent notification", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await notificationService.updateNotification(fakeId, { title: "X" });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+      expect(err.message).toMatch(/not found/i);
+    }
+  });
+
+  it("should throw 400 when notification has already been sent", async () => {
+    const notif = await Notification.create({
+      title: "Sent Notif",
+      message: "Already sent",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+      sentAt: new Date(),
+    });
+
+    try {
+      await notificationService.updateNotification(notif._id.toString(), { title: "New Title" });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/already been sent/i);
+    }
+  });
+
+  it("should update title and message for unsent notification", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const notif = await Notification.create({
+      title: "Old Title",
+      message: "Old Message",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+      scheduledDateTime: future,
+    });
+
+    const updated = await notificationService.updateNotification(notif._id.toString(), {
+      title: "New Title",
+      message: "New Message",
+    });
+
+    expect(updated.title).toBe("New Title");
+    expect(updated.message).toBe("New Message");
+  });
+
+  it("should throw when sendToAll=false with no targetUsers", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const notif = await Notification.create({
+      title: "T",
+      message: "M",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+      scheduledDateTime: future,
+    });
+
+    try {
+      await notificationService.updateNotification(notif._id.toString(), {
+        sendToAll: false,
+        targetUsers: [],
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/targetUsers must be provided/i);
+    }
+  });
+
+  it("should throw when targetUsers contains invalid user IDs", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const notif = await Notification.create({
+      title: "T",
+      message: "M",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+      scheduledDateTime: future,
+    });
+
+    const fakeUserId = new mongoose.Types.ObjectId().toString();
+    try {
+      await notificationService.updateNotification(notif._id.toString(), {
+        sendToAll: false,
+        targetUsers: [fakeUserId],
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/invalid/i);
+    }
+  });
+
+  it("should update targetUsers with valid user IDs", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const notif = await Notification.create({
+      title: "T",
+      message: "M",
+      sendToAll: false,
+      targetUsers: [],
+      clickedUsers: [],
+      createdBy: adminId,
+      scheduledDateTime: future,
+    });
+
+    const updated = await notificationService.updateNotification(notif._id.toString(), {
+      sendToAll: false,
+      targetUsers: [userId.toString()],
+    });
+
+    expect(updated.targetUsers).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// searchUsers + getAllUsersForNotification
+// ---------------------------------------------------------------------------
+describe("notificationService.searchUsers", () => {
+  beforeEach(async () => {
+    await User.create({
+      name: "Alice Smith",
+      email: "alice.search@test.com",
+      phone: "5570000001",
+      password: "hashed",
+    });
+    await User.create({
+      name: "Bob Jones",
+      email: "bob.search@test.com",
+      phone: "5570000002",
+      password: "hashed",
+    });
+  });
+
+  it("should return all users when no search term", async () => {
+    const result = await notificationService.searchUsers({});
+    expect(result.users).toBeDefined();
+    expect(result.pagination).toBeDefined();
+    expect(result.pagination.totalUsers).toBeGreaterThanOrEqual(2);
+  });
+
+  it("should filter by name search term", async () => {
+    const result = await notificationService.searchUsers({ search: "Alice" });
+    expect(result.users.length).toBeGreaterThanOrEqual(1);
+    expect(result.users[0].name).toMatch(/Alice/i);
+  });
+
+  it("should paginate results", async () => {
+    const result = await notificationService.searchUsers({ page: 1, limit: 1 });
+    expect(result.users).toHaveLength(1);
+    expect(result.pagination.totalPages).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("notificationService.getAllUsersForNotification", () => {
+  beforeEach(async () => {
+    await User.create({
+      name: "Notif Target",
+      email: `notif-target-${Date.now()}@test.com`,
+      phone: "5580000001",
+      password: "hashed",
+    });
+  });
+
+  it("should return list of users", async () => {
+    const users = await notificationService.getAllUsersForNotification();
+    expect(Array.isArray(users)).toBe(true);
+    expect(users.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createNotification — scheduled in future (no send now)
+// ---------------------------------------------------------------------------
+describe("notificationService.createNotification — scheduled future", () => {
+  let adminId;
+  let userId;
+
+  beforeEach(async () => {
+    const admin = await Admin.create({
+      firstName: "Sched",
+      lastName: "Admin",
+      phone: "5590000001",
+      email: `sched-admin-${Date.now()}@test.com`,
+      password: "hashed",
+    });
+    adminId = admin._id;
+
+    const user = await User.create({
+      name: "Sched User",
+      email: `sched-user-${Date.now()}@test.com`,
+      phone: "5590000002",
+      password: "hashed",
+    });
+    userId = user._id;
+  });
+
+  it("should schedule notification in the future (not send immediately)", async () => {
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const result = await notificationService.createNotification({
+      title: "Future Notif",
+      message: "Scheduled",
+      scheduledDateTime: future,
+      sendToAll: true,
+      adminId: adminId.toString(),
+      sendInstantly: false,
+    });
+
+    expect(result.title).toBe("Future Notif");
+    expect(result.scheduledDateTime).toBeDefined();
+  });
+
+  it("should throw when scheduledDateTime is in the past", async () => {
+    const past = new Date(Date.now() - 60 * 1000).toISOString();
+
+    try {
+      await notificationService.createNotification({
+        title: "Past Notif",
+        message: "Scheduled",
+        scheduledDateTime: past,
+        sendToAll: true,
+        adminId: adminId.toString(),
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/past/i);
+    }
+  });
+
+  it("should throw 401 when adminId is missing", async () => {
+    try {
+      await notificationService.createNotification({
+        title: "No Admin",
+        message: "Missing admin",
+        sendToAll: true,
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(401);
+    }
+  });
+
+  it("should throw when targetUsers contains invalid user IDs", async () => {
+    const fakeUserId = new mongoose.Types.ObjectId().toString();
+    try {
+      await notificationService.createNotification({
+        title: "T",
+        message: "M",
+        sendToAll: false,
+        targetUsers: [fakeUserId],
+        adminId: adminId.toString(),
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/invalid/i);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trackNotificationClick — edge cases
+// ---------------------------------------------------------------------------
+describe("notificationService.trackNotificationClick — edge cases", () => {
+  let adminId;
+  let userId;
+
+  beforeEach(async () => {
+    const admin = await Admin.create({
+      firstName: "Click",
+      lastName: "Admin",
+      phone: "5600000001",
+      email: `click-admin-${Date.now()}@test.com`,
+      password: "hashed",
+    });
+    adminId = admin._id;
+
+    const user = await User.create({
+      name: "Click User",
+      email: `click-user-${Date.now()}@test.com`,
+      phone: "5600000002",
+      password: "hashed",
+    });
+    userId = user._id;
+  });
+
+  it("should throw 400 when notification has no createdBy (non-admin notification)", async () => {
+    const notif = await Notification.create({
+      title: "User Notif",
+      message: "No admin",
+      sendToAll: false,
+      targetUsers: [userId],
+      clickedUsers: [],
+      // createdBy intentionally omitted
+    });
+
+    try {
+      await notificationService.trackNotificationClick(userId.toString(), notif._id.toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(400);
+      expect(err.message).toMatch(/admin notifications/i);
+    }
+  });
+
+  it("should throw 403 when user is not a target", async () => {
+    const otherUser = await User.create({
+      name: "Other",
+      email: `other-${Date.now()}@test.com`,
+      phone: "5600000003",
+      password: "hashed",
+    });
+
+    const notif = await Notification.create({
+      title: "Targeted",
+      message: "For other",
+      sendToAll: false,
+      targetUsers: [otherUser._id],
+      clickedUsers: [],
+      createdBy: adminId,
+    });
+
+    try {
+      await notificationService.trackNotificationClick(userId.toString(), notif._id.toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(403);
+      expect(err.message).toMatch(/not a target/i);
+    }
+  });
+
+  it("should not add duplicate to clickedUsers when already clicked", async () => {
+    const notif = await Notification.create({
+      title: "Already Clicked",
+      message: "Dup test",
+      sendToAll: true,
+      targetUsers: [],
+      clickedUsers: [userId],
+      createdBy: adminId,
+    });
+
+    await notificationService.trackNotificationClick(userId.toString(), notif._id.toString());
+
+    const saved = await Notification.findById(notif._id);
+    const clickCount = saved.clickedUsers.filter(
+      (id) => id.toString() === userId.toString()
+    ).length;
+    expect(clickCount).toBe(1);
+  });
+});

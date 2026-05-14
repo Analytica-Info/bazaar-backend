@@ -25,6 +25,11 @@ const SyncState = require("../models/SyncState");
 const updateProducts = require("./updateProducts");
 const updateProductsNew = require("./updateProductsNew");
 const sendScheduledNotifications = require("./sendScheduledNotifications");
+const { reconcilePendingPayments } = require("../services/payments/recovery/pollingReconciler");
+const PaymentProviderFactory = require("../services/payments/PaymentProviderFactory");
+const PendingPayment = require("../models/PendingPayment");
+const { processPendingPayment } = require("../services/order/adapters/pendingPayment");
+const runtimeConfig = require("../config/runtime");
 
 const BACKEND_URL = process.env.BACKEND_URL;
 const LOG_FILE = "cron.log";
@@ -191,6 +196,40 @@ async function start() {
       { scheduled: true, timezone: "Asia/Dubai" }
     );
     logger.info("Product sync cron scheduled (daily 3 AM Dubai)");
+  }
+
+  // Payment reconciler: poll Nomod for unresolved pending payments
+  // Opt-in via RECONCILER_ENABLED=true. Default off to prevent surprises on deploy.
+  if (runtimeConfig.reconciler.enabled) {
+    const reconcileTask = async () => {
+      try {
+        const result = await reconcilePendingPayments({
+          PendingPayment,
+          providerFactory: PaymentProviderFactory,
+          processPendingPayment,
+          logger,
+          config: {
+            lookbackMinutes: runtimeConfig.reconciler.lookbackMinutes,
+            batchSize: runtimeConfig.reconciler.batchSize,
+            lockKey: runtimeConfig.reconciler.lockKey,
+            lockTtlSeconds: runtimeConfig.reconciler.lockTtlSeconds,
+          },
+        });
+        logger.info(result, '[Reconciler] cycle complete');
+      } catch (err) {
+        logger.error({ err }, '[Reconciler] unhandled error in reconcile tick');
+      }
+    };
+
+    // Run once immediately on startup so the first cycle doesn't have to wait
+    reconcileTask().catch((err) => logger.error({ err }, '[Reconciler] startup tick failed'));
+
+    // Then schedule recurring ticks
+    setInterval(reconcileTask, runtimeConfig.reconciler.intervalMs);
+    logger.info(
+      { intervalMs: runtimeConfig.reconciler.intervalMs, lookbackMinutes: runtimeConfig.reconciler.lookbackMinutes },
+      '[Reconciler] payment reconciler scheduled',
+    );
   }
 
   // Scheduled notifications: every minute

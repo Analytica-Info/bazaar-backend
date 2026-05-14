@@ -1,5 +1,5 @@
 const adminService = require("../../services/adminService");
-const User = require("../../models/User");
+const User = require('../../repositories').users.rawModel();
 const logger = require("../../utilities/logger");
 exports.orders = async (req, res) => {
     try {
@@ -34,7 +34,7 @@ exports.orders = async (req, res) => {
             pagination: result.pagination,
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'admin handler error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching orders.',
@@ -56,7 +56,7 @@ exports.coupons = async (req, res) => {
                 message: error.message,
             });
         }
-        console.error(error);
+        logger.error({ err: error }, 'admin handler error:');
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching coupons.',

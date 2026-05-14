@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/Admin');
+const Admin = require('../repositories').admins.rawModel();
 const JWT_SECRET = require('../config/jwtSecret');
 
 const logger = require("../utilities/logger");

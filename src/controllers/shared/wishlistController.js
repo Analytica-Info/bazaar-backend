@@ -1,7 +1,8 @@
 const wishlistService = require("../../services/wishlistService");
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
-exports.getWishlist = async (req, res) => {
+
+exports.getWishlist = asyncHandler(async (req, res) => {
     try {
         const result = await wishlistService.getWishlist(req.user._id);
         res.status(200).json({ success: true, ...result });
@@ -10,9 +11,9 @@ exports.getWishlist = async (req, res) => {
         logger.error({ err: err }, "Error fetching wishlist:");
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-};
+});
 
-exports.addToWishlist = async (req, res) => {
+exports.addToWishlist = asyncHandler(async (req, res) => {
     const { product_id } = req.body;
 
     if (!product_id) {
@@ -27,9 +28,9 @@ exports.addToWishlist = async (req, res) => {
         logger.error({ err: err }, "Error adding to wishlist:");
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-};
+});
 
-exports.removeFromWishlist = async (req, res) => {
+exports.removeFromWishlist = asyncHandler(async (req, res) => {
     const { product_id } = req.body;
 
     if (!product_id) {
@@ -44,4 +45,4 @@ exports.removeFromWishlist = async (req, res) => {
         logger.error({ err: err }, "Error removing from wishlist:");
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-};
+});

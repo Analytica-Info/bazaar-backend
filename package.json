@@ -6,11 +6,17 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "build": "echo 'No build step required — plain Node.js project. Add TypeScript to enable build.' && exit 0",
-    "lint": "echo 'Add eslint to enable linting' && exit 0",
+    "lint": "node scripts/check-no-direct-model-imports.js && node scripts/check-no-direct-time.js && node scripts/check-service-size.js",
+    "lint:repo-guardrail": "node scripts/check-no-direct-model-imports.js",
+    "lint:no-direct-time": "node scripts/check-no-direct-time.js",
+    "lint:service-size": "node scripts/check-service-size.js",
     "test": "jest --forceExit --detectOpenHandles",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
+    "test:ci": "jest --forceExit --detectOpenHandles --coverage --ci",
     "cron": "node src/scripts/cronWorker.js",
     "migrate": "node src/scripts/migrateOrderFields.js",
+    "backfill:order-owner": "node src/scripts/backfillOrderOwnerFields.js",
+    "backfill:order-owner:apply": "node src/scripts/backfillOrderOwnerFields.js --apply",
     "migrate:apply": "node src/scripts/migrateOrderFields.js --apply",
     "migrate:cleanup": "node src/scripts/migrateOrderFields.js --cleanup",
     "seed:roles": "node src/scripts/seedRolesAndPermissions.js",
@@ -20,7 +26,9 @@
     "sync:reset:inventory": "node src/scripts/resetSyncState.js inventory",
     "sync:reset:sales": "node src/scripts/resetSyncState.js sales",
     "validate": "node src/scripts/validatePaths.js",
-    "check": "npm run validate && npm test"
+    "validate-env": "node scripts/validateEnv.js",
+    "smoke": "node scripts/smoke.js",
+    "check": "npm run validate && npm run lint && npm test"
   },
   "keywords": [],
   "author": "Analytica",
@@ -48,6 +56,7 @@
     "googleapis": "^150.0.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
+    "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "lz-string": "^1.5.0",
     "mime-types": "^2.1.35",
@@ -61,12 +70,14 @@
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",
     "stripe": "^18.0.0",
+    "swagger-ui-express": "^5.0.1",
     "typo-js": "^1.2.5"
   },
   "devDependencies": {
     "@jest/globals": "^30.3.0",
     "jest": "^30.3.0",
     "mongodb-memory-server": "^11.0.1",
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2"
   }
 }

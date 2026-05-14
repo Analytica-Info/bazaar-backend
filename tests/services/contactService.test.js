@@ -364,4 +364,75 @@ describe("contactService", () => {
       fs.rmdirSync(uploadsDir);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // submitFeedback
+  // ---------------------------------------------------------------------------
+  describe("submitFeedback", () => {
+    it("should throw 400 when name is missing", async () => {
+      try {
+        await contactService.submitFeedback({ feedback: "Great app", userEmail: "u@test.com" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/name is required/i);
+      }
+    });
+
+    it("should throw 400 when feedback is missing", async () => {
+      try {
+        await contactService.submitFeedback({ name: "John", userEmail: "u@test.com" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/feedback is required/i);
+      }
+    });
+
+    it("should throw 400 when userEmail is missing", async () => {
+      try {
+        await contactService.submitFeedback({ name: "John", feedback: "Good" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/email/i);
+      }
+    });
+
+    it("should submit feedback successfully with valid data", async () => {
+      const result = await contactService.submitFeedback({
+        name: "Jane",
+        feedback: "Really love the product selection",
+        userEmail: "jane@test.com",
+      });
+
+      expect(result).toMatch(/thank you/i);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // validateEmail error path (axios throws)
+  // ---------------------------------------------------------------------------
+  describe("submitContactForm — email validation API failure", () => {
+    it("should fall back gracefully when email validation API throws", async () => {
+      const axios = require("axios");
+      // Simulate a network error from the email validation API
+      axios.get.mockRejectedValueOnce(new Error("Network error"));
+
+      try {
+        await contactService.submitContactForm({
+          name: "Retry User",
+          email: "retry@test.com",
+          phone: "0501234567",
+          subject: "Test",
+          message: "Hello",
+        });
+        fail("Expected error to be thrown");
+      } catch (err) {
+        // When API fails, email is treated as invalid
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not valid/i);
+      }
+    });
+  });
 });

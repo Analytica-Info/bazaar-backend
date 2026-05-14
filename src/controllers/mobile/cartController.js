@@ -1,7 +1,8 @@
 const cartService = require("../../services/cartService");
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
-exports.getCart = async (req, res) => {
+
+exports.getCart = asyncHandler(async (req, res) => {
   try {
     const result = await cartService.getCart(req.user._id, { includeGiftLogic: true });
     res.status(200).json({ success: true, ...result });
@@ -9,9 +10,9 @@ exports.getCart = async (req, res) => {
     logger.error({ err: err }, "Error fetching cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-};
+});
 
-exports.addToCart = async (req, res) => {
+exports.addToCart = asyncHandler(async (req, res) => {
   try {
     const result = await cartService.addToCart(req.user._id, req.body, {
       validateVariantQty: false,
@@ -24,9 +25,9 @@ exports.addToCart = async (req, res) => {
     logger.error({ err: err }, "Error adding to cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-};
+});
 
-exports.removeFromCart = async (req, res) => {
+exports.removeFromCart = asyncHandler(async (req, res) => {
   try {
     const result = await cartService.removeFromCart(req.user._id, req.body.product_id);
     res.status(200).json({ success: true, message: "Product removed from cart", ...result });
@@ -35,9 +36,9 @@ exports.removeFromCart = async (req, res) => {
     logger.error({ err: err }, "Error removing from cart:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-};
+});
 
-exports.increaseCartQty = async (req, res) => {
+exports.increaseCartQty = asyncHandler(async (req, res) => {
   try {
     const result = await cartService.increaseQty(req.user._id, req.body.product_id, req.body.qty, {
       validateAvailableQty: false,
@@ -48,9 +49,9 @@ exports.increaseCartQty = async (req, res) => {
     logger.error({ err: err }, "Error increasing quantity:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-};
+});
 
-exports.decreaseCartQty = async (req, res) => {
+exports.decreaseCartQty = asyncHandler(async (req, res) => {
   try {
     const result = await cartService.decreaseQty(req.user._id, req.body.product_id, req.body.qty);
     res.status(200).json({ success: true, message: result.message, cart: result.cart });
@@ -59,4 +60,4 @@ exports.decreaseCartQty = async (req, res) => {
     logger.error({ err: err }, "Error decreasing quantity:");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
-};
+});

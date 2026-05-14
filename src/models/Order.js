@@ -52,5 +52,48 @@ orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ createdAt: -1 });
 
+/**
+ * Dual-field reconciliation hook.
+ *
+ * Historically, the mobile backend wrote `user_id` and the web backend wrote
+ * `userId`. Reads now go through OrderRepository which `$or`s both fields,
+ * but writes were inconsistent — leaving rows with only one field set, which
+ * propagates the duality forever.
+ *
+ * This hook normalizes every write so that BOTH fields are always populated
+ * with the same value. Callers can keep writing whichever field they like;
+ * the hook ensures the other is mirrored. Safe to apply retroactively — if
+ * both are already set and equal, this is a no-op.
+ */
+function mirrorOwnerFieldsOnDoc(doc) {
+    if (!doc) return;
+    // user_id is off-schema (strict: false) — read/write via .get/.set/.markModified
+    const userId = doc.userId;
+    const user_id = typeof doc.get === 'function' ? doc.get('user_id') : doc.user_id;
+    if (userId && !user_id) {
+        if (typeof doc.set === 'function') doc.set('user_id', userId, { strict: false });
+        else doc.user_id = userId;
+    } else if (user_id && !userId) {
+        if (typeof doc.set === 'function') doc.set('userId', user_id);
+        else doc.userId = user_id;
+    }
+}
+
+function mirrorOwnerFieldsOnPlain(obj) {
+    if (!obj) return;
+    if (obj.userId && !obj.user_id) obj.user_id = obj.userId;
+    else if (obj.user_id && !obj.userId) obj.userId = obj.user_id;
+}
+
+orderSchema.pre('save', function (next) {
+    mirrorOwnerFieldsOnDoc(this);
+    next();
+});
+
+orderSchema.pre('insertMany', function (next, docs) {
+    if (Array.isArray(docs)) docs.forEach(mirrorOwnerFieldsOnPlain);
+    next();
+});
+
 const Order = mongoose.model('Order', orderSchema);
 module.exports = Order;

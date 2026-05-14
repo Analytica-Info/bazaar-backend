@@ -1,7 +1,8 @@
 const notificationService = require("../../services/notificationService");
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
-exports.getNotification = async (req, res) => {
+
+exports.getNotification = asyncHandler(async (req, res) => {
     const user_id = req.user._id;
 
     try {
@@ -21,9 +22,9 @@ exports.getNotification = async (req, res) => {
             error: err.message
         });
     }
-};
+});
 
-exports.markNotificationsAsRead = async (req, res) => {
+exports.markNotificationsAsRead = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { ids } = req.body;
 
@@ -38,9 +39,9 @@ exports.markNotificationsAsRead = async (req, res) => {
         logger.error({ err: err }, "Error updating notifications:");
         res.status(500).json({ success: false, message: "Internal server error" });
     }
-};
+});
 
-exports.trackNotificationClick = async (req, res) => {
+exports.trackNotificationClick = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { notificationId } = req.body;
 
@@ -64,4 +65,4 @@ exports.trackNotificationClick = async (req, res) => {
             message: "Internal server error"
         });
     }
-};
+});
