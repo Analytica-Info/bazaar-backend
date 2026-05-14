@@ -70,6 +70,10 @@ tags:
     description: Save and remove products from the wishlist.
   - name: Notifications
     description: In-app notification inbox — list, mark-read, track-click.
+  - name: Coupons
+    description: Coupon and promo code listing and validation. Available to anonymous and authenticated callers.
+  - name: Rails
+    description: Paginated smart-category rail endpoint. Single parameterised route replacing the 9 legacy per-rail routes.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Security Schemes
@@ -3358,6 +3362,194 @@ paths:
                         $ref: '#/components/schemas/Wishlist'
         '401':
           $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Coupons — shared (mobile + web), auth optional
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /coupons:
+    get:
+      operationId: couponsGet
+      tags: [Coupons]
+      summary: Get coupon availability metadata
+      description: |
+        Returns coupon count and availability information for the caller.
+        Auth is **optional** — anonymous callers receive the same response.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Coupon metadata fetched successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          count:
+                            type: integer
+                            minimum: 0
+                            description: Total number of coupons available system-wide.
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/validate:
+    post:
+      operationId: couponsValidate
+      tags: [Coupons]
+      summary: Validate a coupon or promo code
+      description: |
+        Validates a coupon/promo code for the caller.
+        Auth is **optional** — user ID is used for single-use promo checks when present.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couponCode]
+              properties:
+                couponCode:
+                  type: string
+                  example: FIRST15
+      responses:
+        '200':
+          description: Coupon is valid.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid:
+                            type: boolean
+                            example: true
+                          type:
+                            type: string
+                            enum: [coupon, promo]
+                          discountPercent:
+                            type: number
+                            example: 10
+                          capAED:
+                            type: number
+                            nullable: true
+                            example: 30
+                          bankPromoId:
+                            type: string
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Rails — shared (mobile + web), auth optional
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /rails/{railName}:
+    get:
+      operationId: railsGet
+      tags: [Rails]
+      summary: Fetch a paginated smart-category rail
+      description: |
+        Returns page N of any registered home rail.
+        Rail names: `new-arrivals`, `flash-sales`, `today-deal`, `trending`,
+        `favourites-of-week`, `top-rated`, `hot-offers`, `categories-product`,
+        `categories`.
+
+        **Note:** `today-deal`, `top-rated`, `favourites-of-week`, and `categories`
+        use fixed-result fetchers — `page`/`limit` overrides are accepted but have
+        no effect for those rails.
+
+        Auth is **optional**.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: railName
+          required: true
+          schema:
+            type: string
+            enum:
+              - new-arrivals
+              - flash-sales
+              - today-deal
+              - trending
+              - favourites-of-week
+              - top-rated
+              - hot-offers
+              - categories-product
+              - categories
+          description: Registered rail identifier.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+          description: Required for the `categories-product` rail. Ignored by other rails.
+      responses:
+        '200':
+          description: Rail data fetched successfully.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "`public, max-age=60, stale-while-revalidate=300`"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          railName:
+                            type: string
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
         '404':
           $ref: '#/components/responses/404NotFound'
         '500':

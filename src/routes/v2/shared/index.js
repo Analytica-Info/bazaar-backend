@@ -10,11 +10,20 @@ const createUpload = require('../../../utilities/fileUpload');
 const productCtrl = require('../../../controllers/v2/shared/productController');
 const wishlistCtrl = require('../../../controllers/v2/shared/wishlistController');
 const homeCtrl = require('../../../controllers/v2/shared/homeController');
+const couponCtrl = require('../../../controllers/v2/shared/couponController');
+const railCtrl = require('../../../controllers/v2/shared/railController');
 
 const reviewUpload = createUpload(/jpeg|jpg|png|pdf/, 'uploads/users');
 
 // ── Home manifest ──────────────────────────────────────────────────
 router.get('/home', homeCtrl.getHomeManifest);
+
+// ── Rails (paginated) ─────────────────────────────────────────────
+router.get('/rails/:railName', auth.optional(), railCtrl.getRail);
+
+// ── Coupons ───────────────────────────────────────────────────────
+router.get('/coupons', auth.optional(), couponCtrl.getCoupons);
+router.post('/coupons/validate', auth.optional(), couponCtrl.validateCoupon);
 
 // ── Products ──────────────────────────────────────────────────────
 router.get('/products/categories', productCtrl.getCategories);
