@@ -51,7 +51,7 @@ async function validateCoupon(req, res) {
     // The service already returns { success, message, type, discountPercent, capAED, ... }
     // We surface all fields under data so clients can read them uniformly.
     const { success: _svcSuccess, message: svcMessage, ...payload } = result;
-    return res.status(200).json(wrap({ valid: true, ...payload }, svcMessage));
+    return res.status(200).json(wrap({ valid: true, message: svcMessage, ...payload }, svcMessage));
   } catch (err) {
     if (err.status) {
       return res.status(err.status).json(wrapError('COUPON_INVALID', err.message));
