@@ -64,8 +64,13 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true, strict: false });
 
 userSchema.index({ lastSeen: -1 });
-// Phone lookup — used on every mobile login/register
-userSchema.index({ phone: 1 }, { sparse: true });
+// Phone lookup + DB-level uniqueness. `sparse: true` exempts null values —
+// social-login users without a phone are allowed. The service-layer check in
+// signup.js / updateProfile.js remains as defence-in-depth with friendlier
+// error messages. Existing duplicates MUST be reconciled before deploy via
+// `node scripts/migrations/2026-05-user-phone-unique.js` (see that script for
+// the dry-run / apply flow).
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 // Apple Sign-In lookup
 userSchema.index({ appleId: 1 }, { sparse: true });
 // Push notification send — scan was hitting all 6,517 users

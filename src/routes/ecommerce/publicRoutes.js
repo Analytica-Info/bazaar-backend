@@ -31,8 +31,6 @@ const {
   downloadFile,
   search,
   createTabbyCheckout,
-  createNomodCheckout,
-  verifyNomodPayment,
   searchSingleProduct,
   fetchDbProducts,
   fetchProductsNoImages,
@@ -93,8 +91,6 @@ router.get("/shipping-cost", shippingCtrl.getShippingCost);
 
 router.post("/create-card-checkout", createCardCheckout);
 router.post("/create-tabby-checkout", createTabbyCheckout);
-router.post("/create-nomod-checkout", authMiddleware("user"), createNomodCheckout);
-router.post("/verify-nomod-payment", authMiddleware("user"), verifyNomodPayment);
 router.post("/checkout", checkout);
 router.post("/verify-card-payment", authMiddleware("user"), verifyCardPayment);
 router.post(

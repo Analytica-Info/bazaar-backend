@@ -169,40 +169,57 @@ describe("orderService", () => {
       expect(addr.mobile).toBe("0509876543");
     });
 
-    it("should update an existing address when _id is provided", async () => {
+    it("storeAddress is create-only: _id in body is ignored, push always creates a new address", async () => {
       const user = await makeUser();
 
       const store1 = await orderService.storeAddress(user._id.toString(), {
-        name: "Home",
-        city: "Dubai",
-        area: "Marina",
-        floorNo: "3",
-        apartmentNo: "301",
-        landmark: "Near Mall",
-        buildingName: "Tower A",
-        mobile: "0501234567",
-        state: "Dubai",
+        name: "Home", city: "Dubai", area: "Marina",
+        floorNo: "3", apartmentNo: "301", landmark: "Near Mall",
+        buildingName: "Tower A", mobile: "0501234567", state: "Dubai",
       });
 
+      // Even with _id present in the body, storeAddress NO LONGER updates —
+      // it ignores _id and pushes a fresh subdoc. Updates are served by
+      // updateAddress.
+      const fakeId = store1.addresses[0]._id.toString();
+      const result = await orderService.storeAddress(user._id.toString(), {
+        _id: fakeId,
+        name: "Second Home", city: "Sharjah", area: "Al Majaz",
+        floorNo: "5", apartmentNo: "501", landmark: "Near Park",
+        buildingName: "Tower B", mobile: "0502222222", state: "Sharjah",
+      });
+
+      expect(result.message).toMatch(/added/i);
+      expect(result.addresses).toHaveLength(2);
+      // The new doc's _id is freshly generated, NOT the supplied fakeId
+      const newDoc = result.addresses.find((a) => a.name === "Second Home");
+      expect(newDoc).toBeDefined();
+      expect(newDoc._id.toString()).not.toBe(fakeId);
+    });
+
+    it("updateAddress partially updates an existing address", async () => {
+      const user = await makeUser();
+      const store1 = await orderService.storeAddress(user._id.toString(), {
+        name: "Home", city: "Dubai", area: "Marina",
+        floorNo: "3", apartmentNo: "301", landmark: "Near Mall",
+        buildingName: "Tower A", mobile: "0501234567", state: "Dubai",
+      });
       const addressId = store1.addresses[0]._id.toString();
 
-      const result = await orderService.storeAddress(user._id.toString(), {
-        _id: addressId,
-        name: "Updated Home",
-        city: "Sharjah",
-        area: "Al Majaz",
-        floorNo: "5",
-        apartmentNo: "501",
-        landmark: "Near Park",
-        buildingName: "Tower B",
-        mobile: "0502222222",
-        state: "Sharjah",
-      });
+      const result = await orderService.updateAddress(
+        user._id.toString(),
+        addressId,
+        { name: "Updated Home", city: "Sharjah", mobile: "0502222222" },
+      );
 
       expect(result.message).toMatch(/updated/i);
       expect(result.addresses).toHaveLength(1);
       expect(result.addresses[0].name).toBe("Updated Home");
       expect(result.addresses[0].city).toBe("Sharjah");
+      expect(result.addresses[0].mobile).toBe("0502222222");
+      // Unspecified fields preserved
+      expect(result.addresses[0].area).toBe("Marina");
+      expect(result.addresses[0].landmark).toBe("Near Mall");
     });
   });
 
@@ -264,77 +281,44 @@ describe("orderService", () => {
       expect(result.addresses[0].country).toBe("AE");
     });
 
-    it("should update country when editing address", async () => {
+    it("updateAddress should update country when editing address", async () => {
       const user = await makeUser({ email: "country4@test.com" });
 
       const store1 = await orderService.storeAddress(user._id.toString(), {
-        name: "Home",
-        city: "Dubai",
-        area: "Marina",
-        floorNo: "3",
-        apartmentNo: "301",
-        landmark: "Near Mall",
-        buildingName: "Tower A",
-        mobile: "0501234567",
-        state: "Dubai",
+        name: "Home", city: "Dubai", area: "Marina",
+        floorNo: "3", apartmentNo: "301", landmark: "Near Mall",
+        buildingName: "Tower A", mobile: "0501234567", state: "Dubai",
         country: "AE",
       });
-
       const addressId = store1.addresses[0]._id.toString();
 
-      const result = await orderService.storeAddress(user._id.toString(), {
-        _id: addressId,
-        name: "Home",
-        city: "Muscat",
-        area: "Ruwi",
-        floorNo: "3",
-        apartmentNo: "301",
-        landmark: "Near Souq",
-        buildingName: "Tower A",
-        mobile: "96812345678",
-        state: "Muscat",
-        country: "OM",
+      const result = await orderService.updateAddress(user._id.toString(), addressId, {
+        city: "Muscat", area: "Ruwi", landmark: "Near Souq",
+        mobile: "96812345678", state: "Muscat", country: "OM",
       });
 
       expect(result.addresses[0].country).toBe("OM");
       expect(result.addresses[0].city).toBe("Muscat");
     });
 
-    it("should preserve country when country field not sent in update", async () => {
+    it("updateAddress preserves country when country field not sent in patch", async () => {
       const user = await makeUser({ email: "country5@test.com" });
 
       const store1 = await orderService.storeAddress(user._id.toString(), {
-        name: "Home",
-        city: "Muscat",
-        area: "Ruwi",
-        floorNo: "2",
-        apartmentNo: "201",
-        landmark: "Near Souq",
-        buildingName: "Tower O",
-        mobile: "96812345678",
-        state: "Muscat",
+        name: "Home", city: "Muscat", area: "Ruwi",
+        floorNo: "2", apartmentNo: "201", landmark: "Near Souq",
+        buildingName: "Tower O", mobile: "96812345678", state: "Muscat",
         country: "OM",
       });
-
       const addressId = store1.addresses[0]._id.toString();
 
-      // Update name only, no country sent
-      const result = await orderService.storeAddress(user._id.toString(), {
-        _id: addressId,
+      // PATCH name only, no country sent → preserved as the original 'OM'
+      const result = await orderService.updateAddress(user._id.toString(), addressId, {
         name: "Updated Home",
-        city: "Muscat",
-        area: "Ruwi",
-        floorNo: "2",
-        apartmentNo: "201",
-        landmark: "Near Souq",
-        buildingName: "Tower O",
-        mobile: "96812345678",
-        state: "Muscat",
       });
 
-      // Country should default to AE when not provided in update
-      // This tests the current behavior — resolvedCountry defaults to AE
-      expect(result.addresses[0].country).toBeDefined();
+      expect(result.addresses[0].country).toBe("OM");
+      expect(result.addresses[0].name).toBe("Updated Home");
     });
   });
 
@@ -968,5 +952,97 @@ describe("orderService", () => {
       expect(result.orders[0].user_id).toBeDefined();
       expect(result.orders[0].userId).toBeUndefined();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getPaymentMethods — branch coverage
+// ---------------------------------------------------------------------------
+
+describe("orderService.getPaymentMethods", () => {
+  it("should always include stripe", async () => {
+    delete process.env.TABBY_AUTH_KEY;
+    delete process.env.NOMOD_ENABLED;
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "stripe")).toBe(true);
+  });
+
+  it("should include tabby when TABBY_AUTH_KEY is set", async () => {
+    process.env.TABBY_AUTH_KEY = "fake-key";
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "tabby")).toBe(true);
+  });
+
+  it("should include nomod when NOMOD_ENABLED=true and NOMOD_API_KEY set", async () => {
+    process.env.NOMOD_ENABLED = "true";
+    process.env.NOMOD_API_KEY = "fake-nomod-key";
+    const methods = await orderService.getPaymentMethods();
+    expect(methods.some((m) => m.id === "nomod")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// storeAddress / deleteAddress / setPrimaryAddress edge cases
+// ---------------------------------------------------------------------------
+
+describe("orderService.storeAddress — not found", () => {
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new (require("mongoose")).Types.ObjectId().toString();
+    try {
+      await orderService.storeAddress(fakeId, {
+        address: "123",
+        city: "Dubai",
+        area: "Marina",
+      });
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+});
+
+describe("orderService.deleteAddress — edge cases", () => {
+  const User = require("../../src/models/User");
+
+  const makeUser2 = async (overrides = {}) =>
+    User.create({
+      name: "Del Addr",
+      email: `del-addr-${Date.now()}@test.com`,
+      phone: `0509${Date.now()}`.slice(0, 10),
+      password: "hashed",
+      ...overrides,
+    });
+
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.deleteAddress(fakeId, new mongoose.Types.ObjectId().toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+
+  it("should throw 404 when address not found on user", async () => {
+    const user = await makeUser2();
+    const fakeAddrId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.deleteAddress(user._id.toString(), fakeAddrId);
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
+  });
+});
+
+describe("orderService.setPrimaryAddress — not found", () => {
+  it("should throw 404 when user not found", async () => {
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    try {
+      await orderService.setPrimaryAddress(fakeId, new mongoose.Types.ObjectId().toString());
+      fail("Expected error");
+    } catch (err) {
+      expect(err.status).toBe(404);
+    }
   });
 });

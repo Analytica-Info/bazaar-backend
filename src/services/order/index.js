@@ -1,0 +1,29 @@
+'use strict';
+
+// Barrel — re-exports all use-cases so consumers can require('./order') instead of the facade
+module.exports = {
+    getAddresses: require('./use-cases/getAddresses'),
+    storeAddress: require('./use-cases/storeAddress'),
+    deleteAddress: require('./use-cases/deleteAddress'),
+    updateAddress: require('./use-cases/updateAddress'),
+    // Legacy alias preserved so any internal caller still referencing
+    // setPrimaryAddress keeps working. Prefer updateAddress({ primary: true })
+    // in new code — see src/services/order/use-cases/updateAddress.js.
+    setPrimaryAddress: require('./use-cases/setPrimaryAddress'),
+    validateInventoryBeforeCheckout: require('./use-cases/validateInventoryBeforeCheckout'),
+    getOrders: require('./use-cases/getOrders'),
+    initStripePayment: require('./use-cases/initStripePayment'),
+    getPaymentMethods: require('./use-cases/getPaymentMethods'),
+    getPaymentIntent: require('./use-cases/getPaymentIntent'),
+    updateOrderStatus: require('./use-cases/updateOrderStatus'),
+    uploadProofOfDelivery: require('./use-cases/uploadProofOfDelivery'),
+    markCouponUsed: require('./use-cases/markCouponUsed'),
+    createStripeCheckoutSession: require('./use-cases/createStripeCheckoutSession'),
+    createTabbyCheckoutSession: require('./use-cases/createTabbyCheckoutSession'),
+    createTabbySession: require('./use-cases/createTabbySession'),
+    verifyTabbyPayment: require('./use-cases/verifyTabbyPayment'),
+    createNomodCheckoutSession: require('./use-cases/createNomodCheckoutSession'),
+    verifyNomodPayment: require('./use-cases/verifyNomodPayment'),
+    handleTabbyWebhook: require('./use-cases/handleTabbyWebhook'),
+    handleStripeWebhook: require('./use-cases/handleStripeWebhook'),
+};

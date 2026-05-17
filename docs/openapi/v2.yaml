@@ -1,0 +1,4060 @@
+openapi: 3.1.0
+
+info:
+  title: Bazaar v2 API
+  version: 2.0.0
+  description: |
+    Unified BFF API for the Bazaar platform.  All endpoints live under `/v2/*`.
+
+    **Platform routing** — every request must carry an `X-Client` header:
+    - `mobile` — Flutter app (bearer tokens).
+    - `web` — Next.js storefront (cookies preferred).
+
+    Endpoints marked **mobile-only** or **web-only** return `400 UNKNOWN_PLATFORM`
+    when called from the wrong client.  Endpoints under the **Shared** group
+    (Products, Wishlist) are served to both clients.
+
+    **Response envelope** — every response, success or error, is wrapped:
+
+    ```json
+    { "success": true, "data": { … } }
+    { "success": false, "error": { "code": "TOKEN_EXPIRED", "message": "…" } }
+    ```
+
+    Paginated responses add a `meta` key alongside `data`.
+
+    **Auth** — two complementary schemes:
+    - `bearerAuth` — `Authorization: Bearer <access-jwt>` (mobile default, web fallback).
+    - `cookieAuth` — `bz_at` HttpOnly cookie (web default).
+
+    The app accepts either; prefer what matches `tokenDelivery` at login.
+
+    **Error codes** — machine-readable codes in `error.code`.  Full catalog:
+    `docs/v2-auth/ERROR-CATALOG.md`.
+  contact:
+    name: Bazaar Platform Team
+    email: platform@bazaar-uae.com
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+
+servers:
+  - url: "${BACKEND_URL}/v2"
+    description: Production (set BACKEND_URL in .env)
+  - url: "${STAGING_URL}/v2"
+    description: Staging (set STAGING_URL in .env)
+  - url: "http://localhost:${PORT}/v2"
+    description: Local development (default PORT=5000)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tags
+# ─────────────────────────────────────────────────────────────────────────────
+tags:
+  - name: Auth
+    description: |
+      Authentication and session management.
+      Mobile-only routes: `/auth/refresh-token`, `/auth/check-access-token`, `/auth/recovery-account` (mobile variant).
+      Web-only routes: `/auth/logout`, `/auth/check`.
+      Shared auth routes served to both clients: register, login, google-login, apple-login,
+      forgot-password, verify-code, reset-password, update-password, update-profile,
+      user-data, delete-account, resend-recovery-code.
+  - name: Cart
+    description: Shopping cart — add, remove, adjust quantity.
+  - name: Orders
+    description: Checkout flows (Stripe, Tabby, Nomod), address book, order history, payment methods.
+  - name: Products
+    description: Product catalogue, search, categories. Available to all clients without auth.
+  - name: User
+    description: Authenticated user profile, order history, payment history, reviews, dashboard.
+  - name: Wishlist
+    description: Save and remove products from the wishlist.
+  - name: Notifications
+    description: In-app notification inbox — list, mark-read, track-click.
+  - name: Coupons
+    description: Coupon and promo code listing and validation. Available to anonymous and authenticated callers.
+  - name: Rails
+    description: Paginated smart-category rail endpoint. Single parameterised route replacing the 9 legacy per-rail routes.
+  - name: Banners
+    description: Public banner image listing. Read-only, no auth required.
+  - name: Verticals
+    description: Vertical discovery and coming-soon launch subscriptions.
+  - name: Admin
+    description: |
+      Internal admin-only operations.  All routes require an **admin** Bearer token
+      (verified against the `Admin` collection — not a regular user token).
+      The `X-Client` platform header is **not** required for admin routes.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Security Schemes
+# ─────────────────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Access JWT obtained from `/v2/auth/login` (or OAuth login) with
+        `tokenDelivery: "bearer"`.  Pass as `Authorization: Bearer <token>`.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: bz_at
+      description: >
+        HttpOnly access-token cookie set by the server when
+        `tokenDelivery: "cookie"` is used.  Web clients use this by default.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Admin ─────────────────────────────────────────────────────────────────
+
+    PaymentMethodConfig:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: singleton
+        stripeEnabled:
+          type: boolean
+        tabbyEnabled:
+          type: boolean
+        nomodEnabled:
+          type: boolean
+        bannersEnabled:
+          type: boolean
+          description: Home-screen banner carousel kill-switch. Default true (fail-open).
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedBy:
+          type: string
+          example: system
+
+    # ── Home manifest ────────────────────────────────────────────────────────
+
+    HomeRail:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, empty, error]
+        data:
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        ttl:
+          type: integer
+
+    HomeManifest:
+      type: object
+      properties:
+        version:
+          type: integer
+        platform:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        rails:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeRail'
+
+    HomeManifestResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/HomeManifest'
+
+    # ── Envelope ────────────────────────────────────────────────────────────
+
+    Envelope:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        data:
+          description: Payload. Present on success; null or absent on error.
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: TOKEN_EXPIRED
+          description: >
+            Machine-readable stable identifier. Clients switch on this value.
+            Full catalog in `docs/v2-auth/ERROR-CATALOG.md`.
+        message:
+          type: string
+          example: Token expired.
+          description: Human-readable English message. Do not parse; use `code`.
+        details:
+          description: Optional extra context — validation field errors, etc.
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      required: [total, page, limit, pages]
+      properties:
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        pages:
+          type: integer
+          example: 3
+
+    # ── User / Session ───────────────────────────────────────────────────────
+
+    User:
+      type: object
+      required: [_id, email, name]
+      properties:
+        _id:
+          type: string
+          example: "64a1f2b3c4d5e6f7a8b9c0d1"
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: Jane Doe
+        phone:
+          type: string
+          nullable: true
+          example: "+971501234567"
+        role:
+          type: string
+          example: user
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        emailVerified:
+          type: boolean
+          nullable: true
+        scope:
+          type: string
+          nullable: true
+          example: "user"
+
+    TokenPair:
+      type: object
+      description: JWT access + refresh token pair. Nulls in cookie mode.
+      properties:
+        accessToken:
+          type: string
+          nullable: true
+          example: eyJhbGciOiJSUzI1NiJ9...
+        refreshToken:
+          type: string
+          nullable: true
+          example: eyJhbGciOiJSUzI1NiJ9...
+        expiresIn:
+          type: integer
+          description: Access token TTL in seconds from now.
+          example: 900
+        refreshExpiresIn:
+          type: integer
+          description: Refresh token TTL in seconds from now.
+          example: 2592000
+        tokenType:
+          type: string
+          example: Bearer
+        csrfToken:
+          type: string
+          nullable: true
+          description: Set in cookie mode; null in bearer mode.
+
+    AuthSuccess:
+      allOf:
+        - $ref: '#/components/schemas/TokenPair'
+        - type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            status:
+              type: string
+              enum: [ok]
+              example: ok
+
+    MfaChallenge:
+      type: object
+      required: [status, challengeToken, expiresIn]
+      properties:
+        status:
+          type: string
+          enum: [mfa_required]
+        challengeToken:
+          type: string
+        expiresIn:
+          type: integer
+          example: 300
+        mfaMethods:
+          type: array
+          items:
+            type: string
+          example: ["totp"]
+
+    # ── Cart ─────────────────────────────────────────────────────────────────
+
+    CartItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+        qty:
+          type: integer
+          minimum: 1
+        price:
+          type: number
+          format: float
+        name:
+          type: string
+        image:
+          type: string
+          nullable: true
+
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        total:
+          type: number
+          format: float
+          example: 149.95
+        itemCount:
+          type: integer
+          example: 3
+
+    # ── Order ────────────────────────────────────────────────────────────────
+
+    Address:
+      type: object
+      required: [fullName, phone, addressLine1, city, country]
+      properties:
+        _id:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        country:
+          type: string
+        isPrimary:
+          type: boolean
+          default: false
+        postalCode:
+          type: string
+          nullable: true
+
+    OrderItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+        name:
+          type: string
+        qty:
+          type: integer
+        price:
+          type: number
+          format: float
+        image:
+          type: string
+          nullable: true
+
+    Order:
+      type: object
+      properties:
+        orderId:
+          type: string
+        status:
+          type: string
+          example: processing
+        total:
+          type: number
+          format: float
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        address:
+          $ref: '#/components/schemas/Address'
+        createdAt:
+          type: string
+          format: date-time
+        paymentMethod:
+          type: string
+          nullable: true
+
+    PaymentRecord:
+      type: object
+      properties:
+        _id:
+          type: string
+        orderId:
+          type: string
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+          example: AED
+        status:
+          type: string
+          example: paid
+        provider:
+          type: string
+          example: stripe
+        createdAt:
+          type: string
+          format: date-time
+
+    InventoryValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        unavailableItems:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: string
+              requested:
+                type: integer
+              available:
+                type: integer
+
+    CheckoutSession:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          nullable: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Redirect URL for hosted checkout (Tabby, Nomod).
+        clientSecret:
+          type: string
+          nullable: true
+          description: Stripe PaymentIntent client secret.
+
+    # ── Product ──────────────────────────────────────────────────────────────
+
+    Category:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        image:
+          type: string
+          nullable: true
+        subCategories:
+          type: array
+          items:
+            type: object
+
+    Product:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+        salePrice:
+          type: number
+          format: float
+          nullable: true
+        images:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        subCategory:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        inStock:
+          type: boolean
+        rating:
+          type: number
+          format: float
+          nullable: true
+        reviewCount:
+          type: integer
+          nullable: true
+        inWishlist:
+          type: boolean
+          nullable: true
+          description: Only present when the request carries a valid access token.
+
+    # ── Wishlist ─────────────────────────────────────────────────────────────
+
+    Wishlist:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total:
+          type: integer
+
+    # ── Notification ─────────────────────────────────────────────────────────
+
+    Notification:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+          default: false
+        clickedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Dashboard / Review ────────────────────────────────────────────────────
+
+    Dashboard:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        totalSpent:
+          type: number
+          format: float
+        pendingOrders:
+          type: integer
+        deliveredOrders:
+          type: integer
+
+    Review:
+      type: object
+      properties:
+        _id:
+          type: string
+        productId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Request bodies ────────────────────────────────────────────────────────
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name, tokenDelivery]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        phone:
+          type: string
+          nullable: true
+        tokenDelivery:
+          type: string
+          enum: [cookie, bearer]
+
+    LoginRequest:
+      type: object
+      required: [email, password, tokenDelivery]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        tokenDelivery:
+          type: string
+          enum: [cookie, bearer]
+        deviceId:
+          type: string
+          nullable: true
+
+    OAuthLoginRequest:
+      type: object
+      required: [idToken, tokenDelivery]
+      properties:
+        idToken:
+          type: string
+          description: Provider-issued id-token JWT.
+        tokenDelivery:
+          type: string
+          enum: [cookie, bearer]
+        deviceId:
+          type: string
+          nullable: true
+
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          nullable: true
+          description: Required in bearer mode; omit in cookie mode.
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    VerifyCodeRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+
+    ResetPasswordRequest:
+      type: object
+      required: [resetToken, newPassword]
+      properties:
+        resetToken:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    UpdatePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    RecoveryAccountRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+
+    ResendRecoveryRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    CheckAccessTokenRequest:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+
+    CartItemRequest:
+      type: object
+      required: [product_id, qty]
+      properties:
+        product_id:
+          type: string
+        qty:
+          type: integer
+          minimum: 1
+
+    CartQtyRequest:
+      type: object
+      required: [product_id]
+      properties:
+        product_id:
+          type: string
+
+    WishlistRequest:
+      type: object
+      required: [product_id]
+      properties:
+        product_id:
+          type: string
+
+    AddressRequest:
+      type: object
+      required: [fullName, phone, addressLine1, city, country]
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        addressLine1:
+          type: string
+        addressLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        country:
+          type: string
+        postalCode:
+          type: string
+          nullable: true
+        isPrimary:
+          type: boolean
+          default: false
+
+    InventoryValidationRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+
+    CheckoutStripeRequest:
+      type: object
+      required: [addressId, items]
+      properties:
+        addressId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+        couponCode:
+          type: string
+          nullable: true
+
+    CheckoutTabbyRequest:
+      type: object
+      required: [addressId, items]
+      properties:
+        addressId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+        couponCode:
+          type: string
+          nullable: true
+
+    CheckoutNomodRequest:
+      type: object
+      required: [addressId, items]
+      properties:
+        addressId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+
+    StripeInitRequest:
+      type: object
+      required: [addressId, items]
+      properties:
+        addressId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemRequest'
+        couponCode:
+          type: string
+          nullable: true
+
+    UpdateOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: delivered
+        note:
+          type: string
+          nullable: true
+
+    ProductSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+        filters:
+          type: object
+          nullable: true
+        page:
+          type: integer
+          default: 1
+        limit:
+          type: integer
+          default: 20
+
+    MarkNotificationsReadRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+          description: Notification IDs to mark as read. Empty marks all.
+
+    TrackClickRequest:
+      type: object
+      required: [notificationId]
+      properties:
+        notificationId:
+          type: string
+
+    AddReviewRequest:
+      type: object
+      required: [productId, rating]
+      properties:
+        productId:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable Responses
+# ─────────────────────────────────────────────────────────────────────────────
+  responses:
+    400BadRequest:
+      description: Bad request — missing or invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: BAD_REQUEST
+              message: X-Client header required. Valid values web, mobile.
+
+    401Unauthorized:
+      description: Authentication required or token invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: TOKEN_EXPIRED
+              message: Token expired.
+
+    403Forbidden:
+      description: Authenticated but not authorised for this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: AUTH_SCOPE_INSUFFICIENT
+              message: "You don't have permission to do that."
+
+    404NotFound:
+      description: Requested resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: Resource not found.
+
+    409Conflict:
+      description: Conflict — e.g. email already registered.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: OAUTH_EMAIL_CONFLICT
+              message: An account with this email already exists.
+
+    422Unprocessable:
+      description: Validation error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: VALIDATION_REQUIRED_FIELD
+              message: "Missing required field: email."
+              details:
+                field: email
+
+    429RateLimited:
+      description: Too many requests.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate-limit window resets.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: RATE_LIMITED_LOGIN
+              message: Too many sign-in attempts. Try again later.
+
+    500Internal:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: Something went wrong. Please try again.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Auth — both platforms unless noted
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /auth/register:
+    post:
+      operationId: authRegister
+      tags: [Auth]
+      summary: Register a new account
+      description: |
+        Creates a new user account and returns a token pair.
+        Available on **both** mobile and web clients.
+        Rate limit: 5 requests / IP / hour.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthSuccess'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/login:
+    post:
+      operationId: authLogin
+      tags: [Auth]
+      summary: Email + password login
+      description: |
+        Authenticates with email and password.  Returns a token pair (status `ok`)
+        or an MFA challenge (status `mfa_required`).
+        Available on **both** mobile and web clients.
+        Rate limit: 10 / account / 15 min.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful or MFA challenge issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/AuthSuccess'
+                          - $ref: '#/components/schemas/MfaChallenge'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '423':
+          description: Account locked after too many failed attempts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/login/google:
+    post:
+      operationId: authLoginGoogle
+      tags: [Auth]
+      summary: Google OAuth login / signup
+      description: |
+        Authenticates or registers via a Google id-token.
+        Available on **both** mobile and web clients.
+        Rate limit: 10 / IP / minute.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLoginRequest'
+      responses:
+        '200':
+          description: Authenticated successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/login/apple:
+    post:
+      operationId: authLoginApple
+      tags: [Auth]
+      summary: Apple OAuth login / signup
+      description: |
+        Authenticates or registers via an Apple id-token.
+        Available on **both** mobile and web clients.
+        Rate limit: 10 / IP / minute.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/OAuthLoginRequest'
+                - type: object
+                  properties:
+                    authorizationCode:
+                      type: string
+                      nullable: true
+                    name:
+                      type: object
+                      nullable: true
+                      properties:
+                        firstName:
+                          type: string
+                          nullable: true
+                        lastName:
+                          type: string
+                          nullable: true
+      responses:
+        '200':
+          description: Authenticated successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/password/forgot:
+    post:
+      operationId: authPasswordForgot
+      tags: [Auth]
+      summary: Request password reset email
+      description: |
+        Sends a 6-digit recovery code to the email address.
+        Always returns success to prevent email enumeration.
+        Available on **both** mobile and web clients.
+        Rate limit: 3 / email / hour.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Email sent (or silently accepted if email not found).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sent:
+                            type: boolean
+                            example: true
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/password/verify-code:
+    post:
+      operationId: authPasswordVerifyCode
+      tags: [Auth]
+      summary: Exchange recovery code for reset token
+      description: |
+        Validates the 6-digit emailed code and returns a short-lived reset token.
+        Available on **both** mobile and web clients.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+      responses:
+        '200':
+          description: Code verified — reset token issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          resetToken:
+                            type: string
+                          expiresIn:
+                            type: integer
+                            example: 900
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/password/reset:
+    post:
+      operationId: authPasswordReset
+      tags: [Auth]
+      summary: Set new password using reset token
+      description: |
+        Sets a new password using the reset token from `/auth/verify-code`.
+        Revokes all active sessions. User must log in again after reset.
+        Available on **both** mobile and web clients.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          passwordReset:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/recovery/verify:
+    post:
+      operationId: authVerifyRecovery
+      tags: [Auth]
+      summary: Verify account recovery code
+      description: |
+        Verifies a recovery code for account recovery flow.
+        Available on **both** mobile and web clients.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoveryAccountRequest'
+      responses:
+        '200':
+          description: Recovery code verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/recovery/resend:
+    post:
+      operationId: authResendRecovery
+      tags: [Auth]
+      summary: Resend account recovery code
+      description: |
+        Resends the account recovery code email.
+        Available on **both** mobile and web clients.
+        Rate limit: 3 / account / 24 hours.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendRecoveryRequest'
+      responses:
+        '200':
+          description: Recovery code resent.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sent:
+                            type: boolean
+                            example: true
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/password:
+    patch:
+      operationId: meUpdatePassword
+      tags: [Auth]
+      summary: Change password while authenticated
+      description: |
+        Changes the current user's password.
+        Rotates the current session; revokes all other families.
+        Available on **both** mobile and web clients.
+        Rate limit: 5 / account / hour.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordRequest'
+      responses:
+        '200':
+          description: Password updated — new token pair issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me:
+    patch:
+      operationId: meUpdateMe
+      tags: [Auth]
+      summary: Update user profile (name, phone, avatar)
+      description: |
+        Updates the authenticated user's profile.
+        Accepts `multipart/form-data` so an avatar image can be uploaded simultaneously.
+        Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  nullable: true
+                phone:
+                  type: string
+                  nullable: true
+                file:
+                  type: string
+                  format: binary
+                  description: Avatar image (jpeg, jpg, png, pdf).
+      responses:
+        '200':
+          description: Profile updated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+    get:
+      operationId: meGetMe
+      tags: [Auth]
+      summary: Get current authenticated user
+      description: |
+        Returns the full profile of the authenticated user.
+        Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: User data returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+    delete:
+      operationId: meDeleteMe
+      tags: [Auth]
+      summary: Delete (soft-delete) the current user's account
+      description: |
+        Schedules the account for deletion.
+        Recoverable for 30 days, then permanently removed.
+        Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Account deletion scheduled.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          scheduledFor:
+                            type: string
+                            format: date-time
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ── Mobile-only auth ─────────────────────────────────────────────────────
+
+  /auth/refresh:
+    post:
+      operationId: authRefresh
+      tags: [Auth]
+      summary: Rotate refresh token (mobile)
+      description: |
+        Exchanges a valid refresh token for a new access + refresh token pair.
+        **Mobile-only** — web clients receive tokens via cookies.
+        Rate limit: 60 / family / hour.
+        Implements reuse detection: using a retired refresh token revokes the entire family.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New token pair issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '429':
+          $ref: '#/components/responses/429RateLimited'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /auth/session:
+    get:
+      operationId: authGetSession
+      tags: [Auth]
+      summary: Validate current session (both platforms)
+      description: |
+        Web: verifies the cookie session (reads `user_token` cookie).
+        Mobile: verifies the access token passed in the `Authorization` header.
+        Unified across platforms — replaces `GET /auth/check` (web) and
+        `POST /auth/check-access-token` (mobile).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Session status.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          authenticated:
+                            type: boolean
+                          valid:
+                            type: boolean
+                            description: Mobile alias for authenticated.
+                          user:
+                            $ref: '#/components/schemas/User'
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ── Web-only auth ────────────────────────────────────────────────────────
+
+  /auth/logout:
+    post:
+      operationId: authLogout
+      tags: [Auth]
+      summary: Log out — revoke current session (web)
+      description: |
+        Revokes the current refresh token family and clears session cookies.
+        **Web-only** — mobile clients should discard tokens locally.
+        Rate limit: 30 / account / hour.
+        Idempotent: already-revoked sessions still return success.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientWeb'
+      responses:
+        '200':
+          description: Logged out.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          loggedOut:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Cart — both platforms
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /cart:
+    get:
+      operationId: cartGet
+      tags: [Cart]
+      summary: Get the current user's cart
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Cart contents.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /cart/items:
+    post:
+      operationId: cartAddItem
+      tags: [Cart]
+      summary: Add an item to the cart
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemRequest'
+      responses:
+        '200':
+          description: Item added — full cart returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /cart/items/{productId}:
+    delete:
+      operationId: cartRemoveItem
+      tags: [Cart]
+      summary: Remove an item from the cart
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+          description: Product ID to remove from cart.
+      responses:
+        '200':
+          description: Item removed — full cart returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    patch:
+      operationId: cartUpdateItemQuantity
+      tags: [Cart]
+      summary: Increase or decrease item quantity by delta
+      description: |
+        Positive `delta` increases quantity; negative `delta` decreases it.
+        `delta === 0` or missing is a 400. `abs(delta)` is capped at 100.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta]
+              properties:
+                delta:
+                  type: integer
+                  example: 1
+                  description: Positive to increase, negative to decrease. Max abs value 100.
+      responses:
+        '200':
+          description: Quantity updated — full cart returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Notifications — mobile has track-click; web does not
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /notifications:
+    get:
+      operationId: notificationsGet
+      tags: [Notifications]
+      summary: List in-app notifications (paginated)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated notification list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    patch:
+      operationId: notificationsUpdateReadState
+      tags: [Notifications]
+      summary: Mark notifications as read (bulk PATCH)
+      description: |
+        Marks specific notifications (by `ids`) or all unread notifications as read.
+        Body: `{ read: true, ids?: string[] }`.
+        If `ids` is omitted or empty, all unread notifications for the user are marked read.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [read]
+              properties:
+                read:
+                  type: boolean
+                  example: true
+                ids:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 100
+                  description: Specific notification IDs to mark. Omit to mark all unread.
+      responses:
+        '200':
+          description: Notifications marked as read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /notifications/{id}/clicks:
+    post:
+      operationId: notificationsRecordClick
+      tags: [Notifications]
+      summary: Record a notification click (mobile)
+      description: |
+        Records that the user tapped a specific push notification.
+        **Mobile-only**. The notification ID is now a URL segment.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Notification ID.
+      responses:
+        '200':
+          description: Click recorded.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tracked:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /notifications/subscriptions:
+    post:
+      operationId: notificationsSubscribe
+      tags: [Notifications]
+      summary: Subscribe to a coming-soon vertical launch notification
+      description: |
+        Records a launch-notification subscription for a specific vertical.
+        Upserts by (email, vertical) — idempotent.
+        Auth is optional; anonymous callers are supported.
+        (Previously POST /notify-me — Wave 3 rename.)
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, vertical]
+              properties:
+                email:
+                  type: string
+                  format: email
+                vertical:
+                  type: string
+                  enum: [auction, marketplace, wholesale, home]
+                pushOptIn:
+                  type: boolean
+                  default: true
+                deviceId:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Subscribed (or already subscribed).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          alreadySubscribed:
+                            type: boolean
+        '400':
+          $ref: '#/components/responses/400ValidationError'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Orders — mobile has checkout flows; web has address + validate only
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /orders:
+    get:
+      operationId: ordersGetList
+      tags: [Orders]
+      summary: List orders for the current user (both platforms)
+      description: |
+        Returns a paginated list of the authenticated user's orders.
+        Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated order list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Order'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/inventory-checks:
+    post:
+      operationId: ordersCreateInventoryCheck
+      tags: [Orders]
+      summary: Check stock availability before checkout
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryValidationRequest'
+      responses:
+        '200':
+          description: Inventory validation result.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/InventoryValidationResult'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/stripe:
+    post:
+      operationId: ordersCreateStripeCheckout
+      tags: [Orders]
+      summary: Create a Stripe checkout session (mobile)
+      description: |
+        Creates a Stripe hosted checkout session and returns the redirect URL.
+        **Mobile-only**.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutStripeRequest'
+      responses:
+        '200':
+          description: Checkout session created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CheckoutSession'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/tabby:
+    post:
+      operationId: ordersCreateTabbyCheckout
+      tags: [Orders]
+      summary: Create a Tabby BNPL checkout session (mobile)
+      description: |
+        Creates a Tabby buy-now-pay-later checkout session.
+        **Mobile-only**.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutTabbyRequest'
+      responses:
+        '200':
+          description: Tabby checkout URL returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CheckoutSession'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/tabby/verify:
+    post:
+      operationId: ordersVerifyTabbyCheckout
+      tags: [Orders]
+      summary: Verify Tabby payment status (mobile)
+      description: |
+        Called after the user returns from the Tabby payment page.
+        **Mobile-only**. Reads `paymentId` from the request body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentId]
+              properties:
+                paymentId:
+                  type: string
+                  description: Tabby payment ID returned by the checkout session.
+      responses:
+        '200':
+          description: Payment verification result.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          finalStatus:
+                            type: string
+                            example: authorized
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/nomod:
+    post:
+      operationId: ordersCreateNomodCheckout
+      tags: [Orders]
+      summary: Create a Nomod checkout session (mobile + web)
+      description: |
+        Creates a Nomod payment checkout session.
+        Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutNomodRequest'
+      responses:
+        '200':
+          description: Nomod checkout URL returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          paymentId:    { type: string }
+                          checkoutId:   { type: string, description: 'Alias for paymentId — Nomod uses one identifier as both.' }
+                          checkoutUrl:  { type: string, format: uri, description: 'Hosted Nomod checkout URL. Open this in the mobile WebView.' }
+                          status:       { type: string, example: 'created' }
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/nomod/verify:
+    post:
+      operationId: ordersVerifyNomodCheckout
+      tags: [Orders]
+      summary: Verify Nomod payment and create order (mobile + web)
+      description: |
+        Called after the user returns from the Nomod payment page.
+        Available on **both** mobile and web clients. Reads `paymentId` from the request body.
+        On success creates the order and returns the new `orderId`. Returns
+        `orderId: null` with message `"Order already created"` if the payment was
+        already processed (dedup).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentId]
+              properties:
+                paymentId:
+                  type: string
+                  description: Nomod checkout/payment ID returned by the checkout session.
+      responses:
+        '200':
+          description: Payment verified and order created (or already existed).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderId:
+                            type: string
+                            nullable: true
+                      message:
+                        type: string
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/checkouts/stripe/init:
+    post:
+      operationId: ordersInitStripeCheckout
+      tags: [Orders]
+      summary: Initialise a Stripe PaymentIntent (mobile)
+      description: |
+        Creates a Stripe PaymentIntent and returns the `clientSecret` for use with
+        the Stripe Elements SDK on the client.
+        **Mobile-only**.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StripeInitRequest'
+      responses:
+        '200':
+          description: PaymentIntent client secret.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          clientSecret:
+                            type: string
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /payment-methods:
+    get:
+      operationId: listPaymentMethods
+      tags: [Orders]
+      summary: List available payment methods (mobile)
+      description: |
+        Returns the payment methods available to the current user.
+        **Mobile-only**.
+
+        > **NOTE** — the `enabled` flag on each payment method is a runtime-toggleable value,
+        > not a static constant.  Ops can flip individual providers on/off without a redeploy
+        > via `PUT /v2/admin/payment-method-config`.  Env-var hard gates (e.g. `TABBY_AUTH_KEY`)
+        > still control whether a provider appears in the list at all.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      responses:
+        '200':
+          description: Payment methods list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            enabled:
+                              type: boolean
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/addresses:
+    get:
+      operationId: meListAddresses
+      tags: [Orders]
+      summary: List saved delivery addresses
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Address list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+    post:
+      operationId: meCreateAddress
+      tags: [Orders]
+      summary: Save a new delivery address
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+      responses:
+        '200':
+          description: Address saved.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/addresses/{id}:
+    delete:
+      operationId: meDeleteAddress
+      tags: [Orders]
+      summary: Delete a saved address
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Address deleted.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          addresses:
+                            type: array
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    patch:
+      operationId: meUpdateAddress
+      tags: [Orders]
+      summary: Partially update an address
+      description: |
+        Available on **both** mobile and web clients.
+        Body is a partial patch — any subset of address fields plus the
+        optional `primary` flag. Absent fields are left untouched. Unknown
+        keys are silently ignored.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:         { type: string }
+                email:        { type: string }
+                mobile:       { type: string }
+                city:         { type: string }
+                area:         { type: string }
+                state:        { type: string }
+                country:      { type: string }
+                countryCode:  { type: string }
+                floorNo:      { type: string }
+                apartmentNo:  { type: string }
+                buildingName: { type: string }
+                landmark:     { type: string }
+                primary:
+                  type: boolean
+                  description: Set true to mark this address as the primary; false to clear.
+      responses:
+        '200':
+          description: Address updated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /orders/{id}/proof-of-delivery:
+    post:
+      operationId: ordersUploadProofOfDelivery
+      tags: [Orders]
+      summary: Upload proof-of-delivery image (mobile)
+      description: |
+        File-upload route for attaching a proof-of-delivery image to an order.
+        **Mobile-only**. Send as multipart/form-data with a `file` field.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Proof-of-delivery image (jpeg, jpg, png).
+                status:
+                  type: string
+                  description: Optional status to set alongside the upload.
+      responses:
+        '200':
+          description: Proof uploaded and order updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Home manifest — single ETag-cached round-trip replacing 8–10 parallel reqs
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /home:
+    get:
+      operationId: homeGetManifest
+      tags: [Home]
+      summary: Home screen manifest
+      description: >
+        Returns all home-screen rails in a single cacheable response.
+        Supports `If-None-Match` / ETag conditional GETs for 304 Not Modified.
+      parameters:
+        - name: rails
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated list of rail names to include. Defaults to all enabled for the platform.
+        - name: params
+          in: query
+          required: false
+          schema:
+            type: string
+          description: JSON-encoded per-rail param overrides, e.g. `{"new-arrivals":{"limit":20}}`.
+      responses:
+        '200':
+          description: Home manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeManifestResponse'
+        '304':
+          description: Not Modified — client cache is still valid
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Products — shared (both platforms, no auth required for most)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /categories:
+    get:
+      operationId: categoriesList
+      tags: [Products]
+      summary: List categories (or search by name)
+      description: |
+        Returns the full category tree.  If the `q` query param is present,
+        searches categories by name instead.  Public — no auth required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Optional search term — if present, returns matching categories only.
+      responses:
+        '200':
+          description: Category list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/400ValidationError'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /products:
+    get:
+      operationId: productsGetList
+      tags: [Products]
+      summary: List products with optional filtering
+      description: Public — no auth required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter by category ID.
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest, popular]
+      responses:
+        '200':
+          description: Paginated product list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /products/{id}:
+    get:
+      operationId: productsGetDetail
+      tags: [Products]
+      summary: Get product detail
+      description: |
+        Returns full product details including variants.
+        Accepts an optional bearer / cookie token to decorate the `inWishlist` flag.
+      security:
+        - {}
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product detail.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /products/search:
+    post:
+      operationId: productsSearch
+      tags: [Products]
+      summary: Full-text product search
+      description: Public — no auth required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSearchRequest'
+      responses:
+        '200':
+          description: Search results.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /categories/{id}/products:
+    get:
+      operationId: categoriesGetProducts
+      tags: [Products]
+      summary: List products in a category (unified depth handler)
+      description: |
+        Returns products for the given category at the requested depth:
+        - `depth=1` (default) — direct category products
+        - `depth=2` — sub-category products
+        - `depth=3` — sub-sub-category products
+
+        Public — no auth required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: depth
+          schema:
+            type: integer
+            enum: [1, 2, 3]
+            default: 1
+          description: Category depth (1=category, 2=sub-category, 3=sub-sub-category).
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Products in category.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Me — authenticated user resources
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /orders/{id}:
+    get:
+      operationId: ordersGetUserOrder
+      tags: [User]
+      summary: Get a single user order by ID (web)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientWeb'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order detail.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    patch:
+      operationId: ordersUpdateStatus
+      tags: [Orders]
+      summary: Update order status — status-only (mobile)
+      description: |
+        Status-only update — no file. Body: `{ status: '...' }`.
+        **Mobile-only**. For proof-of-delivery uploads use POST /orders/:id/proof-of-delivery.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        '200':
+          description: Order status updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/payments:
+    get:
+      operationId: meGetPayments
+      tags: [User]
+      summary: List payment history
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated payment history.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PaymentRecord'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/payments/{id}:
+    get:
+      operationId: meGetPayment
+      tags: [User]
+      summary: Get a single payment record
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment record.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaymentRecord'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/dashboard:
+    get:
+      operationId: meGetDashboard
+      tags: [User]
+      summary: Get user dashboard stats
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Dashboard data.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/reviews:
+    get:
+      operationId: meGetReviews
+      tags: [User]
+      summary: List the current user's reviews
+      description: Available on **both** mobile and web clients.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated review list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Review'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    # POST /me/reviews was removed — review creation is canonically nested
+    # under `POST /products/{id}/reviews` (see /products/{id}/reviews below).
+
+  /me/payments/tabby/history:
+    get:
+      operationId: meGetTabbyPaymentHistory
+      tags: [User]
+      summary: Get Tabby BNPL purchase history (mobile)
+      description: |
+        Returns the user's Tabby buy-now-pay-later transaction history.
+        **Mobile-only**.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientMobile'
+      responses:
+        '200':
+          description: Tabby history list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /me/dashboard/current-month-categories:
+    get:
+      operationId: meGetCurrentMonthCategories
+      tags: [User]
+      summary: Get categories ordered in the current month (web)
+      description: |
+        Returns a breakdown of categories the user has ordered from
+        in the current calendar month. Used for personalisation on the web dashboard.
+        **Web-only**.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientWeb'
+      responses:
+        '200':
+          description: Category breakdown.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            category:
+                              type: string
+                            count:
+                              type: integer
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Wishlist — shared (both platforms)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /wishlist:
+    get:
+      operationId: wishlistGet
+      tags: [Wishlist]
+      summary: Get the current user's wishlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Wishlist items.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Wishlist'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /wishlist/items:
+    post:
+      operationId: wishlistAddItem
+      tags: [Wishlist]
+      summary: Add a product to the wishlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WishlistRequest'
+      responses:
+        '200':
+          description: Product added — full wishlist returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Wishlist'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /wishlist/items/{productId}:
+    delete:
+      operationId: wishlistRemoveItem
+      tags: [Wishlist]
+      summary: Remove a product from the wishlist
+      description: Product ID moves from request body to URL segment.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+          description: Product ID to remove.
+      responses:
+        '200':
+          description: Product removed — full wishlist returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Wishlist'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Coupons — shared (mobile + web), auth optional
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /coupons/issuance-count:
+    get:
+      operationId: couponsGetIssuanceCount
+      tags: [Coupons]
+      summary: Get coupon issuance count
+      description: |
+        Returns coupon count and availability information for the caller.
+        Auth is **optional** — anonymous callers receive the same response.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Coupon metadata fetched successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          count:
+                            type: integer
+                            minimum: 0
+                            description: Total number of coupons available system-wide.
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/validate:
+    post:
+      operationId: couponsValidate
+      tags: [Coupons]
+      summary: Validate a coupon code (v2 engine — structured reasons)
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                phone:
+                  type: string
+                cart_snapshot:
+                  type: object
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/apply:
+    post:
+      operationId: couponsV2Apply
+      tags: [Coupons]
+      summary: Apply (reserve) a coupon atomically
+      description: Auth is **required** — anonymous callers receive 401.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, phone]
+              properties:
+                code:
+                  type: string
+                phone:
+                  type: string
+                cart_snapshot:
+                  type: object
+                idempotency_key:
+                  type: string
+      responses:
+        '200':
+          description: Reservation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/release:
+    post:
+      operationId: couponsV2Release
+      tags: [Coupons]
+      summary: Release a coupon reservation
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redemption_id]
+              properties:
+                redemption_id:
+                  type: string
+      responses:
+        '200':
+          description: Release result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/redeem:
+    post:
+      operationId: couponsRedeem
+      tags: [Coupons]
+      summary: Confirm a coupon redemption against a placed order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redemption_id, final_cart]
+              properties:
+                redemption_id:
+                  type: string
+                order_id:
+                  type: string
+                final_cart:
+                  type: object
+      responses:
+        '200':
+          description: Redemption confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '409':
+          description: Cart changed — stale reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /coupons/eligible:
+    get:
+      operationId: couponsV2Eligible
+      tags: [Coupons]
+      summary: List eligible coupons for the current cart
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: query
+          name: phone
+          schema:
+            type: string
+        - in: query
+          name: subtotal
+          schema:
+            type: number
+        - in: query
+          name: vertical
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of eligible coupons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # Rails — shared (mobile + web), auth optional
+  # ════════════════════════════════════════════════════════════════════════════
+
+  /rails/{railName}:
+    get:
+      operationId: railsGet
+      tags: [Rails]
+      summary: Fetch a paginated smart-category rail
+      description: |
+        Returns page N of any registered home rail.
+        Rail names: `new-arrivals`, `flash-sales`, `today-deal`, `trending`,
+        `favourites-of-week`, `top-rated`, `hot-offers`, `categories-product`,
+        `categories`.
+
+        **Note:** `today-deal`, `top-rated`, `favourites-of-week`, and `categories`
+        use fixed-result fetchers — `page`/`limit` overrides are accepted but have
+        no effect for those rails.
+
+        Auth is **optional**.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: railName
+          required: true
+          schema:
+            type: string
+            enum:
+              - new-arrivals
+              - flash-sales
+              - today-deal
+              - trending
+              - favourites-of-week
+              - top-rated
+              - hot-offers
+              - categories-product
+              - categories
+          description: Registered rail identifier.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+          description: Required for the `categories-product` rail. Ignored by other rails.
+      responses:
+        '200':
+          description: Rail data fetched successfully.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: "`public, max-age=60, stale-while-revalidate=300`"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          railName:
+                            type: string
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # /products/categories/search merged into GET /categories?q=:term (Wave 3)
+
+  /products/{id}/reviews:
+    get:
+      operationId: productReviewsList
+      tags: [Products]
+      summary: List reviews for a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: string }
+                          total: { type: integer }
+                          reviews: { type: array, items: { type: object } }
+        '500': { $ref: '#/components/responses/500Internal' }
+    post:
+      operationId: productReviewsCreate
+      tags: [Products]
+      summary: Submit a review for a product (multipart)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                title: { type: string }
+                quality_rating: { type: number }
+                value_rating: { type: number }
+                price_rating: { type: number }
+                image: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          reviews: { type: array, items: { type: object } }
+        '400': { $ref: '#/components/responses/400ValidationError' }
+        '401': { $ref: '#/components/responses/401Unauthorized' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /products/{id}/reviews/me:
+    get:
+      operationId: productReviewsMine
+      tags: [Products]
+      summary: Current user's review on a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          productId: { type: string }
+                          total: { type: integer }
+                          reviews: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/401Unauthorized' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /products/{id}/similar:
+    get:
+      operationId: productsGetSimilar
+      tags: [Products]
+      summary: Get similar products
+      description: Returns products similar to the specified product. ID is now a URL segment. Public.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Product ID.
+        - in: query
+          name: product_type_id
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Similar product list.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  /shipping/countries:
+    get:
+      operationId: shippingCountries
+      tags: [Shipping]
+      summary: List active shipping countries
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          countries: { type: array, items: { type: object } }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /shipping/countries/{code}/cities:
+    get:
+      operationId: shippingCities
+      tags: [Shipping]
+      summary: List cities for a shipping country
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          country: { type: string }
+                          cities: { type: array, items: { type: object } }
+        '404': { $ref: '#/components/responses/404NotFound' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /shipping/quote:
+    get:
+      operationId: shippingQuote
+      tags: [Shipping]
+      summary: Calculate shipping quote for an order
+      parameters:
+        - in: query
+          name: country
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: area
+          schema: { type: string }
+        - in: query
+          name: subtotal
+          schema: { type: number }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cost: { type: number }
+                          currency: { type: string }
+                          currencySymbol: { type: string }
+                          countryName: { type: string }
+                          freeShipping: { type: boolean }
+                          freeShippingThreshold: { type: number }
+        '400': { $ref: '#/components/responses/400ValidationError' }
+        '500': { $ref: '#/components/responses/500Internal' }
+
+  /config:
+    get:
+      operationId: mobileConfig
+      tags: [MobileConfig]
+      summary: Mobile app startup config (min version + payment methods)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          minSupportedVersion: { type: string }
+                          bannersEnabled:
+                            type: boolean
+                            description: |
+                              Home-screen banner carousel kill-switch. Mobile
+                              reads this via `AppVersionGate.remoteBannersEnabled`
+                              (see Bazaar-Mobile-App/lib/core/services/
+                              app_version_gate.dart). Defaults to true; flip to
+                              false to hide the home carousel without an app
+                              release. Toggled via PUT /v2/admin/payment-method-config.
+                        required: [minSupportedVersion, bannersEnabled]
+                        description: |
+                          Minimal app-startup bootstrap. Payment-provider
+                          availability is served by `GET /v2/payment-methods`
+                          (rich shape per provider). Earlier versions of this
+                          endpoint also returned `nomodEnabled` and a
+                          `paymentMethods` string array — both removed because
+                          they duplicated `/v2/payment-methods`.
+        '500': { $ref: '#/components/responses/500Internal' }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Banners
+# ─────────────────────────────────────────────────────────────────────────────
+
+  /banners:
+    get:
+      operationId: bannersGet
+      tags: [Banners]
+      summary: Get all banners
+      description: |
+        Returns all banner images, sorted by most recently created first.
+        Public endpoint — no authentication required.
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Banners fetched successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          banners:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                _id:
+                                  type: string
+                                  description: MongoDB document id.
+                                name:
+                                  type: string
+                                  description: Banner display name.
+                                image:
+                                  type: string
+                                  format: uri
+                                  description: Fully-qualified URL to the banner image.
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Verticals
+# ─────────────────────────────────────────────────────────────────────────────
+
+  /verticals:
+    get:
+      operationId: verticalsList
+      tags: [Verticals]
+      summary: List all verticals
+      description: |
+        Returns the full verticals list (UAE first, then coming-soon entries).
+        Response is cached for 5 minutes.
+        Public — no authentication required.
+      parameters:
+        - $ref: '#/components/parameters/XClient'
+      responses:
+        '200':
+          description: Verticals fetched successfully.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          verticals:
+                            type: array
+                            items:
+                              type: object
+                              required: [id, label, enabled, comingSoon]
+                              properties:
+                                id:
+                                  type: string
+                                  example: uae
+                                label:
+                                  type: string
+                                  example: UAE
+                                tag:
+                                  type: string
+                                  nullable: true
+                                  example: Default
+                                enabled:
+                                  type: boolean
+                                comingSoon:
+                                  type: boolean
+                                launchDate:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+  # /notify-me renamed to POST /notifications/subscriptions in Wave 3 (see above)
+
+  /admin/payment-method-config:
+    get:
+      operationId: adminGetPaymentMethodConfig
+      tags: [Admin]
+      summary: Get payment method runtime config
+      description: |
+        Returns the singleton `paymentMethodConfig` document.
+        Auto-creates it with defaults (`stripeEnabled: true`, `tabbyEnabled: true`,
+        `nomodEnabled: false`) if it does not yet exist.
+
+        > **Admin bearer token required** — the `Authorization` header must carry
+        > a JWT issued for an admin account, not a regular user token.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current payment-method config.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaymentMethodConfig'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+    put:
+      operationId: adminUpdatePaymentMethodConfig
+      tags: [Admin]
+      summary: Toggle payment methods on/off at runtime
+      description: |
+        Partial update — only the fields present in the request body are applied.
+        Each field must be a strict JSON boolean (`true` / `false`); strings and
+        numbers are rejected with `400 VALIDATION_ERROR`.
+
+        Flips take effect immediately: the Redis cache for payment-method config
+        (TTL 30 s) is invalidated on every successful PUT.
+
+        > **Admin bearer token required** — the `Authorization` header must carry
+        > a JWT issued for an admin account, not a regular user token.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stripeEnabled:
+                  type: boolean
+                  description: Enable/disable Stripe (card) payments.
+                tabbyEnabled:
+                  type: boolean
+                  description: Enable/disable Tabby buy-now-pay-later.
+                nomodEnabled:
+                  type: boolean
+                  description: Enable/disable Nomod payments.
+                bannersEnabled:
+                  type: boolean
+                  description: |
+                    Home-screen banner carousel kill-switch (mobile). Default
+                    true. Flip to false to hide the home carousel without an
+                    app release.
+              minProperties: 1
+            example:
+              stripeEnabled: true
+              tabbyEnabled: false
+      responses:
+        '200':
+          description: Updated config doc.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaymentMethodConfig'
+        '400':
+          $ref: '#/components/responses/400ValidationError'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500Internal'
+
+# Reusable Parameters
+# ─────────────────────────────────────────────────────────────────────────────
+  parameters:
+
+    XClient:
+      in: header
+      name: X-Client
+      required: true
+      schema:
+        type: string
+        enum: [web, mobile]
+      description: >
+        Platform identifier. Routes behave differently per platform.
+        Missing or invalid value → 400 `UNKNOWN_PLATFORM`.
+
+    XClientMobile:
+      in: header
+      name: X-Client
+      required: true
+      schema:
+        type: string
+        enum: [mobile]
+      description: This endpoint is **mobile-only**. Must be `mobile`.
+
+    XClientWeb:
+      in: header
+      name: X-Client
+      required: true
+      schema:
+        type: string
+        enum: [web]
+      description: This endpoint is **web-only**. Must be `web`.
+
+    AddressId:
+      in: path
+      name: addressId
+      required: true
+      schema:
+        type: string
+      description: MongoDB ObjectId of the address document.

@@ -2,6 +2,11 @@ const authService = require("../../services/authService");
 const userService = require("../../services/userService");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = require("../../config/jwtSecret");
+const { SEC_PER_DAY } = require("../../config/constants/time");
+
+// Apple client-secret JWT must expire within 6 months per Apple's rules.
+// We issue it with a 24-hour (1-day) window to minimise exposure on each request.
+const APPLE_CLIENT_SECRET_EXPIRY_SECS = SEC_PER_DAY;
 
 const logger = require("../../utilities/logger");
 const BACKEND_URL = process.env.BACKEND_URL;
@@ -177,7 +182,7 @@ exports.appleCallback = async (req, res) => {
     {
       iss: teamId,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600 * 24,
+      exp: Math.floor(Date.now() / 1000) + APPLE_CLIENT_SECRET_EXPIRY_SECS,
       aud: "https://appleid.apple.com",
       sub: clientId,
     },
@@ -207,7 +212,7 @@ exports.appleCallback = async (req, res) => {
   let appleEmail = user?.email;
   let name = `${user?.name?.firstName} ${user?.name?.lastName}`;
 
-  const User = require("../../models/User");
+  const User = require('../../repositories').users.rawModel();
 
   if (!appleEmail) {
     const existing = await User.findOne({ appleId: appleUserId });
@@ -391,7 +396,7 @@ exports.getNotification = async (req, res) => {
   const email = req.user.email;
 
   try {
-    const Notification = require("../../models/Notification");
+    const Notification = require('../../repositories').notifications.rawModel();
     const notifications = await Notification.find({
       $or: [{ userId: user_id }, { email: email }],
     })
@@ -421,7 +426,7 @@ exports.markNotificationsAsRead = async (req, res) => {
   }
 
   try {
-    const Notification = require("../../models/Notification");
+    const Notification = require('../../repositories').notifications.rawModel();
     await Notification.updateMany(
       {
         _id: { $in: ids },
@@ -461,7 +466,7 @@ exports.review = async (req, res) => {
       products: result.products,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -505,7 +510,7 @@ exports.addReview = async (req, res) => {
       reviews: result.reviews,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -524,7 +529,7 @@ exports.orders = async (req, res) => {
       canceled_orders: result.canceled_orders,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -544,7 +549,7 @@ exports.order = async (req, res) => {
       orders: result.orders,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -563,7 +568,7 @@ exports.paymentHistory = async (req, res) => {
       history: result.history,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -583,7 +588,7 @@ exports.singlePaymentHistory = async (req, res) => {
       history: result.history,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
@@ -606,7 +611,7 @@ exports.dashboard = async (req, res) => {
       wishlist_item: result.wishlist_item,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'user handler error:');
     const status = error.status || 500;
     return res.status(status).json({
       success: false,

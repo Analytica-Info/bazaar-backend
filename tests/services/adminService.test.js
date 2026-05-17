@@ -673,4 +673,645 @@ describe("adminService", () => {
       }
     });
   });
+
+  // ---- getCoupons ----
+  describe("getCoupons", () => {
+    it("should throw 404 when no coupons exist", async () => {
+      try {
+        await adminService.getCoupons();
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+        expect(err.message).toMatch(/coupons/i);
+      }
+    });
+  });
+
+  // ---- updateOrderStatus ----
+  describe("updateOrderStatus", () => {
+    it("should throw 400 when status is missing", async () => {
+      try {
+        await adminService.updateOrderStatus("fakeid", "", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/required/i);
+      }
+    });
+
+    it("should throw 400 on invalid status value", async () => {
+      try {
+        await adminService.updateOrderStatus("fakeid", "Invented", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid status/i);
+      }
+    });
+
+    it("should throw 404 when order not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.updateOrderStatus(fakeId, "Confirmed", null);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+        expect(err.message).toMatch(/not found/i);
+      }
+    });
+
+    it("should update order status and append to orderTracks", async () => {
+      const user = await makeUser({ email: "order-status@test.com" });
+      const order = await makeOrder(user._id, {
+        order_id: "BZR-STATUS-001",
+        order_no: 9001,
+        status: "Confirmed",
+        orderTracks: [{ status: "Confirmed", dateTime: "2026-01-01" }],
+      });
+
+      const result = await adminService.updateOrderStatus(
+        order._id.toString(),
+        "Packed",
+        null
+      );
+
+      expect(result.status).toBe("Packed");
+      expect(result.orderTracks.some((t) => t.status === "Packed")).toBe(true);
+    });
+
+    it("should include image path when filePath is provided", async () => {
+      process.env.BACKEND_URL = "http://localhost:3000";
+      const user = await makeUser({ email: "order-img@test.com" });
+      const order = await makeOrder(user._id, {
+        order_id: "BZR-IMG-001",
+        order_no: 9002,
+        status: "Packed",
+        orderTracks: [],
+      });
+
+      const result = await adminService.updateOrderStatus(
+        order._id.toString(),
+        "Delivered",
+        "uploads/proof.jpg"
+      );
+
+      expect(result.orderTracks.some((t) => t.image && t.image.includes("uploads/proof.jpg"))).toBe(
+        true
+      );
+    });
+  });
+
+  // ---- blockUser / unblockUser edge cases ----
+  describe("blockUser edge cases", () => {
+    it("should throw when user is deleted", async () => {
+      const user = await makeUser({ email: "del-block@test.com", isDeleted: true });
+      try {
+        await adminService.blockUser(user._id.toString());
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/deleted/i);
+      }
+    });
+
+    it("should throw when user is already blocked", async () => {
+      const user = await makeUser({ email: "already-blocked@test.com", isBlocked: true });
+      try {
+        await adminService.blockUser(user._id.toString());
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already blocked/i);
+      }
+    });
+
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.blockUser("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw when user not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.blockUser(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  describe("unblockUser edge cases", () => {
+    it("should throw when user is not blocked", async () => {
+      const user = await makeUser({ email: "not-blocked@test.com", isBlocked: false });
+      try {
+        await adminService.unblockUser(user._id.toString());
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not blocked/i);
+      }
+    });
+
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.unblockUser("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+  });
+
+  // ---- deleteUser / restoreUser edge cases ----
+  describe("deleteUser edge cases", () => {
+    it("should throw when user is already deleted", async () => {
+      const user = await makeUser({ email: "already-del@test.com", isDeleted: true });
+      try {
+        await adminService.deleteUser(user._id.toString());
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already deleted/i);
+      }
+    });
+
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.deleteUser("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+  });
+
+  describe("restoreUser edge cases", () => {
+    it("should throw when user is not deleted", async () => {
+      const user = await makeUser({ email: "not-del@test.com", isDeleted: false });
+      try {
+        await adminService.restoreUser(user._id.toString());
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/not deleted/i);
+      }
+    });
+
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.restoreUser("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+  });
+
+  // ---- verifyCode / resetPassword ----
+  describe("verifyCode", () => {
+    it("should throw 404 when admin not found", async () => {
+      try {
+        await adminService.verifyCode("nobody@test.com", "123456");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+
+    it("should throw 400 when token is expired", async () => {
+      const admin = await makeAdmin({ email: "verify-admin@test.com" });
+      admin.resetPasswordToken = "sometoken";
+      admin.resetPasswordExpires = Date.now() - 1000; // expired
+      await admin.save();
+
+      try {
+        await adminService.verifyCode("verify-admin@test.com", "999999");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/expired/i);
+      }
+    });
+  });
+
+  describe("resetPassword", () => {
+    it("should throw 404 when admin not found", async () => {
+      try {
+        await adminService.resetPassword("nobody@test.com", "newPass", "code");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+
+    it("should throw 400 when token is expired", async () => {
+      const admin = await makeAdmin({ email: "reset-admin@test.com" });
+      admin.resetPasswordToken = "sometoken";
+      admin.resetPasswordExpires = Date.now() - 1000;
+      await admin.save();
+
+      try {
+        await adminService.resetPassword("reset-admin@test.com", "newPass", "code");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/expired/i);
+      }
+    });
+  });
+
+  // ---- updatePassword ----
+  describe("updatePassword", () => {
+    it("should throw 404 when admin not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.updatePassword(fakeId, "old", "new");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+
+    it("should throw 400 when old password is wrong", async () => {
+      const admin = await makeAdmin({ email: "upd-pass@test.com" });
+      try {
+        await adminService.updatePassword(admin._id.toString(), "WrongPassword", "newPass");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/incorrect/i);
+      }
+    });
+  });
+
+  // ---- getAllUsers — filter branches ----
+  describe("getAllUsers — filter branches", () => {
+    beforeEach(async () => {
+      await User.create({
+        name: "Blocked User",
+        email: "blocked-filter@test.com",
+        phone: "0501111001",
+        password: "hashed",
+        isBlocked: true,
+        isDeleted: false,
+      });
+      await User.create({
+        name: "Web User",
+        email: "web-filter@test.com",
+        phone: "0501111002",
+        password: "hashed",
+        platform: "web",
+      });
+      await User.create({
+        name: "Google User",
+        email: "google-filter@test.com",
+        phone: "0501111003",
+        password: "hashed",
+        authProvider: "google",
+      });
+    });
+
+    it("should filter by blocked status", async () => {
+      const result = await adminService.getAllUsers({ status: "blocked" });
+      expect(result.users.every((u) => u.isBlocked === true)).toBe(true);
+    });
+
+    it("should filter by web platform", async () => {
+      const result = await adminService.getAllUsers({ platform: "web" });
+      expect(result.users.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by authProvider", async () => {
+      const result = await adminService.getAllUsers({ authProvider: "google" });
+      expect(result.users.every((u) => u.authProvider === "google")).toBe(true);
+    });
+
+    it("should filter by date range", async () => {
+      const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const endDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const result = await adminService.getAllUsers({ startDate, endDate });
+      expect(result.users.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ---- getAdminById ----
+  describe("getAdminById", () => {
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.getAdminById("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw 404 when admin not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.getAdminById(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+
+    it("should return admin by id", async () => {
+      const admin = await makeAdmin({ email: "get-by-id@test.com" });
+      const result = await adminService.getAdminById(admin._id.toString());
+      expect(result.email).toBe("get-by-id@test.com");
+    });
+  });
+
+  // ---- createSubAdmin edge cases ----
+  describe("createSubAdmin edge cases", () => {
+    it("should throw on invalid role ObjectId", async () => {
+      try {
+        await adminService.createSubAdmin({
+          firstName: "Sub",
+          lastName: "Admin",
+          email: "sub-inv@test.com",
+          phone: "0501234999",
+          password: "Pass@1234",
+          roleId: "not-valid-id",
+        });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid role/i);
+      }
+    });
+
+    it("should throw when role is inactive", async () => {
+      const role = await Role.create({ name: "InactiveRole", isActive: false });
+      try {
+        await adminService.createSubAdmin({
+          firstName: "Sub",
+          lastName: "Admin",
+          email: "sub-inactive@test.com",
+          phone: "0501234998",
+          password: "Pass@1234",
+          roleId: role._id.toString(),
+        });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid or inactive/i);
+      }
+    });
+  });
+
+  // ---- updateSubAdmin edge cases ----
+  describe("updateSubAdmin edge cases", () => {
+    it("should throw on invalid admin ObjectId", async () => {
+      try {
+        await adminService.updateSubAdmin("bad-id", { firstName: "X" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw on duplicate email", async () => {
+      const admin1 = await makeAdmin({ email: "sub-dup1@test.com" });
+      const admin2 = await makeAdmin({ email: "sub-dup2@test.com" });
+
+      try {
+        await adminService.updateSubAdmin(admin2._id.toString(), {
+          email: "sub-dup1@test.com",
+        });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already exists/i);
+      }
+    });
+  });
+
+  // ---- getOrders — filter branches ----
+  describe("getOrders — filter branches", () => {
+    beforeEach(async () => {
+      const user = await makeUser({ email: "order-filter@test.com" });
+      await makeOrder(user._id, {
+        order_id: "BZR-FILT-001",
+        order_no: 8001,
+        payment_method: "card",
+        payment_status: "paid",
+        status: "Delivered",
+        orderfrom: "website",
+      });
+      await makeOrder(user._id, {
+        order_id: "BZR-FILT-002",
+        order_no: 8002,
+        payment_method: "tabby",
+        payment_status: "pending",
+        status: "Confirmed",
+        orderfrom: "mobile app",
+      });
+    });
+
+    it("should filter by payment status", async () => {
+      const result = await adminService.getOrders({ paymentStatus: "paid" });
+      expect(result.orders.every((o) => o.payment_status.toLowerCase() === "paid")).toBe(true);
+    });
+
+    it("should filter by payment method (stripe alias)", async () => {
+      const result = await adminService.getOrders({ paymentMethod: "stripe" });
+      // card maps to stripe regex
+      expect(result.orders.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by mobileapp platform", async () => {
+      const result = await adminService.getOrders({ platform: "mobileapp" });
+      expect(result.orders.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by website platform", async () => {
+      const result = await adminService.getOrders({ platform: "website" });
+      expect(result.orders.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by date range", async () => {
+      const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const endDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const result = await adminService.getOrders({ startDate, endDate });
+      expect(result.orders.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ---- forgotPassword ----
+  describe("forgotPassword", () => {
+    it("should set resetPasswordToken and expires on admin", async () => {
+      const admin = await makeAdmin({ email: "forgot-admin@test.com" });
+      await adminService.forgotPassword("forgot-admin@test.com");
+
+      const updated = await Admin.findById(admin._id);
+      expect(updated.resetPasswordToken).toBeDefined();
+      expect(new Date(updated.resetPasswordExpires).getTime()).toBeGreaterThan(Date.now());
+    });
+  });
+
+  // ---- getAllAdmins — empty case ----
+  describe("getAllAdmins — empty case", () => {
+    it("should throw 404 when no admins exist", async () => {
+      try {
+        await adminService.getAllAdmins({ page: 1, limit: 10 });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  // ---- getUserById — invalid ID ----
+  describe("getUserById edge cases", () => {
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.getUserById("bad-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+  });
+
+  // ---- exportUsers — filter branches ----
+  describe("exportUsers — filter branches", () => {
+    beforeEach(async () => {
+      await User.create({
+        name: "Export Blocked",
+        email: "exp-blocked@test.com",
+        phone: "0502222001",
+        password: "hashed",
+        isBlocked: true,
+        isDeleted: false,
+      });
+      await User.create({
+        name: "Export Mobile",
+        email: "exp-mobile@test.com",
+        phone: "0502222002",
+        password: "hashed",
+        platform: "mobile",
+      });
+    });
+
+    it("should filter by blocked status", async () => {
+      const result = await adminService.exportUsers({ status: "blocked" });
+      expect(result.every((u) => u.isBlocked === true)).toBe(true);
+    });
+
+    it("should filter by deleted status", async () => {
+      await User.create({
+        name: "Export Del",
+        email: "exp-del@test.com",
+        phone: "0502222003",
+        password: "hashed",
+        isDeleted: true,
+      });
+      const result = await adminService.exportUsers({ status: "deleted" });
+      expect(result.every((u) => u.isDeleted === true)).toBe(true);
+    });
+
+    it("should filter by mobile platform", async () => {
+      const result = await adminService.exportUsers({ platform: "mobile" });
+      expect(result.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by authProvider", async () => {
+      await User.create({
+        name: "Export Apple",
+        email: "exp-apple@test.com",
+        phone: "0502222004",
+        password: "hashed",
+        authProvider: "apple",
+      });
+      const result = await adminService.exportUsers({ authProvider: "apple" });
+      expect(result.every((u) => u.authProvider === "apple")).toBe(true);
+    });
+
+    it("should filter by search query", async () => {
+      const result = await adminService.exportUsers({ search: "Export Mobile" });
+      expect(result.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should filter by date range", async () => {
+      const startDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const endDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const result = await adminService.exportUsers({ startDate, endDate });
+      expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("deleteSubAdmin", () => {
+    it("should throw on invalid ObjectId", async () => {
+      try {
+        await adminService.deleteSubAdmin("not-an-id");
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw 404 when admin not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.deleteSubAdmin(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  describe("getProductAnalytics", () => {
+    it("should return empty analytics when no product views exist", async () => {
+      const result = await adminService.getProductAnalytics({ page: 1, limit: 10 });
+      expect(result.analytics).toEqual([]);
+      expect(result.pagination).toBeDefined();
+    });
+  });
+
+  describe("getActivityLogs", () => {
+    it("should return empty logs when none exist", async () => {
+      const result = await adminService.getActivityLogs({ page: 1, limit: 10 });
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe("getActivityLogById", () => {
+    it("should throw 404 when log not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.getActivityLogById(fakeId);
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
+
+  describe("updateUser", () => {
+    it("should throw 400 on invalid userId", async () => {
+      try {
+        await adminService.updateUser("bad-id", { name: "Test" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(400);
+      }
+    });
+
+    it("should throw 404 when user not found", async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+      try {
+        await adminService.updateUser(fakeId, { name: "New Name" });
+        fail("Expected error");
+      } catch (err) {
+        expect(err.status).toBe(404);
+      }
+    });
+  });
 });

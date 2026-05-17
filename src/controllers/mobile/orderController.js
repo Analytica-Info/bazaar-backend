@@ -3,7 +3,8 @@ const { logActivity } = require('../../utilities/activityLogger');
 const { logBackendActivity } = require('../../utilities/backendLogger');
 
 const logger = require("../../utilities/logger");
-exports.checkoutSession = async (req, res) => {
+const { asyncHandler } = require('../../middleware');
+exports.checkoutSession = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const headers = { fcmToken: req.user?.fcmToken || null };
@@ -15,7 +16,7 @@ exports.checkoutSession = async (req, res) => {
         });
     } catch (error) {
         logger.info('sendPushNotification Error' || 'fcmToken not available');
-        console.error(error);
+        logger.error({ err: error }, 'checkoutSession error:');
 
         if (error.status) {
             return res.status(error.status).json({ error: error.message });
@@ -45,9 +46,9 @@ exports.checkoutSession = async (req, res) => {
 
         res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.checkoutSessionTabby = async (req, res) => {
+exports.checkoutSessionTabby = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const headers = { fcmToken: req.user?.fcmToken || null };
@@ -73,9 +74,9 @@ exports.checkoutSessionTabby = async (req, res) => {
         });
         res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.verifyTabbyPayment = async (req, res) => {
+exports.verifyTabbyPayment = asyncHandler(async (req, res) => {
     try {
         const { paymentId } = req.query;
         const result = await orderService.verifyTabbyPayment(paymentId);
@@ -91,55 +92,26 @@ exports.verifyTabbyPayment = async (req, res) => {
         logger.error({ err: error }, 'Tabby Payment error:');
         return res.status(500).json({ error: 'Internal server error' });
     }
-};
+});
 
-exports.checkoutSessionNomod = async (req, res) => {
+// Server-creates a Tabby checkout session so the mobile client never holds the
+// Tabby secret key. Returns the web URL the mobile WebView should load.
+exports.createTabbySession = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
-        const headers = { fcmToken: req.user?.fcmToken || null };
-        const result = await orderService.createNomodCheckoutSession(userId, req.body, headers);
-
-        return res.status(200).json({
-            message: result.message,
-            paymentId: result.paymentId,
-            status: result.status,
-        });
+        const result = await orderService.createTabbySession(userId, req.body);
+        return res.status(200).json(result);
     } catch (error) {
         if (error.status) {
             return res.status(error.status).json({ error: error.message });
         }
-        logger.error({ err: error }, 'Error storing Nomod order data:');
-        await logBackendActivity({
-            platform: 'Mobile App Backend',
-            activity_name: 'Checkout Session Nomod API Hit',
-            status: 'failure',
-            message: `Nomod checkoutSessionNomod failed: ${error.message}`,
-            execution_path: 'orderController.checkoutSessionNomod (catch)',
-            error_details: error.message,
-        });
-        res.status(500).json({ error: error.message });
-    }
-};
-
-exports.verifyNomodPayment = async (req, res) => {
-    try {
-        const { paymentId } = req.query;
-        const result = await orderService.verifyNomodPayment(paymentId);
-
-        if (result.finalStatus) {
-            return res.status(200).json({ message: result.message, finalStatus: result.finalStatus });
-        }
-        return res.status(200).json({ message: result.message });
-    } catch (error) {
-        if (error.status) {
-            return res.status(error.status).json({ error: error.message });
-        }
-        logger.error({ err: error }, 'Nomod Payment error:');
+        logger.error({ err: error }, 'Tabby create session error:');
         return res.status(500).json({ error: 'Internal server error' });
     }
-};
+});
 
-exports.getOrders = async (req, res) => {
+
+exports.getOrders = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -162,9 +134,9 @@ exports.getOrders = async (req, res) => {
             error: error.message
         });
     }
-};
+});
 
-exports.initStripePayment = async (req, res) => {
+exports.initStripePayment = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const { amountAED } = req.body;
@@ -173,27 +145,32 @@ exports.initStripePayment = async (req, res) => {
             return res.status(400).json({ error: 'amountAED is required and must be a positive number' });
         }
 
-        const result = await orderService.initStripePayment(userId, Number(amountAED));
+        const result = await orderService.initStripePayment(userId, Number(amountAED), req.body);
         return res.status(200).json(result);
     } catch (error) {
         if (error.status) return res.status(error.status).json({ error: error.message });
-        console.error('initStripePayment error:', error);
+        logger.error({ err: error }, 'initStripePayment error:');
         return res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.getPaymentMethods = async (req, res) => {
+exports.getPaymentMethods = asyncHandler(async (req, res) => {
     try {
         const methods = await orderService.getPaymentMethods();
         return res.status(200).json({ methods });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
-};
+});
 
-exports.paymentIntent = async (req, res) => {
+exports.paymentIntent = asyncHandler(async (req, res) => {
     try {
-        const data = await orderService.getPaymentIntent();
+        // Admin/debug route only — not wired into mobile flows.
+        const { paymentIntentId } = req.query;
+        if (!paymentIntentId) {
+            return res.status(400).json({ success: false, message: 'paymentIntentId query parameter is required' });
+        }
+        const data = await orderService.getPaymentIntent(paymentIntentId);
 
         res.status(200).json({
             success: true,
@@ -201,16 +178,16 @@ exports.paymentIntent = async (req, res) => {
             data: data,
         });
     } catch (error) {
-        console.error('Error fetching payment intent:', error.response?.data || error.message);
+        logger.error({ err: error }, 'Error fetching payment intent:');
         res.status(500).json({
             success: false,
             message: 'Failed to retrieve payment intent',
             error: error.response?.data || error.message,
         });
     }
-};
+});
 
-exports.updateOrderStatus = async (req, res) => {
+exports.updateOrderStatus = asyncHandler(async (req, res) => {
     try {
         const { orderId } = req.params;
         const { status } = req.body;
@@ -236,9 +213,9 @@ exports.updateOrderStatus = async (req, res) => {
             error: error.message
         });
     }
-};
+});
 
-exports.storeAddress = async (req, res) => {
+exports.storeAddress = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const result = await orderService.storeAddress(userId, req.body);
@@ -258,9 +235,9 @@ exports.storeAddress = async (req, res) => {
             error: error.message
         });
     }
-};
+});
 
-exports.deleteAddress = async (req, res) => {
+exports.deleteAddress = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const { addressId } = req.params;
@@ -282,9 +259,9 @@ exports.deleteAddress = async (req, res) => {
             error: error.message
         });
     }
-};
+});
 
-exports.setPrimaryAddress = async (req, res) => {
+exports.setPrimaryAddress = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const { addressId } = req.params;
@@ -306,9 +283,9 @@ exports.setPrimaryAddress = async (req, res) => {
             error: error.message
         });
     }
-};
+});
 
-exports.address = async (req, res) => {
+exports.address = asyncHandler(async (req, res) => {
     try {
         const userId = req.user._id;
         const result = await orderService.getAddresses(userId);
@@ -329,9 +306,9 @@ exports.address = async (req, res) => {
             flag: false
         });
     }
-};
+});
 
-exports.tabbyWebhook = async (req, res) => {
+exports.tabbyWebhook = asyncHandler(async (req, res) => {
     try {
         const forwardedIps = (req.headers['x-forwarded-for'] || '').split(',');
         const clientIP = forwardedIps[0]?.trim() || req.socket.remoteAddress;
@@ -365,9 +342,9 @@ exports.tabbyWebhook = async (req, res) => {
         logger.error({ err: error }, 'Tabby webhook error:');
         return res.status(500).send('Internal server error');
     }
-};
+});
 
-exports.validateInventoryBeforeCheckout = async (req, res) => {
+exports.validateInventoryBeforeCheckout = asyncHandler(async (req, res) => {
     try {
         const { products } = req.body;
         const user = req.user || {};
@@ -421,4 +398,4 @@ exports.validateInventoryBeforeCheckout = async (req, res) => {
             error: error.message
         });
     }
-};
+});

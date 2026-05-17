@@ -1,8 +1,9 @@
 const contactService = require("../../services/contactService");
 const path = require('path');
-
+const { asyncHandler } = require("../../middleware");
 const logger = require("../../utilities/logger");
-exports.contactUs = async (req, res) => {
+
+exports.contactUs = asyncHandler(async (req, res) => {
     try {
         const { email, name, subject, message, phone } = req.body;
 
@@ -17,9 +18,9 @@ exports.contactUs = async (req, res) => {
         }
         res.status(500).json({ message: "Server error" });
     }
-};
+});
 
-exports.submitFeedback = async (req, res) => {
+exports.submitFeedback = asyncHandler(async (req, res) => {
     try {
         const { name, feedback } = req.body;
         const userEmail = req.user?.email;
@@ -36,9 +37,9 @@ exports.submitFeedback = async (req, res) => {
         logger.error({ err: error }, "Feedback submission error:");
         res.status(500).json({ message: "Server error" });
     }
-};
+});
 
-exports.downloadFile = async (req, res) => {
+exports.downloadFile = asyncHandler(async (req, res) => {
     try {
         const relativePath = req.query.url;
         const uploadsDir = path.join(__dirname, '../../uploads');
@@ -58,9 +59,9 @@ exports.downloadFile = async (req, res) => {
         logger.error({ err: error }, "Download error:");
         res.status(500).send("Failed to download file.");
     }
-};
+});
 
-exports.createMobileAppLog = async (req, res) => {
+exports.createMobileAppLog = asyncHandler(async (req, res) => {
     try {
         const { user_name, mobile_device, app_version, email, issue_message, activity_name } = req.body;
 
@@ -89,4 +90,4 @@ exports.createMobileAppLog = async (req, res) => {
             error: error.message
         });
     }
-};
+});

@@ -1,0 +1,4699 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/admin/admins/:adminId",
+    "version": "v1-ecommerce",
+    "controller": "deleteSubAdmin",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/bank-promo-codes/:id",
+    "version": "v1-ecommerce",
+    "controller": "deleteBankPromoCode",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/notifications/:notificationId",
+    "version": "v1-ecommerce",
+    "controller": "deleteNotification",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/permissions/:permissionId",
+    "version": "v1-ecommerce",
+    "controller": "deletePermission",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/roles/:roleId",
+    "version": "v1-ecommerce",
+    "controller": "deleteRole",
+    "file": "src/routes/ecommerce/roleRoutes.js",
+    "controller_file": "src/controllers/ecommerce/roleController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/shipping-countries/:id",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/shipping-countries/:id/cities/:cityId",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/shipping-countries/:id/cities/:cityId/areas/:areaId",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/users/:userId",
+    "version": "v1-ecommerce",
+    "controller": "deleteUser",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/banner/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/bannerImages.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/order/address/:addressId",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/banner/:id",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/bannerImages.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/user/address/:addressId",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v2/auth/account",
+    "version": "v2",
+    "controller": "authCtrl.deleteAccount",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/v2/cart",
+    "version": "v2",
+    "controller": "cartCtrl.removeFromCart",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/cartController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/v2/orders/address/:addressId",
+    "version": "v2",
+    "controller": "orderCtrl.deleteAddress",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/v2/wishlist",
+    "version": "v2",
+    "controller": "wishlistCtrl.removeFromWishlist",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/wishlistController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/admin/admins",
+    "version": "v1-ecommerce",
+    "controller": "getAllAdmins",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/admins/:adminId",
+    "version": "v1-ecommerce",
+    "controller": "getAdminById",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/admins/me",
+    "version": "v1-ecommerce",
+    "controller": "getCurrentAdmin",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/analytics/products",
+    "version": "v1-ecommerce",
+    "controller": "getProductAnalytics",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/analytics/products/:productId",
+    "version": "v1-ecommerce",
+    "controller": "getProductViewDetails",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/analytics/products/export",
+    "version": "v1-ecommerce",
+    "controller": "exportProductAnalytics",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/bank-promo-codes",
+    "version": "v1-ecommerce",
+    "controller": "listBankPromoCodes",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/admin/bank-promo-codes/:id",
+    "version": "v1-ecommerce",
+    "controller": "getBankPromoCodeById",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/admin/coupon",
+    "version": "v1-ecommerce",
+    "controller": "coupons",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/email-config",
+    "version": "v1-ecommerce",
+    "controller": "getEmailConfig",
+    "file": "src/routes/ecommerce/emailRoutes.js",
+    "controller_file": "src/controllers/ecommerce/emailController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs",
+    "version": "v1-ecommerce",
+    "controller": "getActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs/:logId",
+    "version": "v1-ecommerce",
+    "controller": "getActivityLogById",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs/activity/download",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs/backend",
+    "version": "v1-ecommerce",
+    "controller": "getBackendLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs/backend/:date/:platform",
+    "version": "v1-ecommerce",
+    "controller": "getBackendLogByDate",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/logs/backend/download",
+    "version": "v1-ecommerce",
+    "controller": "downloadBackendLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/monitoring/discount-sync",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/monitoring/errors",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/monitoring/overview",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/monitoring/requests",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/monitoring/webhooks",
+    "version": "v1-ecommerce",
+    "controller": "downloadActivityLogs",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/notifications",
+    "version": "v1-ecommerce",
+    "controller": "getNotifications",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/web/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "error",
+      "code",
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/notifications/:notificationId",
+    "version": "v1-ecommerce",
+    "controller": "getNotificationDetails",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/notifications/users/all",
+    "version": "v1-ecommerce",
+    "controller": "getAllUsersForNotification",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/notifications/users/search",
+    "version": "v1-ecommerce",
+    "controller": "searchUsers",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/orders",
+    "version": "v1-ecommerce",
+    "controller": "orders",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/permissions",
+    "version": "v1-ecommerce",
+    "controller": "getAllPermissions",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/permissions/:permissionId",
+    "version": "v1-ecommerce",
+    "controller": "getPermissionById",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/permissions/by-module",
+    "version": "v1-ecommerce",
+    "controller": "getPermissionsByModule",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/products/gift",
+    "version": "v1-ecommerce",
+    "controller": "getGiftProduct",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/giftProductController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "product",
+      "giftProduct"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/products/webhook-product-update",
+    "version": "v1-ecommerce",
+    "controller": "getProductsWithProductUpdateWebhook",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/productDiscountFixController.js",
+    "response_shape_keys": [
+      "success",
+      "count",
+      "webhook",
+      "products",
+      "message",
+      "distinctParentIds",
+      "syncedParentIds",
+      "skippedNotEligible",
+      "bulkWriteOperations"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/roles",
+    "version": "v1-ecommerce",
+    "controller": "getAllRoles",
+    "file": "src/routes/ecommerce/roleRoutes.js",
+    "controller_file": "src/controllers/ecommerce/roleController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/roles/:roleId",
+    "version": "v1-ecommerce",
+    "controller": "getRoleById",
+    "file": "src/routes/ecommerce/roleRoutes.js",
+    "controller_file": "src/controllers/ecommerce/roleController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/shipping-countries",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/shipping-countries/:id",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/admin/users",
+    "version": "v1-ecommerce",
+    "controller": "getAllUsers",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/users/:userId",
+    "version": "v1-ecommerce",
+    "controller": "getUserById",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/users/export",
+    "version": "v1-ecommerce",
+    "controller": "exportUsers",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/admin/users/live",
+    "version": "v1-ecommerce",
+    "controller": "getLiveUsers",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/all-categories",
+    "version": "v1-ecommerce",
+    "controller": "allCategories",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/apple-callback",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/delete-account",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/payment-history",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/user-data",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/user/customerId",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/banners",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/bannerImages.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/cart/get-cart",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/cartRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/coupon",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/couponsRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/mobile/config",
+    "version": "v1-mobile",
+    "controller": "res",
+    "file": "src/routes/mobile/configRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notification/get-notification",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/notificationRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/address",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/get-orders",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/payment-intent",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/payment-methods",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/verify-nomod-payment",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/order/verify-tabby-status",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/categories",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/categories-product/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/favourites-of-week",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/flash-sales",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/get-new-arrivals",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/hot-offers",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/product-details/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/products",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/products-by-variant",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/products-price",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/review/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/similar-products",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/sub-categories-product/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/sub-sub-categories-product/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/super-saver-products",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/today-deal",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/top-rated-items",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/trending-products",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/products/user-review/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/shipping-cost",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/shipping-countries",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/shipping-countries/:code/cities",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/user/auth/check",
+    "version": "v1-mobile",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/user/profile",
+    "version": "v1-mobile",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "GET",
+    "path": "/api/wishlist/get-wishlist",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/wishlistRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/banners",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/bannerImages.js"
+  },
+  {
+    "method": "GET",
+    "path": "/brand-name/:id",
+    "version": "v1-ecommerce",
+    "controller": "getBrandNameById",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/brands",
+    "version": "v1-ecommerce",
+    "controller": "brands",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/cart/get-cart",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/cartRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/categories",
+    "version": "v1-ecommerce",
+    "controller": "categories",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/categories-product/:id",
+    "version": "v1-ecommerce",
+    "controller": "categoriesProduct",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/category-name/:id",
+    "version": "v1-ecommerce",
+    "controller": "getCategoryNameById",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/coupon",
+    "version": "v1-ecommerce",
+    "controller": "coupons",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/download-file",
+    "version": "v1-ecommerce",
+    "controller": "downloadFile",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "log_id",
+      "error"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/export-products-availability",
+    "version": "v1-ecommerce",
+    "controller": "exportProductsAvailability",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/favourites-of-week",
+    "version": "v1-ecommerce",
+    "controller": "favouritesOfWeek",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/fetch_all_products",
+    "version": "v1-ecommerce",
+    "controller": "fetchAllProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/fetch_home_products",
+    "version": "v1-ecommerce",
+    "controller": "fetchHomeProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/fetch-db-products",
+    "version": "v1-ecommerce",
+    "controller": "fetchDbProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/fetch-products-no-images",
+    "version": "v1-ecommerce",
+    "controller": "fetchProductsNoImages",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/flash-sale-data",
+    "version": "v1-ecommerce",
+    "controller": "getFlashSaleData",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/flash-sales",
+    "version": "v1-ecommerce",
+    "controller": "getFlashSales",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-cms-data",
+    "version": "v1-ecommerce",
+    "controller": "getCmsData",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-coupon-cms-data",
+    "version": "v1-ecommerce",
+    "controller": "getCouponCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-coupon-count",
+    "version": "v1-ecommerce",
+    "controller": "getCouponCount",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-cron-logs",
+    "version": "v1-ecommerce",
+    "controller": "getCronLogs",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-new-arrivals",
+    "version": "v1-ecommerce",
+    "controller": "getNewArrivals",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-newsletter-subscribers",
+    "version": "v1-ecommerce",
+    "controller": "getAllNewsLetters",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/get-wishlist",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/wishlistRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/health",
+    "version": "shared",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "GET",
+    "path": "/healthz",
+    "version": "shared",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "GET",
+    "path": "/hot-offers",
+    "version": "v1-ecommerce",
+    "controller": "hotOffers",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/product-details/:id",
+    "version": "v1-ecommerce",
+    "controller": "productDetails",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/products-price",
+    "version": "v1-ecommerce",
+    "controller": "productsByPrice",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/random-products/:id",
+    "version": "v1-ecommerce",
+    "controller": "randomProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/readyz",
+    "version": "shared",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "GET",
+    "path": "/review",
+    "version": "v1-ecommerce",
+    "controller": "review",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/productController.js",
+    "response_shape_keys": [
+      "message",
+      "reviews",
+      "error",
+      "success",
+      "product_id",
+      "total",
+      "user_id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/shipping-cost",
+    "version": "v1-ecommerce",
+    "controller": "createCardCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/shipping-countries",
+    "version": "v1-ecommerce",
+    "controller": "createCardCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/shipping-countries/:code/cities",
+    "version": "v1-ecommerce",
+    "controller": "createCardCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/similar-products/:id",
+    "version": "v1-ecommerce",
+    "controller": "similarProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/store-all-item",
+    "version": "v1-ecommerce",
+    "controller": "getIdsss",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/store-all-items",
+    "version": "v1-ecommerce",
+    "controller": "getIdss",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/sub-categories-product/:id",
+    "version": "v1-ecommerce",
+    "controller": "subCategoriesProduct",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/sub-sub-categories-product/:id",
+    "version": "v1-ecommerce",
+    "controller": "subSubCategoriesProduct",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/super-saver-products",
+    "version": "v1-ecommerce",
+    "controller": "getSuperSaverProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/today-deal",
+    "version": "v1-ecommerce",
+    "controller": "todayDeal",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/top-rated-items",
+    "version": "v1-ecommerce",
+    "controller": "getTopRatedProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/trending-products",
+    "version": "v1-ecommerce",
+    "controller": "trendingProducts",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/update-product-details/:id",
+    "version": "v1-ecommerce",
+    "controller": "updateProductDetails",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/address",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "GET",
+    "path": "/user/current-month-order-categories",
+    "version": "v1-ecommerce",
+    "controller": "currentMonthOrderCategories",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/ecommerce/userController.js",
+    "response_shape_keys": [
+      "message",
+      "refreshToken",
+      "user",
+      "attemptsUsed",
+      "attemptsLeft",
+      "success",
+      "notificationsCount",
+      "notifications",
+      "products",
+      "error",
+      "reviews",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders",
+      "history",
+      "recent_orders",
+      "total_spent",
+      "active_orders",
+      "wishlist_item",
+      "data"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/delete-account",
+    "version": "v1-ecommerce",
+    "controller": "deleteAccount",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/user/get-notification",
+    "version": "v1-ecommerce",
+    "controller": "getNotification",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/mobile/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "notificationsCount",
+      "unreadCount",
+      "notifications",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-dashboard",
+    "version": "v1-ecommerce",
+    "controller": "dashboard",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/ecommerce/userController.js",
+    "response_shape_keys": [
+      "message",
+      "refreshToken",
+      "user",
+      "attemptsUsed",
+      "attemptsLeft",
+      "success",
+      "notificationsCount",
+      "notifications",
+      "products",
+      "error",
+      "reviews",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders",
+      "history",
+      "recent_orders",
+      "total_spent",
+      "active_orders",
+      "wishlist_item",
+      "data"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-order/:id",
+    "version": "v1-ecommerce",
+    "controller": "order",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-orders",
+    "version": "v1-ecommerce",
+    "controller": "orders",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-payment-history",
+    "version": "v1-ecommerce",
+    "controller": "paymentHistory",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/ecommerce/userController.js",
+    "response_shape_keys": [
+      "message",
+      "refreshToken",
+      "user",
+      "attemptsUsed",
+      "attemptsLeft",
+      "success",
+      "notificationsCount",
+      "notifications",
+      "products",
+      "error",
+      "reviews",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders",
+      "history",
+      "recent_orders",
+      "total_spent",
+      "active_orders",
+      "wishlist_item",
+      "data"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-review",
+    "version": "v1-ecommerce",
+    "controller": "review",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/mobile/productController.js",
+    "response_shape_keys": [
+      "message",
+      "reviews",
+      "error",
+      "success",
+      "product_id",
+      "total",
+      "user_id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/user/user-single-payment-history/:id",
+    "version": "v1-ecommerce",
+    "controller": "singlePaymentHistory",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/ecommerce/userController.js",
+    "response_shape_keys": [
+      "message",
+      "refreshToken",
+      "user",
+      "attemptsUsed",
+      "attemptsLeft",
+      "success",
+      "notificationsCount",
+      "notifications",
+      "products",
+      "error",
+      "reviews",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders",
+      "history",
+      "recent_orders",
+      "total_spent",
+      "active_orders",
+      "wishlist_item",
+      "data"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/v2/auth/check",
+    "version": "v2",
+    "controller": "authCtrl.checkAuth",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/auth/user-data",
+    "version": "v2",
+    "controller": "authCtrl.getUserData",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/cart",
+    "version": "v2",
+    "controller": "cartCtrl.getCart",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/cartController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/notifications",
+    "version": "v2",
+    "controller": "notifCtrl.getNotifications",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "error",
+      "code",
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/v2/orders",
+    "version": "v2",
+    "controller": "orderCtrl.getOrders",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/orders/address",
+    "version": "v2",
+    "controller": "orderCtrl.getAddress",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/orders/payment-methods",
+    "version": "v2",
+    "controller": "orderCtrl.getPaymentMethods",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/orders/verify/nomod",
+    "version": "v2",
+    "controller": "orderCtrl.verifyNomod",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/orders/verify/tabby",
+    "version": "v2",
+    "controller": "orderCtrl.verifyTabby",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products",
+    "version": "v2",
+    "controller": "productCtrl.getProducts",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/:id",
+    "version": "v2",
+    "controller": "productCtrl.getProductDetails",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/categories",
+    "version": "v2",
+    "controller": "productCtrl.getCategories",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/category/:id",
+    "version": "v2",
+    "controller": "productCtrl.categoriesProduct",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/similar",
+    "version": "v2",
+    "controller": "productCtrl.similarProducts",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/sub-category/:id",
+    "version": "v2",
+    "controller": "productCtrl.subCategoriesProduct",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/products/sub-sub-category/:id",
+    "version": "v2",
+    "controller": "productCtrl.subSubCategoriesProduct",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/current-month-categories",
+    "version": "v2",
+    "controller": "userCtrl.getCurrentMonthCategories",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/dashboard",
+    "version": "v2",
+    "controller": "userCtrl.getDashboard",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/orders",
+    "version": "v2",
+    "controller": "userCtrl.getOrders",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/orders/:id",
+    "version": "v2",
+    "controller": "userCtrl.getOrder",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/payment-history",
+    "version": "v2",
+    "controller": "userCtrl.getPaymentHistory",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/payment-history/:id",
+    "version": "v2",
+    "controller": "userCtrl.getSinglePaymentHistory",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/profile",
+    "version": "v2",
+    "controller": "userCtrl.getProfile",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/reviews",
+    "version": "v2",
+    "controller": "userCtrl.getReviews",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/user/tabby-buyer-history",
+    "version": "v2",
+    "controller": "userCtrl.getTabbyBuyerHistory",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "GET",
+    "path": "/v2/wishlist",
+    "version": "v2",
+    "controller": "wishlistCtrl.getWishlist",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/wishlistController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/admin/bank-promo-codes/:id/toggle-active",
+    "version": "v1-ecommerce",
+    "controller": "toggleBankPromoCodeActive",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/admin/shipping-countries/:id/toggle-active",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/order/address/:addressId/set-primary",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "PATCH",
+    "path": "/user/address/:addressId/set-primary",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v2/orders/:orderId/status",
+    "version": "v2",
+    "controller": "orderCtrl.updateOrderStatus",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/v2/orders/address/:addressId/set-primary",
+    "version": "v2",
+    "controller": "orderCtrl.setPrimaryAddress",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/about-cms",
+    "version": "v1-ecommerce",
+    "controller": "AboutCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/add-review",
+    "version": "v1-ecommerce",
+    "controller": "addReview",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/add-to-wishlist",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/wishlistRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/admins",
+    "version": "v1-ecommerce",
+    "controller": "createSubAdmin",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/bank-promo-codes",
+    "version": "v1-ecommerce",
+    "controller": "createBankPromoCode",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/admin/email-config/sync-env",
+    "version": "v1-ecommerce",
+    "controller": "syncFromEnv",
+    "file": "src/routes/ecommerce/emailRoutes.js",
+    "controller_file": "src/controllers/ecommerce/emailController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/forgot-password",
+    "version": "v1-ecommerce",
+    "controller": "forgotPassword",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/admin/login",
+    "version": "v1-ecommerce",
+    "controller": "adminLogin",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/notifications",
+    "version": "v1-ecommerce",
+    "controller": "createNotification",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/order-status/:orderId",
+    "version": "v1-ecommerce",
+    "controller": "updateOrderStatus",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/admin/permissions",
+    "version": "v1-ecommerce",
+    "controller": "createPermission",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/products/set-gift",
+    "version": "v1-ecommerce",
+    "controller": "setGiftProduct",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/giftProductController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "product",
+      "giftProduct"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/products/sync-webhook-product-update-discounts",
+    "version": "v1-ecommerce",
+    "controller": "syncProductUpdateWebhookDiscounts",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/productDiscountFixController.js",
+    "response_shape_keys": [
+      "success",
+      "count",
+      "webhook",
+      "products",
+      "message",
+      "distinctParentIds",
+      "syncedParentIds",
+      "skippedNotEligible",
+      "bulkWriteOperations"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/refresh-product",
+    "version": "v1-ecommerce",
+    "controller": "refreshSingleProductById",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/productRefreshController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "created",
+      "updated",
+      "productId",
+      "product"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/register",
+    "version": "v1-ecommerce",
+    "controller": "adminRegister",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/reset-password",
+    "version": "v1-ecommerce",
+    "controller": "resetPassword",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/admin/roles",
+    "version": "v1-ecommerce",
+    "controller": "createRole",
+    "file": "src/routes/ecommerce/roleRoutes.js",
+    "controller_file": "src/controllers/ecommerce/roleController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/admin/shipping-countries",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/shipping-countries/:id/bulk-cities",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/shipping-countries/:id/cities",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/shipping-countries/:id/cities/:cityId/areas",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/shipping-countries/:id/cities/:cityId/bulk-areas",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/update-password",
+    "version": "v1-ecommerce",
+    "controller": "updatePassword",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/admin/verify-code",
+    "version": "v1-ecommerce",
+    "controller": "verifyCode",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/apple-login",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/check-access-token",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/forgot-password",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/google-login",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/recovery-account",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/refresh-token",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/resend-recovery-code",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/reset-password",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/user/customerId",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/user/update",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/verify-code",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/banner",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/bannerImages.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/cart/add-to-cart",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/cart/decrease",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/cart/increase",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/cart/remove-to-cart",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/check-coupon",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/couponsRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/contact-us",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/create-coupon",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/couponsRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/feedback",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/mobile-app-log",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/publicRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/notification/mark-read",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/notificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/notification/track-click",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/notificationRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/address",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/checkout-session",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/checkout-session-nomod",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/checkout-session-tabby",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/order-status/:orderId",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/stripe/init",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/order/validate-inventory",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/add-review",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/category-image",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/search",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/search-categories",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/search-product",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/products/store-flash-sales",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/productRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/user/auth/logout",
+    "version": "v1-mobile",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/wishlist/add-to-wishlist",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/wishlistRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/api/wishlist/remove-to-wishlist",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/wishlistRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/banner",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/bannerImages.js"
+  },
+  {
+    "method": "POST",
+    "path": "/body-images-upload",
+    "version": "v1-ecommerce",
+    "controller": "editorBodyImagesUpload",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/brandsLogo-cms",
+    "version": "v1-ecommerce",
+    "controller": "BrandsLogo",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/cart/add-to-cart",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/cart/decrease",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/cart/increase",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/cart/remove-to-cart",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/cartRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/categoriesImages-cms",
+    "version": "v1-ecommerce",
+    "controller": "categoryImagesCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/check-coupon",
+    "version": "v1-ecommerce",
+    "controller": "checkCouponCode",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/checkout",
+    "version": "v1-ecommerce",
+    "controller": "checkout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/contact-cms",
+    "version": "v1-ecommerce",
+    "controller": "contactCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/contact-us",
+    "version": "v1-ecommerce",
+    "controller": "contactUs",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "log_id",
+      "error"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/coupon-cms",
+    "version": "v1-ecommerce",
+    "controller": "CouponCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/create-card-checkout",
+    "version": "v1-ecommerce",
+    "controller": "createCardCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/create-coupon",
+    "version": "v1-ecommerce",
+    "controller": "createCoupon",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/create-nomod-checkout",
+    "version": "v1-ecommerce",
+    "controller": "createNomodCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/create-tabby-checkout",
+    "version": "v1-ecommerce",
+    "controller": "createTabbyCheckout",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/delete-account-public",
+    "version": "v1-ecommerce",
+    "controller": "deleteAccountPublic",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/userController.js",
+    "response_shape_keys": [
+      "message",
+      "refreshToken",
+      "user",
+      "attemptsUsed",
+      "attemptsLeft",
+      "success",
+      "notificationsCount",
+      "notifications",
+      "products",
+      "error",
+      "reviews",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders",
+      "history",
+      "recent_orders",
+      "total_spent",
+      "active_orders",
+      "wishlist_item",
+      "data"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/delete-body-images-upload",
+    "version": "v1-ecommerce",
+    "controller": "deleteFileByUrl",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/export-products-to-sheet",
+    "version": "v1-ecommerce",
+    "controller": "res",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/features-cms",
+    "version": "v1-ecommerce",
+    "controller": "featuresCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/footerInfo-cms",
+    "version": "v1-ecommerce",
+    "controller": "FooterInfoCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/header-info-cms",
+    "version": "v1-ecommerce",
+    "controller": "headerInfoCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/news-letter",
+    "version": "v1-ecommerce",
+    "controller": "newsLetter",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/offerFilter-cms",
+    "version": "v1-ecommerce",
+    "controller": "offerFilterCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/offers-cms",
+    "version": "v1-ecommerce",
+    "controller": "offersCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/redeem-coupon",
+    "version": "v1-ecommerce",
+    "controller": "redeemCoupon",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/remove-to-wishlist",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/wishlistRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/search",
+    "version": "v1-ecommerce",
+    "controller": "search",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/search-product",
+    "version": "v1-ecommerce",
+    "controller": "searchProduct",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/productController.js",
+    "response_shape_keys": [
+      "message",
+      "reviews",
+      "error",
+      "success",
+      "product_id",
+      "total",
+      "user_id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/search-single-product",
+    "version": "v1-ecommerce",
+    "controller": "searchSingleProduct",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/seed-roles-permissions",
+    "version": "v1-ecommerce",
+    "controller": "seedRolesAndPermissions",
+    "file": "src/routes/ecommerce/seedRoutes.js",
+    "controller_file": "src/controllers/ecommerce/seedController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "data",
+      "permissionsProcessed",
+      "totalAdmins",
+      "adminsAssigned",
+      "superAdminRoleId",
+      "error"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/send-bulk-mails",
+    "version": "v1-ecommerce",
+    "controller": "sendBulkEmails",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/shop-cms",
+    "version": "v1-ecommerce",
+    "controller": "ShopCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/slider-cms",
+    "version": "v1-ecommerce",
+    "controller": "sliderCms",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/store-flash-sales",
+    "version": "v1-ecommerce",
+    "controller": "storeFlashSales",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status",
+      "products",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalProducts",
+      "productsPerPage",
+      "filterColor"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/tabby/webhook",
+    "version": "shared",
+    "controller": "inline",
+    "file": "src/server.js"
+  },
+  {
+    "method": "POST",
+    "path": "/toggle-flash-sale-status",
+    "version": "v1-ecommerce",
+    "controller": "toggleFlashSaleStatus",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/smartCategoriesController.js",
+    "response_shape_keys": [
+      "message",
+      "success",
+      "status"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/update-coupon-count",
+    "version": "v1-ecommerce",
+    "controller": "updateCouponCount",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/user/add-review",
+    "version": "v1-ecommerce",
+    "controller": "addReview",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/address",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/user/apple-call-back",
+    "version": "v1-ecommerce",
+    "controller": "appleCallback",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/user/apple-login",
+    "version": "v1-ecommerce",
+    "controller": "appleLogin",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/forgot-password",
+    "version": "v1-ecommerce",
+    "controller": "forgotPassword",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/google-login",
+    "version": "v1-ecommerce",
+    "controller": "googleLogin",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/login",
+    "version": "v1-ecommerce",
+    "controller": "login",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/mark-read",
+    "version": "v1-ecommerce",
+    "controller": "markNotificationsAsRead",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/mobile/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "notificationsCount",
+      "unreadCount",
+      "notifications",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/user/orders/proof-of-delivery",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/user/recovery-account",
+    "version": "v1-ecommerce",
+    "controller": "verifyRecoveryCode",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/register",
+    "version": "v1-ecommerce",
+    "controller": "register",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/resend-recovery-code",
+    "version": "v1-ecommerce",
+    "controller": "resendRecoveryCode",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/reset-password",
+    "version": "v1-ecommerce",
+    "controller": "resetPassword",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/user/user-update",
+    "version": "v1-ecommerce",
+    "controller": "userUpdate",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/mobile/authController.js",
+    "response_shape_keys": [
+      "message",
+      "customerId",
+      "error",
+      "token",
+      "refreshToken",
+      "data",
+      "coupon",
+      "totalOrderCount",
+      "usedFirst15Coupon",
+      "fcmToken",
+      "accessToken",
+      "user",
+      "success",
+      "count",
+      "available_coupons",
+      "attemptsUsed",
+      "attemptsLeft"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/user/validate-inventory",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/orderRoutes.js"
+  },
+  {
+    "method": "POST",
+    "path": "/user/verify-code",
+    "version": "v1-ecommerce",
+    "controller": "verifyCode",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/apple-login",
+    "version": "v2",
+    "controller": "authCtrl.appleLogin",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/check-access-token",
+    "version": "v2",
+    "controller": "authCtrl.checkAccessToken",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/forgot-password",
+    "version": "v2",
+    "controller": "authCtrl.forgotPassword",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/google-login",
+    "version": "v2",
+    "controller": "authCtrl.googleLogin",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/login",
+    "version": "v2",
+    "controller": "authCtrl.login",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/logout",
+    "version": "v2",
+    "controller": "authCtrl.logout",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/recovery-account",
+    "version": "v2",
+    "controller": "authCtrl.verifyRecoveryCode",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/refresh-token",
+    "version": "v2",
+    "controller": "authCtrl.refreshToken",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/register",
+    "version": "v2",
+    "controller": "authCtrl.register",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/resend-recovery-code",
+    "version": "v2",
+    "controller": "authCtrl.resendRecoveryCode",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/reset-password",
+    "version": "v2",
+    "controller": "authCtrl.resetPassword",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/update-profile",
+    "version": "v2",
+    "controller": "authCtrl.updateProfile",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/auth/verify-code",
+    "version": "v2",
+    "controller": "authCtrl.verifyCode",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/cart",
+    "version": "v2",
+    "controller": "cartCtrl.addToCart",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/cartController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/cart/decrease",
+    "version": "v2",
+    "controller": "cartCtrl.decreaseQty",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/cartController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/cart/increase",
+    "version": "v2",
+    "controller": "cartCtrl.increaseQty",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/cartController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/notifications/mark-read",
+    "version": "v2",
+    "controller": "notifCtrl.markRead",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "error",
+      "code",
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/v2/notifications/track-click",
+    "version": "v2",
+    "controller": "notifCtrl.trackClick",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "error",
+      "code",
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/address",
+    "version": "v2",
+    "controller": "orderCtrl.storeAddress",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/checkout/nomod",
+    "version": "v2",
+    "controller": "orderCtrl.checkoutNomod",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/checkout/stripe",
+    "version": "v2",
+    "controller": "orderCtrl.checkoutStripe",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/checkout/tabby",
+    "version": "v2",
+    "controller": "orderCtrl.checkoutTabby",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/stripe/init",
+    "version": "v2",
+    "controller": "orderCtrl.initStripePayment",
+    "file": "src/routes/v2/mobile/index.js",
+    "controller_file": "src/controllers/v2/mobile/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/orders/validate-inventory",
+    "version": "v2",
+    "controller": "orderCtrl.validateInventory",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/orderController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/products/search",
+    "version": "v2",
+    "controller": "productCtrl.search",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/productController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/user/reviews",
+    "version": "v2",
+    "controller": "userCtrl.addReview",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/userController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/v2/wishlist",
+    "version": "v2",
+    "controller": "wishlistCtrl.addToWishlist",
+    "file": "src/routes/v2/shared/index.js",
+    "controller_file": "src/controllers/v2/shared/wishlistController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/verify-card-payment",
+    "version": "v1-ecommerce",
+    "controller": "verifyCardPayment",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/ecommerce/publicController.js",
+    "response_shape_keys": [
+      "message",
+      "error",
+      "reviews",
+      "product",
+      "success"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/verify-nomod-payment",
+    "version": "v1-ecommerce",
+    "controller": "verifyNomodPayment",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/orderController.js",
+    "response_shape_keys": [
+      "message",
+      "orderId",
+      "error",
+      "paymentId",
+      "status",
+      "finalStatus",
+      "success",
+      "data",
+      "total",
+      "page",
+      "limit",
+      "addresses",
+      "flag",
+      "address",
+      "isValid",
+      "results"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/verify-tabby-payment",
+    "version": "v1-ecommerce",
+    "controller": "verifyTabbyPayment",
+    "file": "src/routes/ecommerce/publicRoutes.js",
+    "controller_file": "src/controllers/mobile/orderController.js",
+    "response_shape_keys": [
+      "message",
+      "orderId",
+      "error",
+      "paymentId",
+      "status",
+      "finalStatus",
+      "success",
+      "data",
+      "total",
+      "page",
+      "limit",
+      "addresses",
+      "flag",
+      "address",
+      "isValid",
+      "results"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/webhook/inventory-update",
+    "version": "v1-ecommerce",
+    "controller": "inventoryUpdate",
+    "file": "src/routes/ecommerce/webhooksRoutes.js",
+    "controller_file": "src/controllers/ecommerce/webhookController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/webhook/product-update",
+    "version": "v1-ecommerce",
+    "controller": "productUpdate",
+    "file": "src/routes/ecommerce/webhooksRoutes.js",
+    "controller_file": "src/controllers/ecommerce/webhookController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "POST",
+    "path": "/webhook/sale-update",
+    "version": "v1-ecommerce",
+    "controller": "saleUpdate",
+    "file": "src/routes/ecommerce/webhooksRoutes.js",
+    "controller_file": "src/controllers/ecommerce/webhookController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/admins/:adminId",
+    "version": "v1-ecommerce",
+    "controller": "updateSubAdmin",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/bank-promo-codes/:id",
+    "version": "v1-ecommerce",
+    "controller": "updateBankPromoCode",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": null,
+    "response_shape_keys": []
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/email-config",
+    "version": "v1-ecommerce",
+    "controller": "updateEmailConfig",
+    "file": "src/routes/ecommerce/emailRoutes.js",
+    "controller_file": "src/controllers/ecommerce/emailController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/notifications/:notificationId",
+    "version": "v1-ecommerce",
+    "controller": "updateNotification",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/notificationController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "notifications",
+      "pagination",
+      "users"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/permissions/:permissionId",
+    "version": "v1-ecommerce",
+    "controller": "updatePermission",
+    "file": "src/routes/ecommerce/permissionRoutes.js",
+    "controller_file": "src/controllers/ecommerce/permissionController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error",
+      "permissions",
+      "allPermissions"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/roles/:roleId",
+    "version": "v1-ecommerce",
+    "controller": "updateRole",
+    "file": "src/routes/ecommerce/roleRoutes.js",
+    "controller_file": "src/controllers/ecommerce/roleController.js",
+    "response_shape_keys": [
+      "success",
+      "message",
+      "error"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/shipping-countries/:id",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/shipping-countries/:id/cities/:cityId",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/shipping-countries/:id/cities/:cityId/areas/:areaId",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/adminRoutes.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/users/:userId",
+    "version": "v1-ecommerce",
+    "controller": "updateUser",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/users/:userId/block",
+    "version": "v1-ecommerce",
+    "controller": "blockUser",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/users/:userId/restore",
+    "version": "v1-ecommerce",
+    "controller": "restoreUser",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/admin/users/:userId/unblock",
+    "version": "v1-ecommerce",
+    "controller": "unblockUser",
+    "file": "src/routes/ecommerce/adminRoutes.js",
+    "controller_file": "src/controllers/ecommerce/adminController.js",
+    "response_shape_keys": [
+      "success",
+      "orders",
+      "pagination",
+      "currentPage",
+      "totalPages",
+      "totalOrders",
+      "ordersPerPage",
+      "message",
+      "coupons",
+      "data",
+      "order",
+      "error",
+      "users",
+      "totalUsers",
+      "usersPerPage",
+      "user",
+      "admins",
+      "admin",
+      "analytics",
+      "product",
+      "viewDetails",
+      "totalViews",
+      "uniqueUsers",
+      "logs",
+      "count"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/update-password",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/authRoutes.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/banner/:id",
+    "version": "v1-mobile",
+    "controller": null,
+    "file": "src/routes/mobile/bannerImages.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/banner/:id",
+    "version": "v1-ecommerce",
+    "controller": null,
+    "file": "src/routes/ecommerce/bannerImages.js"
+  },
+  {
+    "method": "PUT",
+    "path": "/user/update-password",
+    "version": "v1-ecommerce",
+    "controller": "updatePassword",
+    "file": "src/routes/ecommerce/userRoutes.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  },
+  {
+    "method": "PUT",
+    "path": "/v2/auth/update-password",
+    "version": "v2",
+    "controller": "authCtrl.updatePassword",
+    "file": "src/routes/v2/web/index.js",
+    "controller_file": "src/controllers/v2/web/authController.js",
+    "response_shape_keys": []
+  }
+]

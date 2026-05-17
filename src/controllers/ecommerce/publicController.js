@@ -1,26 +1,26 @@
 const express = require("express");
 const connectDB = require("../../config/db");
-const Order = require("../../models/Order");
-const OrderDetail = require("../../models/OrderDetail");
-const Review = require("../../models/Review");
-const Coupon = require("../../models/Coupon");
-const BankPromoCode = require("../../models/BankPromoCode");
-const BankPromoCodeUsage = require("../../models/BankPromoCodeUsage");
-const Notification = require("../../models/Notification");
-const Cart = require("../../models/Cart");
-const NewsLetter = require("../../models/NewsLetter");
+const Order = require('../../repositories').orders.rawModel();
+const OrderDetail = require('../../repositories').orderDetails.rawModel();
+const Review = require('../../repositories').reviews.rawModel();
+const Coupon = require('../../repositories').coupons.rawModel();
+const BankPromoCode = require('../../repositories').bankPromoCodes.rawModel();
+const BankPromoCodeUsage = require('../../repositories').bankPromoCodeUsages.rawModel();
+const Notification = require('../../repositories').notifications.rawModel();
+const Cart = require('../../repositories').carts.rawModel();
+const NewsLetter = require('../../repositories').newsletters.rawModel();
 const { getAdminEmail, getCcEmails } = require("../../utilities/emailHelper");
 
-const Product = require("../../models/Product");
-const ProductId = require("../../models/ProductId");
+const Product = require('../../repositories').products.rawModel();
+const ProductId = require('../../repositories').productIds.rawModel();
 const { escapeRegex } = require("../../utilities/stringUtils");
-const ProductView = require("../../models/ProductView");
-const User = require("../../models/User");
-const Cronjoblog = require("../../models/Cronjoblog");
-const CouponsCount = require("../../models/CouponsCount");
+const ProductView = require('../../repositories').productViews.rawModel();
+const User = require('../../repositories').users.rawModel();
+const Cronjoblog = require('../../repositories').cronJoblogs.rawModel();
+const CouponsCount = require('../../repositories').couponsCount.rawModel();
 const mime = require("mime-types");
-const Brand = require("../../models/Brand");
-const Category = require("../../models/Category");
+const Brand = require('../../repositories').brands.rawModel();
+const Category = require('../../repositories').categories.rawModel();
 const stripe = require("stripe")(process.env.STRIPE_SK);
 const cors = require("cors");
 const axios = require("axios");
@@ -30,13 +30,14 @@ const { sendEmail } = require("../../mail/emailService");
 const crypto = require("crypto");
 const year = new Date().getFullYear();
 const cache = require('../../utilities/cache');
+const runtimeConfig = require('../../config/runtime');
 const { Readable } = require("stream");
 const fs = require("fs");
 const path = require("path");
 const Typo = require("typo-js");
 const dictionary = new Typo("en_US");
 const pako = require("pako");
-const CartData = require("../../models/CartData");
+const CartData = require('../../repositories').cartData.rawModel();
 const createCsvWriter = require("csv-writer").createObjectCsvWriter;
 const fastCsv = require("fast-csv");
 const multer = require("multer");
@@ -47,7 +48,7 @@ const createUploader = require("../../config/multerConfig");
 const deleteOldFile = require("../../utils/deleteOldFile");
 const { logActivity } = require("../../utilities/activityLogger");
 const { logBackendActivity } = require("../../utilities/backendLogger");
-const PendingPayment = require("../../models/PendingPayment");
+const PendingPayment = require('../../repositories').pendingPayments.rawModel();
 
 // ─── Phase 4 Service Imports ─────────────────────────────────────
 const productService = require("../../services/productService");
@@ -517,7 +518,7 @@ exports.search = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -818,39 +819,13 @@ exports.verifyTabbyPayment = async (req, res) => {
   }
 };
 
-exports.createNomodCheckout = async (req, res) => {
-  try {
-    const result = await checkoutService.createNomodCheckout(req);
-    return res.json(result);
-  } catch (error) {
-    if (error.status) {
-      return res.status(error.status).json({ message: error.message });
-    }
-    logger.error({ err: error }, 'Nomod checkout error:');
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-exports.verifyNomodPayment = async (req, res) => {
-  try {
-    const result = await checkoutService.verifyNomodPayment(req);
-    return res.json(result);
-  } catch (error) {
-    if (error.status) {
-      return res.status(error.status).json({ error: error.message });
-    }
-    logger.error({ err: error }, 'Nomod payment verification error:');
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
 exports.checkout = async (req, res) => {
   try {
     const user_id = req.user?._id;
     const result = await checkoutService.processCheckout(req.body, user_id);
     res.json(result);
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -970,7 +945,7 @@ exports.addReview = async (req, res) => {
       reviews: reviews,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -1000,7 +975,7 @@ exports.review = async (req, res) => {
       reviews: reviewsWithProductId,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'public handler error:');
     res.status(500).json({ error: error.message });
   }
 };
@@ -1016,7 +991,7 @@ exports.contactUs = [
       const { email, name, message, phone, recaptchaToken } = req.body;
 
       if (!email) {
-        return res.status(400).json({ message: "Email is required123" });
+        return res.status(400).json({ message: "Email is required" });
       }
       if (!name) {
         return res.status(400).json({ message: "Name is required" });
@@ -1062,10 +1037,7 @@ exports.contactUs = [
       const score = recaptchaResponse.data.riskAnalysis?.score || 0;
 
       if (!tokenValid) {
-        console.error(
-          "reCAPTCHA token is invalid:",
-          recaptchaResponse.data.tokenProperties?.invalidReason
-        );
+        logger.error({ reason: recaptchaResponse.data.tokenProperties?.invalidReason }, 'reCAPTCHA token is invalid:');
         return res
           .status(403)
           .json({ message: "Security verification failed. Please try again." });
@@ -1852,7 +1824,7 @@ async function filterProductsByInventory(productsResponse) {
 
 async function filterAndCacheProductsByInventory() {
   const cacheKey = cache.key('lightspeed', 'products-inventory', 'v1');
-  return cache.getOrSet(cacheKey, 300, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsInventoryTtl, async () => {
     logger.info("Fetching filtered products from Lightspeed API");
 
     const productsResponse = await axios.get(PRODUCTS_URL, {
@@ -1953,7 +1925,7 @@ async function fetchProducts() {
 
 async function fetchAndCacheProducts() {
   const cacheKey = cache.key('lightspeed', 'products', 'v1');
-  return cache.getOrSet(cacheKey, 600, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsProductsTtl, async () => {
     logger.info("Fetching products from Lightspeed API");
 
     const response = await axios.get(PRODUCTS_URL, {
@@ -2001,7 +1973,7 @@ async function fetchCategories() {
 
 async function fetchAndCacheCategories() {
   const cacheKey = cache.key('lightspeed', 'categories', 'v1');
-  return cache.getOrSet(cacheKey, 3600, async () => {
+  return cache.getOrSet(cacheKey, runtimeConfig.cache.lsCategoriesTtl, async () => {
     logger.info("Fetching categories from Lightspeed API");
 
     const categoriesResponse = await axios.get(CATEGORIES_URL, {
@@ -2182,10 +2154,7 @@ const fetchProductDetails = async (id) => {
     }
     return { product, variantsData, totalQty };
   } catch (error) {
-    console.error(
-      `Error fetching product details for ID: ${id}`,
-      error.message
-    );
+    logger.error({ err: error, id }, 'Error fetching product details:');
     throw error;
   }
 };
@@ -2210,10 +2179,7 @@ const fetchCouponDetails = async (id) => {
     return null;
 
   } catch (error) {
-    console.error(
-      `Error fetching coupon details for ID: ${id} ->`,
-      error.response?.data || error.message
-    );
+    logger.error({ err: error, id }, 'Error fetching coupon details:');
     return null;
   }
 };

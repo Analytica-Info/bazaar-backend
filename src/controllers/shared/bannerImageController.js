@@ -1,6 +1,7 @@
 const bannerService = require("../../services/bannerService");
+const { asyncHandler } = require("../../middleware");
 
-exports.createBanner = async (req, res) => {
+exports.createBanner = asyncHandler(async (req, res) => {
     try {
         const { name } = req.body;
 
@@ -23,18 +24,18 @@ exports.createBanner = async (req, res) => {
         if (err.status) return res.status(err.status).json({ message: err.message });
         res.status(500).json({ message: "Server error", error: err.message });
     }
-};
+});
 
-exports.getAllBanners = async (req, res) => {
+exports.getAllBanners = asyncHandler(async (req, res) => {
     try {
         const banners = await bannerService.getAllBanners();
         res.status(200).json({ banners });
     } catch (err) {
         res.status(500).json({ message: "Server error", error: err.message });
     }
-};
+});
 
-exports.updateBanner = async (req, res) => {
+exports.updateBanner = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
@@ -47,9 +48,9 @@ exports.updateBanner = async (req, res) => {
         if (err.status) return res.status(err.status).json({ message: err.message });
         res.status(500).json({ message: "Server error", error: err.message });
     }
-};
+});
 
-exports.deleteBanner = async (req, res) => {
+exports.deleteBanner = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
         await bannerService.deleteBanner(id);
@@ -58,4 +59,4 @@ exports.deleteBanner = async (req, res) => {
         if (err.status) return res.status(err.status).json({ message: err.message });
         res.status(500).json({ message: "Server error", error: err.message });
     }
-};
+});

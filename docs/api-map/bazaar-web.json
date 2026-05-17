@@ -1,0 +1,748 @@
+[
+  {
+    "method": "GET",
+    "url": "/user/current-month-order-categories",
+    "dynamic": false,
+    "file": "account/Dashboard.jsx",
+    "line": 272,
+    "fields": [
+      "success",
+      "data"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-dashboard",
+    "dynamic": false,
+    "file": "account/Dashboard.jsx",
+    "line": 288,
+    "fields": [
+      "success",
+      "recent_orders"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/forgot-password",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 132,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/verify-code",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 299,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/reset-password",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 444,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/forgot-password",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 607,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/google-login",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 684,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/apple-login",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 724,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/login",
+    "dynamic": true,
+    "file": "account/Login.jsx",
+    "line": 756,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/api/user/auth/logout",
+    "dynamic": false,
+    "file": "account/Logout.jsx",
+    "line": 14,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-single-payment-history/${orderId}",
+    "dynamic": true,
+    "file": "account/Orders/Invoice.jsx",
+    "line": 240,
+    "fields": [
+      "history"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-orders",
+    "dynamic": false,
+    "file": "account/Orders/Orders.jsx",
+    "line": 258,
+    "fields": [
+      "success",
+      "orders",
+      "total_orders",
+      "shipped_orders",
+      "delivered_orders",
+      "canceled_orders"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-order/${orderId}",
+    "dynamic": true,
+    "file": "account/Orders/TrackOrder.jsx",
+    "line": 118,
+    "fields": [
+      "orders"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-order/${orderId}",
+    "dynamic": true,
+    "file": "account/Orders/ViewOrderDetail.jsx",
+    "line": 37,
+    "fields": [
+      "orders"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-payment-history",
+    "dynamic": false,
+    "file": "account/PaymentHistory.jsx",
+    "line": 81,
+    "fields": [
+      "success",
+      "history",
+      "total_spent",
+      "total_orders",
+      "active_orders",
+      "wishlist_item"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/api/user/auth/check",
+    "dynamic": false,
+    "file": "account/ProtectedRoute.jsx",
+    "line": 12,
+    "fields": [
+      "authenticated"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/user/add-review",
+    "dynamic": false,
+    "file": "account/RatingsReview.jsx",
+    "line": 300,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/user-review",
+    "dynamic": false,
+    "file": "account/RatingsReview.jsx",
+    "line": 764,
+    "fields": [
+      "products"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/shipping-countries",
+    "dynamic": false,
+    "file": "account/Settings/Address.jsx",
+    "line": 30,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/address",
+    "dynamic": false,
+    "file": "account/Settings/Address.jsx",
+    "line": 40,
+    "fields": []
+  },
+  {
+    "method": "DELETE",
+    "url": "/user/address/${_id}",
+    "dynamic": true,
+    "file": "account/Settings/Address.jsx",
+    "line": 202,
+    "fields": [
+      "addresses"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "url": "/user/address/${_id}/set-primary",
+    "dynamic": true,
+    "file": "account/Settings/Address.jsx",
+    "line": 258,
+    "fields": [
+      "addresses"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/user/address",
+    "dynamic": false,
+    "file": "account/Settings/Address.jsx",
+    "line": 334,
+    "fields": [
+      "addresses"
+    ]
+  },
+  {
+    "method": "PUT",
+    "url": "/user/update-password",
+    "dynamic": false,
+    "file": "account/Settings/PasswordSetting.jsx",
+    "line": 70,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/user/user-update",
+    "dynamic": false,
+    "file": "account/Settings/Profile.jsx",
+    "line": 185,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/delete-account",
+    "dynamic": false,
+    "file": "account/Settings/Profile.jsx",
+    "line": 231,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/api/user/auth/logout",
+    "dynamic": false,
+    "file": "account/Settings/Profile.jsx",
+    "line": 240,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/google-login",
+    "dynamic": true,
+    "file": "account/SignUp.jsx",
+    "line": 137,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/apple-login",
+    "dynamic": true,
+    "file": "account/SignUp.jsx",
+    "line": 180,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/recovery-account",
+    "dynamic": true,
+    "file": "account/SignUp.jsx",
+    "line": 229,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/resend-recovery-code",
+    "dynamic": true,
+    "file": "account/SignUp.jsx",
+    "line": 263,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "${apiUrl}/user/register",
+    "dynamic": true,
+    "file": "account/SignUp.jsx",
+    "line": 318,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/get-cms-data",
+    "dynamic": false,
+    "file": "cmsDataContextApi.jsx",
+    "line": 15,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/flash-sales",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 343,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/hot-offers",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 412,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/today-deal",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 413,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/top-rated-items",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 414,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/trending-products",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 415,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/get-new-arrivals",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 416,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/favourites-of-week",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 417,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/super-saver-products",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 418,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/flash-sales",
+    "dynamic": false,
+    "file": "components/All_Products/All_products.jsx",
+    "line": 419,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/api/user/auth/check",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 21,
+    "fields": [
+      "authenticated",
+      "cart"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/cart/get-cart",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 41,
+    "fields": [
+      "cart"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/cart/add-to-cart",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 58,
+    "fields": [
+      "cart",
+      "mes"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/cart/remove-to-cart",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 91,
+    "fields": [
+      "cart"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/cart/increase",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 124,
+    "fields": [
+      "cart"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/cart/decrease",
+    "dynamic": false,
+    "file": "components/CartContext.jsx",
+    "line": 158,
+    "fields": [
+      "cart"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/shipping-countries",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 155,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/shipping-countries/${countryCode}/cities",
+    "dynamic": true,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 164,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/address",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 251,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/shipping-cost",
+    "dynamic": true,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 450,
+    "fields": [
+      "shippingCost",
+      "freeShippingThreshold"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/check-coupon",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 511,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "redeem-coupon",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 552,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/create-card-checkout",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 648,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/create-tabby-checkout",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 785,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/create-nomod-checkout",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 861,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/user/validate-inventory",
+    "dynamic": false,
+    "file": "components/Checkout/Checkout.jsx",
+    "line": 907,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/contact-us",
+    "dynamic": false,
+    "file": "components/Contact/Contact.jsx",
+    "line": 87,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/delete-account-public",
+    "dynamic": false,
+    "file": "components/DeleteAccount/DeleteAccount.jsx",
+    "line": 69,
+    "fields": [
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "${apiUrl}/api/user/profile",
+    "dynamic": true,
+    "file": "components/Header/Header.jsx",
+    "line": 474,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/search",
+    "dynamic": false,
+    "file": "components/Header/Header.jsx",
+    "line": 606,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "api/user/auth/logout",
+    "dynamic": false,
+    "file": "components/Header/Header.jsx",
+    "line": 658,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/coupon",
+    "dynamic": false,
+    "file": "components/Header/Header.jsx",
+    "line": 961,
+    "fields": [
+      "count"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/get-coupon-count",
+    "dynamic": false,
+    "file": "components/Header/Header.jsx",
+    "line": 964,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/create-coupon",
+    "dynamic": false,
+    "file": "components/Header/Header.jsx",
+    "line": 987,
+    "fields": [
+      "coupon",
+      "message"
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/product-details/${id}",
+    "dynamic": true,
+    "file": "components/Products_Details/ProductDetails.jsx",
+    "line": 321,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/random-products/${product.product_type_id}",
+    "dynamic": true,
+    "file": "components/Products_Details/ProductDetails.jsx",
+    "line": 369,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/similar-products/${product.product_type_id}",
+    "dynamic": true,
+    "file": "components/Products_Details/ProductDetails.jsx",
+    "line": 406,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/review",
+    "dynamic": false,
+    "file": "components/Products_Details/ProductDetails.jsx",
+    "line": 431,
+    "fields": [
+      "reviews"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/search",
+    "dynamic": false,
+    "file": "components/SelectCategory/SelectCategory.jsx",
+    "line": 172,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/news-letter",
+    "dynamic": false,
+    "file": "components/SignUp_Offers/SignUp_Offers.jsx",
+    "line": 108,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/verify-card-payment",
+    "dynamic": false,
+    "file": "components/SuccessPage.jsx",
+    "line": 58,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/verify-tabby-payment",
+    "dynamic": false,
+    "file": "components/SuccessPage.jsx",
+    "line": 72,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/verify-nomod-payment",
+    "dynamic": false,
+    "file": "components/SuccessPage.jsx",
+    "line": 86,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/get-wishlist",
+    "dynamic": false,
+    "file": "components/WishlistContext.jsx",
+    "line": 31,
+    "fields": [
+      "wishlist"
+    ]
+  },
+  {
+    "method": "POST",
+    "url": "/add-to-wishlist",
+    "dynamic": false,
+    "file": "components/WishlistContext.jsx",
+    "line": 55,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/remove-to-wishlist",
+    "dynamic": false,
+    "file": "components/WishlistContext.jsx",
+    "line": 57,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/user/get-notification",
+    "dynamic": false,
+    "file": "contextApis/NotificationsContext.jsx",
+    "line": 29,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/user/mark-read",
+    "dynamic": false,
+    "file": "contextApis/NotificationsContext.jsx",
+    "line": 54,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/api/user/profile",
+    "dynamic": false,
+    "file": "contextApis/UserContext.jsx",
+    "line": 15,
+    "fields": []
+  },
+  {
+    "method": "POST",
+    "url": "/v2/recommendations/events",
+    "dynamic": false,
+    "file": "services/recommendations.js",
+    "line": 52,
+    "fields": []
+  },
+  {
+    "method": "GET",
+    "url": "/random-products/${productTypeId}",
+    "dynamic": true,
+    "file": "useRandomProducts.js",
+    "line": 22,
+    "fields": [
+      "randomProducts"
+    ]
+  }
+]
