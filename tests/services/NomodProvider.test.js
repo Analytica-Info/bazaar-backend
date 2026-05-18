@@ -86,6 +86,22 @@ describe('NomodProvider', () => {
             });
         });
 
+        it('truncates item names to 100 chars (Nomod limit)', async () => {
+            mockClient.post.mockResolvedValue({
+                data: { id: 'chk_trunc', url: 'https://pay.nomod.com/chk_trunc' },
+            });
+
+            const longName = 'A'.repeat(250);
+            await provider.createCheckout({
+                ...checkoutArgs,
+                items: [{ name: longName, quantity: 1, price: 100 }],
+            });
+
+            const body = mockClient.post.mock.calls[0][1];
+            expect(body.items[0].name.length).toBe(100);
+            expect(body.items[0].name).toBe('A'.repeat(100));
+        });
+
         it('throws 500 when NOMOD_API_KEY is missing', async () => {
             const savedKey = provider.apiKey;
             provider.apiKey = undefined;

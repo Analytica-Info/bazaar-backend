@@ -105,9 +105,13 @@ class NomodProvider extends PaymentProvider {
     }) {
         if (!this.apiKey) throw { status: 500, message: 'Nomod API key not configured' };
 
+        // Nomod rejects items[].name longer than 100 chars (validation error
+        // "Ensure this field has no more than 100 characters."). Truncate
+        // defensively — long Lightspeed product names hit this regularly.
+        // Same 100-char cap is applied to reference_id below.
         const lineItems = items.map((item, idx) => ({
             item_id: String(item.id || item.variantId || `item-${idx + 1}`),
-            name: item.name || 'Product',
+            name: String(item.name || 'Product').slice(0, 100),
             quantity: Number(item.quantity) || 1,
             unit_amount: String(Number(item.price).toFixed(2)),
         }));
