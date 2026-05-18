@@ -3,6 +3,7 @@
 const Coupon = require('../../../repositories').coupons.rawModel();
 const BankPromoCode = require('../../../repositories').bankPromoCodes.rawModel();
 const BankPromoCodeUsage = require('../../../repositories').bankPromoCodeUsages.rawModel();
+const User = require('../../../repositories').users.rawModel();
 const logger = require('../../../utilities/logger');
 const clock = require('../../../utilities/clock');
 const { fetchCouponDetails } = require('../domain/fetchCouponDetails');
@@ -38,6 +39,22 @@ async function checkCouponCode(code, userId, cartData) {
     // Escape regex special chars so a user typing e.g. 'first15.' doesn't construct
     // a pattern with a real `.` wildcard against the unique index.
     const codeRegex = new RegExp(`^${codeUpper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+    if (codeUpper === "FIRST15") {
+        // FIRST15 is a hardcoded universal-per-user first-purchase promo —
+        // there is no `Coupon` document for it in the collection. Gate on
+        // the User-level `usedFirst15Coupon` flag (set after first paid order
+        // via order/use-cases/markCouponUsed.js). Anonymous callers (no userId)
+        // are accepted optimistically; the markCouponUsed step at order time
+        // is the authoritative single-use enforcement.
+        if (userId) {
+            const user = await User.findById(userId).select('usedFirst15Coupon').lean();
+            if (user && user.usedFirst15Coupon) {
+                throw { status: 400, message: "FIRST15 coupon is already used." };
+            }
+        }
+        return { success: true, message: "Coupon code is valid.", type: "coupon", discountPercent: 10, capAED: FIRST15_CAP_AED };
+    }
 
     if (codeUpper === "UAE10") {
         const couponDetails = await fetchCouponDetails(UAE10_PROMOTION_ID);

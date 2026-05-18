@@ -144,6 +144,56 @@ describe("couponService", () => {
         expect(err.message).toMatch(/not valid/i);
       }
     });
+
+    // FIRST15 is a universal-per-user hardcoded promo — no DB row exists for it.
+    // Eligibility is gated by the User.usedFirst15Coupon flag, not the Coupon collection.
+    it("FIRST15 is valid for a user who has not used it (cap 30 AED)", async () => {
+      const user = await User.create({
+        name: "First-time buyer", email: "f15-fresh@example.com",
+        phone: "+97155000001", password: "x", authProvider: "local", usedFirst15Coupon: false,
+      });
+
+      const result = await couponService.checkCouponCode("FIRST15", user._id, null);
+
+      expect(result.success).toBe(true);
+      expect(result.discountPercent).toBe(10);
+      expect(result.capAED).toBe(30);
+    });
+
+    it("FIRST15 throws 400 when user has already used it", async () => {
+      const user = await User.create({
+        name: "Repeat buyer", email: "f15-used@example.com",
+        phone: "+97155000002", password: "x", authProvider: "local", usedFirst15Coupon: true,
+      });
+
+      try {
+        await couponService.checkCouponCode("FIRST15", user._id, null);
+        fail("Expected error to be thrown");
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/already used/i);
+      }
+    });
+
+    it("FIRST15 with no userId is accepted optimistically (markCouponUsed enforces single-use at order time)", async () => {
+      const result = await couponService.checkCouponCode("FIRST15", null, null);
+
+      expect(result.success).toBe(true);
+      expect(result.discountPercent).toBe(10);
+      expect(result.capAED).toBe(30);
+    });
+
+    it("FIRST15 is case-insensitive (first15 also valid)", async () => {
+      const user = await User.create({
+        name: "Lowercase buyer", email: "f15-lower@example.com",
+        phone: "+97155000003", password: "x", authProvider: "local", usedFirst15Coupon: false,
+      });
+
+      const result = await couponService.checkCouponCode("first15", user._id, null);
+
+      expect(result.success).toBe(true);
+      expect(result.discountPercent).toBe(10);
+    });
   });
 
   // ── createCoupon ──────────────────────────────────────────────
