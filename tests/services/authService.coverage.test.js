@@ -732,19 +732,28 @@ describe('authService.appleLogin — web', () => {
 // ── forgotPassword — edge cases ───────────────────────────────────────────────
 
 describe('authService.forgotPassword — edge cases', () => {
-    it('throws 403 when user is deleted', async () => {
+    // Security: no user enumeration. Deleted accounts and social-login accounts
+    // both resolve {} (controller responds 200 with the same generic message as a
+    // successful send). The previous behavior of throwing 403/400 here was an
+    // enumeration leak — a caller could distinguish "deleted", "social", and
+    // "non-existent" branches by status code alone.
+
+    it('resolves {} silently when user is deleted (was 403 — fixed for enumeration)', async () => {
         const user = await makeUser({ isDeleted: true, deletedAt: new Date() });
-        await expect(
-            authService.forgotPassword(user.email)
-        ).rejects.toMatchObject({ status: 403 });
+        await expect(authService.forgotPassword(user.email)).resolves.toEqual({});
+
+        // No reset token persisted on deleted accounts
+        const reloaded = await User.findById(user._id);
+        expect(reloaded.resetPasswordToken).toBeFalsy();
     });
 
-    it('throws 400 when user has social login provider', async () => {
+    it('resolves {} silently when user has social login provider (was 400 — fixed for enumeration)', async () => {
         const user = await makeUser({ authProvider: 'google' });
         await User.updateOne({ _id: user._id }, { $set: { authProvider: 'google' } });
-        await expect(
-            authService.forgotPassword(user.email)
-        ).rejects.toMatchObject({ status: 400, message: expect.stringContaining('social login') });
+        await expect(authService.forgotPassword(user.email)).resolves.toEqual({});
+
+        const reloaded = await User.findById(user._id);
+        expect(reloaded.resetPasswordToken).toBeFalsy();
     });
 });
 

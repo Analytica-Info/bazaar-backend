@@ -184,7 +184,7 @@ describe("POST /v2/auth/logout (web)", () => {
 });
 
 describe("POST /v2/auth/password/forgot (web)", () => {
-  test("200 — sends code", async () => {
+  test("200 — sends code for known account", async () => {
     authService.forgotPassword.mockResolvedValueOnce(undefined);
 
     const res = await request(app).post("/v2/auth/password/forgot").set(WEB)
@@ -194,14 +194,17 @@ describe("POST /v2/auth/password/forgot (web)", () => {
     expect(res.body.message).toBe("Verification code sent to email");
   });
 
-  test("404 — user not found", async () => {
-    authService.forgotPassword.mockRejectedValueOnce({ status: 404, message: "User not found" });
+  // Security: no user enumeration. Unknown email returns the SAME 200 + message
+  // as a known email. The service silently no-ops; the contract surface is identical.
+  test("200 — same response shape for unknown email (no enumeration leak)", async () => {
+    authService.forgotPassword.mockResolvedValueOnce(undefined);
 
     const res = await request(app).post("/v2/auth/password/forgot").set(WEB)
       .send({ email: "nope@test.com" });
 
-    expect(res.status).toBe(404);
-    expect(res.body.error.code).toBe("ACCOUNT_NOT_FOUND");
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Verification code sent to email");
+    expect(res.body.success).toBe(true);
   });
 });
 

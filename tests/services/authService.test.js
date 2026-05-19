@@ -164,13 +164,50 @@ describe('authService.loginWithCredentials', () => {
 // forgotPassword
 // ---------------------------------------------------------------------------
 describe('authService.forgotPassword', () => {
-    it('should throw when user not found', async () => {
-        await expect(
-            authService.forgotPassword('nobody@example.com')
-        ).rejects.toEqual(expect.objectContaining({ status: 404, message: 'User not found' }));
+    // Security: no user enumeration. All "ineligible account" branches (no
+    // match, deleted, social-login) return {} silently rather than throwing —
+    // the controller responds 200 with a generic "Verification code sent" message.
+    // Empty email is still rejected (input validation, not enumeration risk).
+
+    it('should throw 400 when email is empty/missing', async () => {
+        await expect(authService.forgotPassword('')).rejects.toEqual(
+            expect.objectContaining({ status: 400, message: 'Email is required.' })
+        );
+        await expect(authService.forgotPassword(undefined)).rejects.toEqual(
+            expect.objectContaining({ status: 400 })
+        );
     });
 
-    it('should set resetPasswordToken on existing user', async () => {
+    it('returns {} silently when no account matches the email (no enumeration leak)', async () => {
+        await expect(
+            authService.forgotPassword('nobody@example.com')
+        ).resolves.toEqual({});
+    });
+
+    it('returns {} silently when matching account is marked deleted', async () => {
+        await makeUser({ email: 'deleted-forgot@example.com', isDeleted: true });
+
+        await expect(
+            authService.forgotPassword('deleted-forgot@example.com')
+        ).resolves.toEqual({});
+
+        const user = await User.findOne({ email: 'deleted-forgot@example.com' });
+        // No reset token persisted for ineligible accounts
+        expect(user.resetPasswordToken).toBeFalsy();
+    });
+
+    it('returns {} silently when matching account is social-login (authProvider != local)', async () => {
+        await makeUser({ email: 'google-forgot@example.com', authProvider: 'google' });
+
+        await expect(
+            authService.forgotPassword('google-forgot@example.com')
+        ).resolves.toEqual({});
+
+        const user = await User.findOne({ email: 'google-forgot@example.com' });
+        expect(user.resetPasswordToken).toBeFalsy();
+    });
+
+    it('should set resetPasswordToken on eligible local-auth user', async () => {
         await makeUser({ email: 'forgot@example.com' });
 
         await authService.forgotPassword('forgot@example.com');
