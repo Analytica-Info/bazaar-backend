@@ -12,16 +12,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * Subscribe a user to a coming-soon vertical notification.
  *
- * @param {{ email: string, vertical: string, pushOptIn?: boolean, deviceId?: string }} input
+ * Email is now sourced server-side from the authenticated JWT (req.user.email);
+ * the controller passes it explicitly. `userId` is stored alongside the email
+ * so downstream comms (launch-notification dispatch) can join back to the users
+ * collection — pre-auth-required rows continue to have a null user_id and stay
+ * in place.
+ *
+ * @param {{ email: string, userId?: string|null, vertical: string, pushOptIn?: boolean, deviceId?: string }} input
  * @returns {Promise<{ alreadySubscribed: boolean }>}
  */
-async function createSubscription({ email, vertical, pushOptIn = true, deviceId }) {
-    if (!email || !EMAIL_RE.test(email)) {
-        throw { status: 400, message: 'Invalid email' };
-    }
-
+async function createSubscription({ email, userId = null, vertical, pushOptIn = true, deviceId }) {
+    // Validate vertical first — clients can hit this with a bad enum before any
+    // email-related branching runs. Keeps the 400 path cheap and predictable.
     if (!vertical || !ALLOWED_VERTICALS.includes(vertical)) {
         throw { status: 400, message: 'Invalid vertical' };
+    }
+
+    if (!email || !EMAIL_RE.test(email)) {
+        throw { status: 400, message: 'Invalid email' };
     }
 
     const normalisedEmail = email.toLowerCase().trim();
@@ -29,7 +37,7 @@ async function createSubscription({ email, vertical, pushOptIn = true, deviceId 
     const { created } = await repos.notifyMeSubscriptions.upsert(
         normalisedEmail,
         vertical,
-        { pushOptIn: Boolean(pushOptIn), deviceId: deviceId || null }
+        { pushOptIn: Boolean(pushOptIn), deviceId: deviceId || null, userId }
     );
 
     // Fire-and-forget: FCM topic subscription

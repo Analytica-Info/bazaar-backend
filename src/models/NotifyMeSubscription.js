@@ -11,6 +11,14 @@ const notifyMeSubscriptionSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        // Added 2026-05-19 with the auth.required() flip. Nullable for
+        // backward-compatibility with pre-flip rows whose subscriptions were
+        // anonymous. New rows store the JWT-derived user_id for downstream comms.
+        user_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
         vertical: {
             type: String,
             required: true,

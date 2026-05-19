@@ -22,15 +22,31 @@ async function list(req, res) {
 
 /**
  * POST /v2/notifications/subscriptions
- * auth.optional() — works for anonymous and authenticated callers.
+ * auth.required() (2026-05-19) — mobile dropped its email field and now relies on
+ * the authenticated user's account email from the JWT. Guests get a 401 before
+ * reaching this handler. Body-supplied `email` is intentionally ignored to
+ * prevent a signed-in user from subscribing another user's email address.
+ *
  * (Previously POST /v2/notify-me — Wave 3 rename.)
  */
 async function subscribe(req, res) {
     try {
-        const { email, vertical, pushOptIn, deviceId } = req.body || {};
+        const { vertical, pushOptIn, deviceId } = req.body || {};
+
+        // Email is sourced from the authenticated user; any body.email is ignored.
+        const email = req.user?.email;
+        const userId = req.user?._id ? String(req.user._id) : null;
+
+        if (!email) {
+            // Defensive: auth.required() should have rejected before this point.
+            return res.status(401).json(
+                wrapError('UNAUTHORIZED', 'Sign in required to subscribe.')
+            );
+        }
 
         const result = await verticalsService.createSubscription({
             email,
+            userId,
             vertical,
             pushOptIn,
             deviceId,

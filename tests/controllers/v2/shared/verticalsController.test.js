@@ -58,47 +58,73 @@ describe('verticalsController.list', () => {
 describe('verticalsController.subscribe', () => {
     beforeEach(() => jest.clearAllMocks());
 
-    it('returns 200 with alreadySubscribed: false on new subscription', async () => {
+    const authedUser = { _id: 'user-001', email: 'user@example.com' };
+
+    it('returns 401 when no JWT (req.user missing) — defensive behind auth.required()', async () => {
+        // auth.required() middleware normally rejects before this handler runs;
+        // this guard catches any misrouting and is the contract surface tests pin.
+        const req = makeReq({ body: { vertical: 'auction' } }); // no user
+        const { statusCode, body } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
+
+        expect(statusCode).toBe(401);
+        expect(body.success).toBe(false);
+        expect(body.error.code).toBe('UNAUTHORIZED');
+        expect(body.error.message).toMatch(/Sign in required/i);
+        expect(verticalsService.createSubscription).not.toHaveBeenCalled();
+    });
+
+    it('returns 200 with alreadySubscribed: false on new subscription (email from JWT)', async () => {
         verticalsService.createSubscription.mockResolvedValue({ alreadySubscribed: false });
 
-        const req = makeReq({ body: { email: 'user@example.com', vertical: 'auction' } });
+        const req = makeReq({ user: authedUser, body: { vertical: 'auction', pushOptIn: true } });
         const { statusCode, body } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
 
         expect(statusCode).toBe(200);
         expect(body.success).toBe(true);
         expect(body.data).toEqual({ alreadySubscribed: false });
         expect(body.message).toBe('Subscribed');
+        // Email is sourced from the JWT, not the body
+        expect(verticalsService.createSubscription).toHaveBeenCalledWith(
+            expect.objectContaining({ email: 'user@example.com', userId: 'user-001', vertical: 'auction' })
+        );
     });
 
     it('returns 200 with alreadySubscribed: true on duplicate', async () => {
         verticalsService.createSubscription.mockResolvedValue({ alreadySubscribed: true });
 
-        const req = makeReq({ body: { email: 'user@example.com', vertical: 'auction' } });
+        const req = makeReq({ user: authedUser, body: { vertical: 'auction' } });
         const { statusCode, body } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
 
         expect(statusCode).toBe(200);
         expect(body.data.alreadySubscribed).toBe(true);
     });
 
-    it('returns 400 when email is missing', async () => {
-        verticalsService.createSubscription.mockRejectedValue({ status: 400, message: 'Invalid email' });
-
-        const req = makeReq({ body: { vertical: 'auction' } });
-        const { statusCode, body } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
-
-        expect(statusCode).toBe(400);
-        expect(body.success).toBe(false);
-        expect(body.error.message).toBe('Invalid email');
-    });
-
     it('returns 400 when vertical is unknown', async () => {
         verticalsService.createSubscription.mockRejectedValue({ status: 400, message: 'Invalid vertical' });
 
-        const req = makeReq({ body: { email: 'user@example.com', vertical: 'foo' } });
+        const req = makeReq({ user: authedUser, body: { vertical: 'foo' } });
         const { statusCode, body } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
 
         expect(statusCode).toBe(400);
         expect(body.success).toBe(false);
         expect(body.error.message).toBe('Invalid vertical');
+    });
+
+    it('IGNORES body.email — uses the authenticated user email (prevents impersonation)', async () => {
+        // Security guard: a signed-in user must not be able to subscribe a
+        // different person's email by stuffing it into the request body.
+        verticalsService.createSubscription.mockResolvedValue({ alreadySubscribed: false });
+
+        const req = makeReq({
+            user: authedUser, // user@example.com
+            body: { email: 'victim@evil.com', vertical: 'auction' },
+        });
+        const { statusCode } = await runHandler(subscribe, req, { path: '/v2/notifications/subscriptions' });
+
+        expect(statusCode).toBe(200);
+        // Service must receive the JWT email, never the body email
+        const call = verticalsService.createSubscription.mock.calls[0][0];
+        expect(call.email).toBe('user@example.com');
+        expect(call.email).not.toBe('victim@evil.com');
     });
 });

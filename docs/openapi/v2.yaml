@@ -1965,8 +1965,17 @@ paths:
       description: |
         Records a launch-notification subscription for a specific vertical.
         Upserts by (email, vertical) — idempotent.
-        Auth is optional; anonymous callers are supported.
+
+        **Auth required (2026-05-19):** the subscriber email is sourced from
+        the authenticated user's JWT (`req.user.email`); any client-supplied
+        `email` field in the request body is ignored. Unauthenticated callers
+        receive `401 UNAUTHORIZED`. The new row also stores the authenticated
+        `user_id` for downstream launch-comms join-back to the users collection.
+
         (Previously POST /notify-me — Wave 3 rename.)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/XClient'
       requestBody:
@@ -1975,11 +1984,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, vertical]
+              required: [vertical]
               properties:
-                email:
-                  type: string
-                  format: email
                 vertical:
                   type: string
                   enum: [auction, marketplace, wholesale, home]
@@ -1989,6 +1995,7 @@ paths:
                 deviceId:
                   type: string
                   nullable: true
+                  description: Optional FCM token for push notifications.
       responses:
         '200':
           description: Subscribed (or already subscribed).
@@ -2006,6 +2013,8 @@ paths:
                             type: boolean
         '400':
           $ref: '#/components/responses/400ValidationError'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
         '500':
           $ref: '#/components/responses/500Internal'
 

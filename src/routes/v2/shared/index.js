@@ -98,7 +98,9 @@ router.get('/verticals', verticalsCtrl.list);
 
 // ── Notifications (shared subscription endpoint) ──────────────────
 // POST /notify-me → POST /notifications/subscriptions (Wave 3)
-router.post('/notifications/subscriptions', auth.optional(), verticalsCtrl.subscribe);
+// Auth required (2026-05-19): mobile dropped its email TextField and now reads
+// the subscriber email from req.user.email. Guests are routed to Sign In first.
+router.post('/notifications/subscriptions', auth.required(), verticalsCtrl.subscribe);
 
 // ── Wishlist ──────────────────────────────────────────────────────
 router.get('/wishlist', auth.required(), wishlistCtrl.getWishlist);

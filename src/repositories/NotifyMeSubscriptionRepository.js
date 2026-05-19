@@ -23,12 +23,21 @@ class NotifyMeSubscriptionRepository extends BaseRepository {
      * Upsert a subscription.  Returns { doc, created }.
      * @param {string} email   Normalised (lowercase) email.
      * @param {string} vertical
-     * @param {{ pushOptIn?: boolean, deviceId?: string }} [fields]
+     * @param {{ pushOptIn?: boolean, deviceId?: string, userId?: string|null }} [fields]
+     *
+     * Note on userId: written only on INSERT via $setOnInsert. Pre-auth-required
+     * rows (created when the endpoint was anonymous) keep their null user_id —
+     * we don't backfill on update because the upserted email may belong to a
+     * different user than the one currently calling.
      */
     async upsert(email, vertical, fields = {}) {
         const filter = { email, vertical };
         const update = {
-            $setOnInsert: { email, vertical },
+            $setOnInsert: {
+                email,
+                vertical,
+                ...(fields.userId !== undefined ? { user_id: fields.userId } : {}),
+            },
             $set: {
                 ...(fields.pushOptIn !== undefined ? { pushOptIn: fields.pushOptIn } : {}),
                 ...(fields.deviceId ? { deviceId: fields.deviceId } : {}),
