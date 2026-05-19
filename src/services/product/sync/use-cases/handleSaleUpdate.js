@@ -32,6 +32,16 @@ async function handleSaleUpdate(data) {
   }
 
   const productId = parsedPayload?.id;
+
+  // Lightspeed sale webhooks occasionally arrive without `register_sale_products`
+  // populated (e.g. non-product sales, manual adjustments, voided sales). The
+  // legacy code dereferenced [0] unconditionally and crashed. Skip silently
+  // when the array is missing/empty — these events have no inventory impact.
+  if (!Array.isArray(parsedPayload.register_sale_products) || parsedPayload.register_sale_products.length === 0) {
+    logger.info({ productId, type }, 'sale.update event has no register_sale_products — skipping');
+    return { success: true, skipped: true, reason: 'no_register_sale_products' };
+  }
+
   const updateProductId = parsedPayload.register_sale_products[0].product_id;
   const updateProductQty = parsedPayload.register_sale_products[0].quantity;
   const updateProductStatus = parsedPayload.status;
